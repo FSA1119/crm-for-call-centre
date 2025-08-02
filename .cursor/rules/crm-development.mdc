@@ -1,0 +1,82 @@
+---
+description: Google Sheets CRM Development Standards
+globs: ["*.js", "*.gs", "*.html"]
+alwaysApply: true
+---
+
+## Google Sheets CRM Development Rules
+
+### Code Structure Requirements
+Every function must follow this structure:
+```javascript
+function functionName(parameters) {
+  console.log('Function started:', parameters);
+  
+  try {
+    // Input validation
+    if (!validateInput(parameters)) {
+      throw new Error('Invalid input provided');
+    }
+    
+    // Main logic
+    const result = processLogic(parameters);
+    console.log('Processing complete:', result);
+    
+    return result;
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Error: ' + error.message);
+    throw error;
+  }
+}
+
+Data Handling Standards
+Only use columns specified in sayfa_kolonlari.md
+Validate all dropdown values against allowed options
+Use SpreadsheetApp.getUi() for all user dialogs
+Log all data transformations with console.log
+Handle empty/null values gracefully
+UI Development Rules
+Create modal dialogs with proper form validation
+Pre-fill fields from selected row data
+Implement default values (80-90% pre-filled)
+Show clear error messages to users
+Test all UI interactions before delivery
+Testing Requirements
+Before saying "code is ready":
+
+ Function executes without errors
+ Console shows expected output
+ Data saves to correct sheet and columns
+ UI opens and closes properly
+ All form fields work correctly
+ Data validation prevents invalid entries
+ Error handling shows user-friendly messages
+Synchronization Rules
+Sync between Temsilci and Yönetici files
+Use employee codes: [Initials]_[Number] (e.g., LG_001)
+Maintain data consistency across all sheets
+Log all sync operations with timestamps
+Color Coding Standards
+Apply these colors automatically based on status:
+
+Randevu Alındı: #E3F2FD
+Teyitlendi: #E8F5E8
+Ertelendi: #FFF3E0
+İptal: #FFEBEE
+Fırsat: #FFF8E1
+Toplantı Tamamlandı: #C8E6C9
+Forbidden Actions
+Never deliver untested code
+Never skip error handling
+Never ignore data validation
+Never use hardcoded values without constants
+Never modify data without user confirmation
+Required Actions
+Always test functions individually
+Always show console output during development
+Always verify data integrity after operations
+Always handle edge cases and errors
+Always follow the exact column structure from sayfa_kolonlari.md
+@sistem_semasi.md
+@sayfa_kolonlari.md

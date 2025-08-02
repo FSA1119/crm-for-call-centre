@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f8f9fa;
+    }
+    
+    .container {
+      max-width: 100%;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #17a2b8, #138496);
+      color: white;
+      padding: 15px 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .form-container {
+      padding: 20px;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e1e5e9;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s ease;
+      box-sizing: border-box;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #17a2b8;
+      box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.1);
+    }
+    
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .form-row {
+      display: flex;
+      gap: 15px;
+    }
+    
+    .form-row .form-group {
+      flex: 1;
+    }
+    
+    .required {
+      color: #dc3545;
+    }
+    
+    .pre-filled {
+      background-color: #f8f9fa;
+      color: #6c757d;
+    }
+    
+    .buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e1e5e9;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+      background-color: #17a2b8;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background-color: #138496;
+    }
+    
+    .btn-secondary {
+      background-color: #6c757d;
+      color: white;
+    }
+    
+    .btn-secondary:hover {
+      background-color: #5a6268;
+    }
+    
+    .error {
+      color: #dc3545;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+    
+    .success {
+      color: #28a745;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+    
+    .company-info {
+      background-color: #d1ecf1;
+      border: 1px solid #bee5eb;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .company-info h3 {
+      margin: 0 0 10px 0;
+      color: #0c5460;
+      font-size: 16px;
+    }
+    
+    .company-info p {
+      margin: 5px 0;
+      font-size: 14px;
+      color: #333;
+    }
+    
+    .appointment-info {
+      background-color: #e8f5e8;
+      border: 1px solid #c3e6c3;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .appointment-info h3 {
+      margin: 0 0 10px 0;
+      color: #2d8f47;
+      font-size: 16px;
+    }
+    
+    .appointment-info p {
+      margin: 5px 0;
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      🤝 Toplantıya Geç
+    </div>
+    
+    <div class="form-container">
+      <!-- Company Information -->
+      <div class="company-info">
+        <h3>🏢 Firma Bilgileri</h3>
+        <p><strong>Firma:</strong> <?= rowData['Company name'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Kategori:</strong> <?= rowData['Category'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Website:</strong> <?= rowData['Website'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Telefon:</strong> <?= rowData['Phone'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Adres:</strong> <?= rowData['Address'] ? rowData['Address'] + ', ' + rowData['City'] : 'Belirtilmemiş' ?></p>
+      </div>
+      
+      <!-- Appointment Information -->
+      <div class="appointment-info">
+        <h3>📅 Randevu Bilgileri</h3>
+        <p><strong>İletişim Kişisi:</strong> <?= rowData['İsim Soyisim'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Randevu Tarihi:</strong> <?= rowData['Randevu Tarihi'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Saat:</strong> <?= rowData['Saat'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Format:</strong> <?= rowData['Toplantı formatı'] || 'Belirtilmemiş' ?></p>
+      </div>
+      
+      <form id="meetingForm">
+        <!-- Meeting Details -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="toplantiTarihi">Toplantı Tarihi <span class="required">*</span></label>
+            <input type="date" id="toplantiTarihi" name="toplantiTarihi" value="<?= rowData['Randevu Tarihi'] ?>" required>
+          </div>
+          <div class="form-group">
+                          <label for="toplantiFormat">Toplantı Formatı</label>
+              <select id="toplantiFormat" name="toplantiFormat">
+              <? for (let i = 0; i < meetingFormats.length; i++) { ?>
+                <option value="<?= meetingFormats[i] ?>" <?= meetingFormats[i] === 'Yüz Yüze' ? 'selected' : '' ?>>
+                  <?= meetingFormats[i] ?>
+                </option>
+              <? } ?>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+                            <label for="toplantiSonucu">Toplantı Sonucu</label>
+                <select id="toplantiSonucu" name="toplantiSonucu">
+              <option value="">Seçiniz</option>
+              <option value="Satış Yapıldı">Satış Yapıldı</option>
+              <option value="Teklif İletildi">Teklif İletildi</option>
+              <option value="Beklemede">Beklemede</option>
+              <option value="Satış İptal">Satış İptal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="satisPotansiyeli">Satış Potansiyeli</label>
+            <select id="satisPotansiyeli" name="satisPotansiyeli">
+              <option value="">Seçiniz</option>
+              <option value="Yerinde Satış">Yerinde Satış</option>
+              <option value="Sıcak">Sıcak</option>
+              <option value="Orta">Orta</option>
+              <option value="Soğuk">Soğuk</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="teklifDetayi">Teklif Detayı</label>
+          <select id="teklifDetayi" name="teklifDetayi">
+            <option value="">Seçiniz</option>
+            <option value="Custom">Custom</option>
+            <option value="Elite">Elite</option>
+            <option value="Platinium Plus">Platinium Plus</option>
+            <option value="Platinium">Platinium</option>
+            <option value="Entegre">Entegre</option>
+            <option value="Digifirst Custom">Digifirst Custom</option>
+            <option value="Digifirst Plus">Digifirst Plus</option>
+            <option value="Digifirst">Digifirst</option>
+            <option value="Digifirst Setup">Digifirst Setup</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="yeniTakipTarihi">Yeni Takip Tarihi</label>
+          <input type="date" id="yeniTakipTarihi" name="yeniTakipTarihi">
+        </div>
+        
+        <!-- Notes -->
+        <div class="form-group">
+          <label for="yorum">Toplantı Notları</label>
+          <textarea id="yorum" name="yorum" placeholder="Toplantı ile ilgili notlarınızı buraya yazın..."><?= rowData['Yorum'] || '' ?></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="yoneticiNot">Yönetici Notu</label>
+          <textarea id="yoneticiNot" name="yoneticiNot" placeholder="Yönetici için özel notlar..."><?= rowData['Yönetici Not'] || '' ?></textarea>
+        </div>
+        
+        <!-- Validation Messages -->
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        <div id="successMessage" class="success" style="display: none;"></div>
+        
+        <!-- Buttons -->
+        <div class="buttons">
+          <button type="button" class="btn btn-secondary" onclick="cancelForm()">İptal</button>
+          <button type="submit" class="btn btn-primary">Toplantı Oluştur</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script>
+    // Pre-fill meeting format from appointment
+    const appointmentFormat = '<?= rowData['Toplantı formatı'] || '' ?>';
+    if (appointmentFormat) {
+      document.getElementById('toplantiFormat').value = appointmentFormat;
+    }
+    
+
+    
+    // Form validation and submission
+    document.getElementById('meetingForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      // Prevent double submission
+      const submitButton = document.querySelector('button[type="submit"]');
+      if (submitButton.disabled) {
+        return; // Already processing
+      }
+      
+      // Disable submit button
+      submitButton.disabled = true;
+      submitButton.textContent = 'Kaydediliyor...';
+      
+      // Clear previous messages
+      document.getElementById('errorMessage').style.display = 'none';
+      document.getElementById('successMessage').style.display = 'none';
+      
+      // Validate required fields
+      const toplantiTarihi = document.getElementById('toplantiTarihi').value;
+      
+      if (!toplantiTarihi) {
+        showError('Toplantı tarihi zorunludur');
+        return;
+      }
+      
+      // Collect form data
+      const formData = {
+        toplantiTarihi: toplantiTarihi,
+        toplantiFormat: document.getElementById('toplantiFormat').value,
+        toplantiSonucu: document.getElementById('toplantiSonucu').value,
+        satisPotansiyeli: document.getElementById('satisPotansiyeli').value,
+        teklifDetayi: document.getElementById('teklifDetayi').value,
+        yeniTakipTarihi: document.getElementById('yeniTakipTarihi').value,
+        yorum: document.getElementById('yorum').value.trim(),
+        yoneticiNot: document.getElementById('yoneticiNot').value.trim()
+      };
+      
+      // Submit to Google Apps Script
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onError)
+        .processMeetingForm(formData);
+    });
+    
+    function showError(message) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+    
+    function showSuccess(message) {
+      const successDiv = document.getElementById('successMessage');
+      successDiv.textContent = message;
+      successDiv.style.display = 'block';
+    }
+    
+    function onSuccess(result) {
+      // Re-enable submit button
+      const submitButton = document.querySelector('button[type="submit"]');
+      submitButton.disabled = false;
+      submitButton.textContent = 'Toplantı Oluştur';
+      
+      if (result.success) {
+        showSuccess(result.message);
+        setTimeout(() => {
+          google.script.host.close();
+        }, 1500);
+      } else {
+        showError(result.message || 'Bir hata oluştu');
+      }
+    }
+    
+    function onError(error) {
+      // Re-enable submit button
+      const submitButton = document.querySelector('button[type="submit"]');
+      submitButton.disabled = false;
+      submitButton.textContent = 'Toplantı Oluştur';
+      
+      showError('Sistem hatası: ' + error.message);
+    }
+    
+    function cancelForm() {
+      google.script.host.close();
+    }
+    
+    // Auto-fill follow-up date based on meeting result
+    document.getElementById('toplantiSonucu').addEventListener('change', function() {
+      const result = this.value;
+      const followUpDate = document.getElementById('yeniTakipTarihi');
+      
+      if (result === 'Beklemede') {
+        // Set follow-up date to 1 week later
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        const year = nextWeek.getFullYear();
+        const month = (nextWeek.getMonth() + 1).toString().padStart(2, '0');
+        const day = nextWeek.getDate().toString().padStart(2, '0');
+        followUpDate.value = `${year}-${month}-${day}`;
+      } else if (result === 'Teklif İletildi') {
+        // Set follow-up date to 3 days later
+        const threeDays = new Date();
+        threeDays.setDate(threeDays.getDate() + 3);
+        const year = threeDays.getFullYear();
+        const month = (threeDays.getMonth() + 1).toString().padStart(2, '0');
+        const day = threeDays.getDate().toString().padStart(2, '0');
+        followUpDate.value = `${year}-${month}-${day}`;
+      } else {
+        followUpDate.value = '';
+      }
+    });
+  </script>
+</body>
+</html> 
