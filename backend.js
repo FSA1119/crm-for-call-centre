@@ -3264,44 +3264,55 @@ const CRM_CONFIG = {
    * Creates CRM menu when spreadsheet opens
    */
   function onOpen() {
-    console.log('Creating CRM and Admin menus');
+    console.log('Creating menus based on file type');
     
-    // Automatically apply data validation to all sheets
-    try {
-      console.log('Auto-applying data validation to all sheets...');
-      applyDataValidationToExistingSheets({});
-      console.log('Data validation applied successfully');
-    } catch (error) {
-      console.warn('Auto data validation failed:', error.message);
-    }
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const spreadsheetId = spreadsheet.getId();
     
-    // Create admin menu for all sheets
-    createAdminMenu();
-    
-    // Create CRM menu for all sheets (simplified approach)
-    const ui = SpreadsheetApp.getUi();
-    
-    // Remove existing CRM menu if exists
-    try {
-      const existingMenus = ui.getMenus();
-      const crmMenu = existingMenus.find(menu => menu.getName() === 'CRM');
-      if (crmMenu) {
-        crmMenu.remove();
-      }
-    } catch (error) {
-      console.log('No existing CRM menu to remove');
-    }
-    
-    // Create CRM menu for all sheets
-    ui.createMenu('CRM')
-      .addItem('Randevu al', 'showTakeAppointmentDialog')
-      .addItem('Fırsat ekle', 'showAddOpportunityDialog')
-      .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
-      .addSeparator()
-      .addItem('📊 Rapor oluştur', 'showGenerateReportDialog')
-      .addToUi();
+    // Check if this is the Manager file
+    if (spreadsheetId === MANAGER_FILE_ID) {
+      console.log('Manager file detected - creating SYNC menu');
+      createManagerMenu();
+    } else {
+      console.log('Temsilci file detected - creating CRM and ADMIN menus');
       
-    console.log('CRM menu created for all sheets');
+      // Automatically apply data validation to all sheets
+      try {
+        console.log('Auto-applying data validation to all sheets...');
+        applyDataValidationToExistingSheets({});
+        console.log('Data validation applied successfully');
+      } catch (error) {
+        console.warn('Auto data validation failed:', error.message);
+      }
+      
+      // Create admin menu for all sheets
+      createAdminMenu();
+      
+      // Create CRM menu for all sheets (simplified approach)
+      const ui = SpreadsheetApp.getUi();
+      
+      // Remove existing CRM menu if exists
+      try {
+        const existingMenus = ui.getMenus();
+        const crmMenu = existingMenus.find(menu => menu.getName() === 'CRM');
+        if (crmMenu) {
+          crmMenu.remove();
+        }
+      } catch (error) {
+        console.log('No existing CRM menu to remove');
+      }
+      
+      // Create CRM menu for all sheets
+      ui.createMenu('CRM')
+        .addItem('Randevu al', 'showTakeAppointmentDialog')
+        .addItem('Fırsat ekle', 'showAddOpportunityDialog')
+        .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
+        .addSeparator()
+        .addItem('📊 Rapor oluştur', 'showGenerateReportDialog')
+        .addToUi();
+        
+      console.log('CRM menu created for all sheets');
+    }
   }
   
   /**
@@ -3651,4 +3662,313 @@ const CRM_CONFIG = {
     
     const color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
     sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).setBackground(color);
+  }
+  
+  // ========================================
+  // ЭТАП 4: СИНХРОНИЗАЦИЯ CRM СИСТЕМЫ
+  // ========================================
+  
+  // Конфигурация файлов для синхронизации
+  const EMPLOYEE_FILES = {
+    'LG 001': '1JdU8uIXOcmSQ1c70OOklcR97tqdmDTeCeikpa8DHltE',
+    'NT 002': '1Q6IIfbIlTTM8hf1Nv67KLiHGzoAJUBWIhp7rOel9ngQ',
+    'KO 003': '1uLufPJqFSfm1WxqSzcvDOKW_hAv8AMhkQwljeiD51mc',
+    'SB 004': '17RWqUrQ_m9h0ktJQ_E_55dt-Ao-RA01O6pUFbZ9DxDs',
+    'KM 005': '11veeCnPYRPGEWMzZzpLiwUOSNvPhp8n_qHEiDi7lXlw',
+    'CA 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8'
+  };
+  
+  const MANAGER_FILE_ID = '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A';
+  
+  // Основная функция сбора всех данных
+  function collectAllData() {
+    console.log('=== СИНХРОНИЗАЦИЯ НАЧАТА ===');
+    
+    try {
+      const managerFile = SpreadsheetApp.openById(MANAGER_FILE_ID);
+      if (!managerFile) {
+        throw new Error('Yönetici dosyası bulunamadı');
+      }
+      
+      console.log('Yönetici dosyası açıldı:', managerFile.getName());
+      
+      // Сбор данных от каждого сотрудника
+      let totalStats = {
+        randevular: 0,
+        firsatlar: 0,
+        toplantilar: 0,
+        errors: []
+      };
+      
+      for (const [employeeCode, fileId] of Object.entries(EMPLOYEE_FILES)) {
+        console.log(`\n--- ${employeeCode} işleniyor ---`);
+        
+        try {
+          const employeeFile = SpreadsheetApp.openById(fileId);
+          if (!employeeFile) {
+            throw new Error(`${employeeCode} dosyası bulunamadı`);
+          }
+          
+          const stats = collectEmployeeData(employeeFile, employeeCode, managerFile);
+          
+          totalStats.randevular += stats.randevular;
+          totalStats.firsatlar += stats.firsatlar;
+          totalStats.toplantilar += stats.toplantilar;
+          
+          console.log(`${employeeCode} tamamlandı:`, stats);
+          
+        } catch (error) {
+          console.error(`${employeeCode} hatası:`, error.message);
+          totalStats.errors.push(`${employeeCode}: ${error.message}`);
+        }
+      }
+      
+      // Обновление статистики
+      updateManagerStatistics(managerFile, totalStats);
+      
+      // Показ результатов
+      showSyncResults(totalStats);
+      
+      console.log('=== СИНХРОНИЗАЦИЯ TAMAMLANDI ===');
+      
+    } catch (error) {
+      console.error('Synchronization failed:', error);
+      SpreadsheetApp.getUi().alert('Synchronization Error: ' + error.message);
+    }
+  }
+  
+  // Сбор данных от одного сотрудника
+  function collectEmployeeData(employeeFile, employeeCode, managerFile) {
+    console.log(`${employeeCode} verileri toplanıyor...`);
+    
+    const stats = {
+      randevular: 0,
+      firsatlar: 0,
+      toplantilar: 0
+    };
+    
+    // Randevularım → Randevular
+    try {
+      const randevularimSheet = employeeFile.getSheetByName('Randevularım');
+      if (randevularimSheet) {
+        const randevuData = collectSheetData(randevularimSheet, employeeCode);
+        updateManagerSheet(managerFile, 'Randevular', randevuData, employeeCode);
+        stats.randevular = randevuData.length;
+        console.log(`${employeeCode} Randevularım: ${stats.randevular} kayıt`);
+      }
+    } catch (error) {
+      console.error(`${employeeCode} Randevularım hatası:`, error.message);
+    }
+    
+    // Fırsatlarım → Fırsatlar
+    try {
+      const firsatlarimSheet = employeeFile.getSheetByName('Fırsatlarım');
+      if (firsatlarimSheet) {
+        const firsatData = collectSheetData(firsatlarimSheet, employeeCode);
+        updateManagerSheet(managerFile, 'Fırsatlar', firsatData, employeeCode);
+        stats.firsatlar = firsatData.length;
+        console.log(`${employeeCode} Fırsatlarım: ${stats.firsatlar} kayıt`);
+      }
+    } catch (error) {
+      console.error(`${employeeCode} Fırsatlarım hatası:`, error.message);
+    }
+    
+    // Toplantılarım → Toplantılar
+    try {
+      const toplantilarimSheet = employeeFile.getSheetByName('Toplantılarım');
+      if (toplantilarimSheet) {
+        const toplantıData = collectSheetData(toplantilarimSheet, employeeCode);
+        updateManagerSheet(managerFile, 'Toplantılar', toplantıData, employeeCode);
+        stats.toplantilar = toplantıData.length;
+        console.log(`${employeeCode} Toplantılarım: ${stats.toplantilar} kayıt`);
+      }
+    } catch (error) {
+      console.error(`${employeeCode} Toplantılarım hatası:`, error.message);
+    }
+    
+    return stats;
+  }
+  
+  // Сбор данных из листа
+  function collectSheetData(sheet, employeeCode) {
+    const data = [];
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow <= 1) {
+      return data; // Только заголовки
+    }
+    
+    const range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    const values = range.getValues();
+    
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      if (row.some(cell => cell !== '')) { // Пропускаем пустые строки
+        const rowData = {
+          temsilciKodu: employeeCode,
+          rowIndex: i + 2,
+          data: row
+        };
+        data.push(rowData);
+      }
+    }
+    
+    return data;
+  }
+  
+  // Обновление листа в Yönetici файле
+  function updateManagerSheet(managerFile, sheetName, data, employeeCode) {
+    console.log(`${sheetName} güncelleniyor (${employeeCode}): ${data.length} kayıt`);
+    
+    let sheet = managerFile.getSheetByName(sheetName);
+    
+    // Создаем лист если не существует
+    if (!sheet) {
+      sheet = managerFile.insertSheet(sheetName);
+      console.log(`${sheetName} sayfası oluşturuldu`);
+    }
+    
+    // Очищаем старые данные этого сотрудника
+    clearEmployeeData(sheet, employeeCode);
+    
+    // Добавляем новые данные
+    if (data.length > 0) {
+      const startRow = sheet.getLastRow() + 1;
+      
+      for (let i = 0; i < data.length; i++) {
+        const rowData = data[i];
+        const targetRow = startRow + i;
+        
+        // Добавляем Temsilci Kodu в первую колонку
+        sheet.getRange(targetRow, 1).setValue(rowData.temsilciKodu);
+        
+        // Копируем остальные данные
+        if (rowData.data.length > 0) {
+          sheet.getRange(targetRow, 2, 1, rowData.data.length).setValues([rowData.data]);
+        }
+      }
+      
+      console.log(`${sheetName} güncellendi: ${data.length} kayıt eklendi`);
+    }
+  }
+  
+  // Очистка старых данных сотрудника
+  function clearEmployeeData(sheet, employeeCode) {
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return; // Только заголовки
+    
+    const range = sheet.getRange(2, 1, lastRow - 1, 1); // Первая колонка
+    const values = range.getValues();
+    
+    const rowsToDelete = [];
+    for (let i = 0; i < values.length; i++) {
+      if (values[i][0] === employeeCode) {
+        rowsToDelete.push(i + 2); // +2 потому что начинаем с 2-й строки
+      }
+    }
+    
+    // Удаляем строки снизу вверх
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+      sheet.deleteRow(rowsToDelete[i]);
+    }
+    
+    if (rowsToDelete.length > 0) {
+      console.log(`${employeeCode} eski verileri silindi: ${rowsToDelete.length} satır`);
+    }
+  }
+  
+  // Обновление статистики в Yönetici файле
+  function updateManagerStatistics(managerFile, totalStats) {
+    console.log('İstatistikler güncelleniyor...');
+    
+    let statsSheet = managerFile.getSheetByName('Raporlar');
+    if (!statsSheet) {
+      statsSheet = managerFile.insertSheet('Raporlar');
+    }
+    
+    // Очищаем старые данные
+    statsSheet.clear();
+    
+    // Заголовки
+    statsSheet.getRange(1, 1, 1, 4).setValues([['Synchronization Report', '', '', '']]);
+    statsSheet.getRange(2, 1, 1, 4).setValues([['Tarih', 'Randevular', 'Fırsatlar', 'Toplantılar']]);
+    
+    // Данные
+    const today = new Date().toLocaleDateString('tr-TR');
+    statsSheet.getRange(3, 1, 1, 4).setValues([[today, totalStats.randevular, totalStats.firsatlar, totalStats.toplantilar]]);
+    
+    // Ошибки
+    if (totalStats.errors.length > 0) {
+      statsSheet.getRange(5, 1).setValue('Hatalar:');
+      for (let i = 0; i < totalStats.errors.length; i++) {
+        statsSheet.getRange(6 + i, 1).setValue(totalStats.errors[i]);
+      }
+    }
+    
+    console.log('İstatistikler güncellendi');
+  }
+  
+  // Показ результатов синхронизации
+  function showSyncResults(totalStats) {
+    const message = `
+Synchronization Completed!
+
+📊 Statistics:
+• Randevular: ${totalStats.randevular}
+• Fırsatlar: ${totalStats.firsatlar}
+• Toplantılar: ${totalStats.toplantilar}
+
+${totalStats.errors.length > 0 ? `\n❌ Errors: ${totalStats.errors.length}` : '✅ No errors'}
+  `.trim();
+    
+    SpreadsheetApp.getUi().alert('Synchronization Results', message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+  
+  // Функция для создания меню в Yönetici файле
+  function createManagerMenu() {
+    const ui = SpreadsheetApp.getUi();
+    const menu = ui.createMenu('SYNC');
+    
+    menu.addItem('Tüm Verileri Topla', 'collectAllData');
+    menu.addSeparator();
+    menu.addItem('Synchronization Status', 'showSyncStatus');
+    
+    menu.addToUi();
+    
+    console.log('Manager menu created');
+  }
+  
+  // Показ статуса синхронизации
+  function showSyncStatus() {
+    try {
+      const managerFile = SpreadsheetApp.openById(MANAGER_FILE_ID);
+      const statsSheet = managerFile.getSheetByName('Raporlar');
+      
+      if (statsSheet) {
+        const lastRow = statsSheet.getLastRow();
+        if (lastRow >= 3) {
+          const lastSync = statsSheet.getRange(3, 1).getValue();
+          const randevular = statsSheet.getRange(3, 2).getValue();
+          const firsatlar = statsSheet.getRange(3, 3).getValue();
+          const toplantilar = statsSheet.getRange(3, 4).getValue();
+          
+          const message = `
+Last Sync: ${lastSync}
+
+Current Data:
+• Randevular: ${randevular}
+• Fırsatlar: ${firsatlar}
+• Toplantılar: ${toplantilar}
+          `.trim();
+          
+          SpreadsheetApp.getUi().alert('Sync Status', message, SpreadsheetApp.getUi().ButtonSet.OK);
+        } else {
+          SpreadsheetApp.getUi().alert('No sync data available. Run "Tüm Verileri Topla" first.');
+        }
+      } else {
+        SpreadsheetApp.getUi().alert('No sync data available. Run "Tüm Verileri Topla" first.');
+      }
+    } catch (error) {
+      SpreadsheetApp.getUi().alert('Error checking sync status: ' + error.message);
+    }
   }
