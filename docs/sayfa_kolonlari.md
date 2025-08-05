@@ -310,6 +310,34 @@ hırdavat	izmit	MAZLUM TEKNİK HIRDAVAT	Department store		0532 748 04 20				İZM
 
 **Not:** Bu sayfalar Pivot Table olarak çalışır ve otomatik olarak diğer sayfalardaki verilerden oluşturulur.
 
+# Rapor örnek 1
+1. Randevu Alındı
+- Randevu Teyitlendi 
+- Randevu Ertelendi  
+- Randevu İptal oldu
+2. İleri Tarih Randevu
+3. Yeniden Aranacak
+4. Bilgi Verildi
+5. Fırsat İletildi
+6. İlgilenmiyor
+7. Ulaşılamadı
+
+
+
+	1.08.2025	2.08.2025	3.08.2025	4.08.2025	5.08.2025	6.08.2025	7.08.2025	8.08.2025	9.08.2025	10.08.2025	11.08.2025	12.08.2025	13.08.2025	14.08.2025	15.08.2025	16.08.2025	17.08.2025	18.08.2025	19.08.2025	20.08.2025	21.08.2025	22.08.2025	23.08.2025	24.08.2025	25.08.2025	26.08.2025	27.08.2025	28.08.2025	29.08.2025	30.08.2025	31.08.2025	Total
+1. Randevu Alındı	4	2	6	3	3																											18
+- Randevu Teyitlendi	3	2	3	1	2																											11
+- Randevu Ertelendi	1	0	2	1	1																											5
+- Randevu İptal oldu	0	0	1	1	0																											2
+2. İleri Tarih Randevu	0	2	3	2	1																											8
+3. Yeniden Aranacak	1	2	2	2	3																											10
+4. Bilgi Verildi	2	3	2	0	1																											8
+5. Fırsat İletildi	2	1	0	1	2																											6
+6. İlgilenmiyor	15	5	7	9	12																											48
+Toplam kontak	24	15	20	17	22																											98
+7. Ulaşılamadı	15	12	14	12	11																											64
+
+
 ### 📈 **Pivot Table Özellikleri:**
 - **Kaynak veri:** Format Tablo'daki aktiviteler
 - **Filtreleme:** Tarih, aktivite türü, temsilci bazında
@@ -320,4 +348,96 @@ hırdavat	izmit	MAZLUM TEKNİK HIRDAVAT	Department store		0532 748 04 20				İZM
 ### 🔄 **Senkronizasyon:**
 - Temsilci Raporlarım ↔ Yönetici Raporlar
 - Tüm aktivite türleri dahil
-- Gerçek zamanlı güncelleme 
+- Gerçek zamanlı güncelleme
+
+---
+
+## 📊 Günlük Rapor
+
+### 📋 **Rapor Yapısı:**
+```
+A1: GÜNLÜK RAPORLAR
+B1: 03.08.2025
+C1: 04.08.2025
+D1: 05.08.2025
+...
+
+A3: 1. Randevu Alındı
+B3: 10
+C3: 5
+D3: 8
+
+A4:    - Randevu Teyitlendi
+B4: 0
+C4: 2
+D4: 3
+
+A5:    - Randevu Ertelendi
+B5: 0
+C5: 1
+D5: 2
+
+A6:    - Randevu İptal oldu
+B6: 0
+C6: 0
+D6: 1
+
+A8: 2. İleri Tarih Randevu
+B8: 0
+C8: 3
+D8: 1
+
+A9: 3. Yeniden Aranacak
+B9: 1
+C9: 2
+D9: 4
+
+A10: 4. Bilgi Verildi
+B10: 3
+C10: 4
+D10: 2
+
+A11: 5. Fırsat İletildi
+B11: 0
+C11: 1
+D11: 0
+
+A12: 6. İlgilenmiyor
+B12: 1
+C12: 0
+D12: 2
+
+A13: TOPLAM KONTAK
+B13: 15
+C13: 18
+D13: 20
+
+A15: 7. Ulaşılamadı
+B15: 1
+C15: 2
+D15: 3
+
+A17: TOPLAM İŞLEM
+B17: 16
+C17: 20
+D17: 23
+```
+
+### 🎯 **Günlük Rapor Mantığı:**
+- **A sütunu:** Aktivite etiketleri (hiç değişmiyor)
+- **B sütunu:** İlk gün sayıları
+- **C sütunu:** İkinci gün sayıları
+- **D sütunu:** Üçüncü gün sayıları
+- **Ve böyle devam ediyor...**
+
+### 📊 **Hesaplama Mantığı:**
+- **TOPLAM KONTAK:** Kategoriler 1-6'nın toplamı (Ulaşılamadı hariç)
+- **TOPLAM İŞLEM:** Tüm kategorilerin toplamı (1-7)
+- **Ulaşılamadı:** Konuşma olmadığı için ayrı kategori
+
+### 🔄 **Günlük Rapor Özellikleri:**
+- **Yan yana yazma:** Her gün yeni sütun eklenir
+- **Gelişim takibi:** Günlük karşılaştırma mümkün
+- **Otomatik hesaplama:** TOPLAM KONTAK ve TOPLAM İŞLEM
+- **Aktivite etiketleri:** Sadece A sütununda (bir kere yazılır)
+- **Sayılar:** İlgili günün sütununda 
