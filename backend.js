@@ -1725,52 +1725,68 @@ function addOpportunity(parameters) {
         
         console.log('Debug - Checking for existing opportunity with Company:', selectedCompany, 'Phone:', selectedPhone || 'BOŞ');
         
+        // Daha sıkı kontrol - sadece gerçekten dolu ve anlamlı satırları bul
         const existingOpportunity = firsatlarimData.slice(1).find(row => {
-          const rowPhone = row[phoneIndex];
-          const rowCompany = row[companyIndex];
+          // Boş satırları hemen atla
+          const hasData = row.some(cell => cell && cell.toString().trim() !== '');
+          if (!hasData) return false;
           
-          const companyMatch = rowCompany && rowCompany.toString().trim() === selectedCompany;
+          const rowPhone = phoneIndex >= 0 ? row[phoneIndex] : '';
+          const rowCompany = companyIndex >= 0 ? row[companyIndex] : '';
+          const kodIndex = firsatlarimHeaders.indexOf('Kod');
+          const rowKod = kodIndex >= 0 ? row[kodIndex] : '';
           
-          // Eğer telefon boşsa sadece company name kontrol et
-          let phoneMatch = true;
-          if (selectedPhone !== '') {
+          // Kod varsa ve boş değilse, bu gerçek bir kayıttır
+          const hasKod = rowKod && rowKod.toString().trim() !== '';
+          
+          // Company name karşılaştırması
+          const companyMatch = rowCompany && 
+                              selectedCompany && 
+                              rowCompany.toString().trim() === selectedCompany;
+          
+          // Phone karşılaştırması (telefon boşsa atla)
+          let phoneMatch = true; // Varsayılan olarak true
+          if (selectedPhone && selectedPhone !== '') {
             phoneMatch = rowPhone && rowPhone.toString().trim() === selectedPhone;
           }
           
-          const match = phoneMatch && companyMatch;
+          const match = phoneMatch && companyMatch && hasKod;
           
-          console.log('Debug - Comparing rowCompany:', rowCompany, 'with selectedCompany:', selectedCompany, 'companyMatch:', companyMatch);
-          console.log('Debug - Phone check:', selectedPhone !== '' ? `rowPhone: ${rowPhone}, selectedPhone: ${selectedPhone}, phoneMatch: ${phoneMatch}` : 'Phone boş, sadece company kontrol ediliyor');
-          console.log('Debug - Final match:', match);
+          console.log('Debug - Comparing row:', {
+            kod: rowKod,
+            company: rowCompany,
+            phone: rowPhone,
+            hasKod: hasKod,
+            companyMatch: companyMatch,
+            phoneMatch: phoneMatch,
+            finalMatch: match
+          });
           
-          // Sadece gerçekten dolu satırları kontrol et
-          if (match) {
-            const hasAnyData = row.some(cell => cell && cell.toString().trim() !== '');
-            console.log('Debug - Row has any data:', hasAnyData);
-            return hasAnyData; // Sadece dolu satırları döndür
-          }
-          
-          return false;
+          return match;
         });
         
         if (existingOpportunity) {
           console.log('Debug - Found existing opportunity:', existingOpportunity);
           
-          // Daha detaylı kontrol - sadece gerçekten anlamlı veri içeren satırlar için hata ver
-          const hasValidData = existingOpportunity.some((cell, index) => {
-            // Kod, Company name, Phone gibi önemli alanları kontrol et
-            const header = firsatlarimHeaders[index];
-            if (header === 'Kod' || header === 'Company name' || header === 'Phone' || header === 'Fırsat Durumu') {
-              return cell && cell.toString().trim() !== '';
+          // Fırsat Durumu kontrolü - eğer satır silindi olarak işaretlendiyse izin ver
+          const firsatDurumuIndex = firsatlarimHeaders.indexOf('Fırsat Durumu');
+          if (firsatDurumuIndex >= 0) {
+            const firsatDurumu = existingOpportunity[firsatDurumuIndex];
+            
+            // Eğer fırsat durumu "İlgilenmiyor" veya "Ulaşılamadı" ise, yeni fırsat eklenebilir
+            if (firsatDurumu === 'İlgilenmiyor' || firsatDurumu === 'Ulaşılamadı') {
+              console.log('Debug - Existing opportunity has status:', firsatDurumu, '- allowing new opportunity');
+              return; // İşleme devam et
             }
-            return false;
-          });
+          }
           
-          if (hasValidData) {
-            console.log('Debug - Valid data found, showing error');
+          // Kod kontrolü - gerçekten anlamlı bir kayıt mı?
+          const kodIndex = firsatlarimHeaders.indexOf('Kod');
+          if (kodIndex >= 0 && existingOpportunity[kodIndex] && existingOpportunity[kodIndex].toString().trim() !== '') {
+            console.log('Debug - Valid opportunity with Kod found, showing error');
             throw new Error('Bu satır zaten fırsat olarak işaretlenmiş (Fırsatlarım sayfasında mevcut)');
           } else {
-            console.log('Debug - No valid data found, allowing duplicate');
+            console.log('Debug - No valid Kod found, allowing duplicate');
           }
         }
       } else {
@@ -2204,8 +2220,12 @@ function setFirsatlarimDataValidation(sheet) {
   // Fırsat Durumu validation (dropdown)
   const firsatDurumuIndex = headers.indexOf('Fırsat Durumu') + 1;
   if (firsatDurumuIndex > 0) {
-    // Use centralized options from CRM_CONFIG
-    const firsatDurumuOptions = CRM_CONFIG.ACTIVITY_OPTIONS;
+    // Use only Fırsatlarım specific options (3 options only)
+    const firsatDurumuOptions = [
+      'Yeniden Aranacak',
+      'Bilgi Verildi',
+      'Fırsat İletildi'
+    ];
     
     console.log('Setting Fırsat Durumu validation with options:', firsatDurumuOptions);
     
@@ -4276,40 +4296,31 @@ function testMonthlyReport() {
 function createAdminMenu() {
   console.log('Creating admin menu');
   
-  const ui = SpreadsheetApp.getUi();
-  
-  // Remove existing admin menu if exists
   try {
-    const existingMenus = ui.getMenus();
-    const adminMenu = existingMenus.find(menu => menu.getName() === 'ADMIN');
-    if (adminMenu) {
-      adminMenu.remove();
-    }
-  } catch (error) {
-    console.log('No existing admin menu to remove');
-  }
-  
-  // Create admin menu
-  ui.createMenu('ADMIN')
-    .addItem('Yeni Tablo oluştur', 'showCreateTableDialog')
-    .addSeparator()
-    .addItem('🔧 Dropdown/Datepicker Ekle', 'applyDataValidationToExistingSheets')
-    .addItem('🧪 Test Data Validation', 'testDataValidation')
-    .addSeparator()
-    .addItem('🔍 CMS ALTYAPI', 'performCMSAnalysis')
-    .addItem('🛒 E-TİCARET İZİ', 'performEcommerceDetection')
-    .addItem('⚡ HIZ TESTİ', 'performSpeedTest')
-    .addSeparator()
-    .addItem('Telefon olmayanları sil', 'deleteNoPhoneRows')
-    .addItem('Cep sabit ayarla', 'categorizePhones')
-    .addSeparator()
-    .addItem('🧪 Test onEdit Trigger', 'testOnEditTrigger')
-            .addItem('🔍 Test Haftalık Rapor', 'testMonthlyReport')
-    .addSeparator()
-    .addItem('Senkronize Et', 'manualSync')
-    .addToUi();
+    const ui = SpreadsheetApp.getUi();
     
-  console.log('Admin menu created');
+    // Create CRM Admin menu
+    const menu = ui.createMenu('🔧 CRM Admin');
+    
+    // Add menu items
+    menu.addItem('🧪 Test Data Validation', 'testDataValidation');
+    menu.addSeparator();
+    menu.addItem('🔄 Apply Data Validation to All Sheets', 'applyDataValidationToExistingSheets');
+    menu.addItem('🔄 Refresh Format Tablo Validation', 'refreshFormatTabloValidation');
+    menu.addSeparator();
+    menu.addItem('📝 Update Existing Codes', 'updateExistingCodes');
+    menu.addSeparator();
+    menu.addItem('🧪 Test onEdit Trigger', 'testOnEditTrigger');
+    menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
+    
+    // Add menu to UI
+    menu.addToUi();
+    
+    console.log('Admin menu created');
+    
+  } catch (error) {
+    console.error('Failed to create admin menu:', error);
+  }
 }
 
 /**
@@ -5452,4 +5463,46 @@ function findNextAvailableColumn(sheet) {
   
   // Son sütundan sonraki sütunu döndür
   return lastColumn + 1;
+}
+
+/**
+ * Refresh all Format Tablo validation rules
+ * This function fixes K20 validation errors
+ */
+function refreshFormatTabloValidation() {
+  console.log('Starting refreshFormatTabloValidation');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const allSheets = spreadsheet.getSheets();
+    let formatTabloCount = 0;
+    
+    for (let i = 0; i < allSheets.length; i++) {
+      const sheet = allSheets[i];
+      
+      if (isFormatTable(sheet)) {
+        console.log('Found Format Tablo:', sheet.getName());
+        formatTabloCount++;
+        
+        // Apply validation rules
+        setDataValidation(sheet);
+        console.log('Refreshed validation rules for:', sheet.getName());
+      }
+    }
+    
+    console.log(`Refreshed validation for ${formatTabloCount} Format Tablo sheets`);
+    SpreadsheetApp.getUi().alert(`Veri doğrulama kuralları ${formatTabloCount} Format Tablo sayfası için yenilendi!`);
+    
+    return {
+      success: true,
+      formatTabloCount: formatTabloCount
+    };
+  } catch (error) {
+    console.error('refreshFormatTabloValidation failed:', error);
+    SpreadsheetApp.getUi().alert('Error: ' + error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }
