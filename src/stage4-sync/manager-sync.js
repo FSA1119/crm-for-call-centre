@@ -536,26 +536,8 @@ function createManagerMenu() {
       
     console.log('✅ Manager menu created with individual employee sync options');
     
-    // Create the handler functions for each employee
-    createEmployeeSyncHandlers();
-    
   } catch (error) {
     console.error('❌ Error creating manager menu:', error);
-  }
-}
-
-/**
- * Creates handler functions for each employee sync option
- */
-function createEmployeeSyncHandlers() {
-  for (const employeeCode of Object.keys(CRM_CONFIG.EMPLOYEE_CODES)) {
-    const functionName = `syncSingleEmployee_${employeeCode.replace(/\s+/g, '_')}`;
-    
-    // Create the function dynamically
-    this[functionName] = function() {
-      console.log(`🔄 Starting sync for single employee: ${employeeCode}`);
-      syncSingleEmployee(employeeCode);
-    };
   }
 }
 
@@ -614,6 +596,54 @@ function syncSingleEmployee(employeeCode) {
     console.error(`❌ Error synchronizing employee ${employeeCode}:`, error);
     SpreadsheetApp.getUi().alert(`❌ Hata: ${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`);
   }
+}
+
+/**
+ * LG 001 için senkronizasyon fonksiyonu
+ */
+function syncSingleEmployee_LG_001() {
+  console.log('🔄 Starting sync for single employee: LG 001');
+  syncSingleEmployee('LG 001');
+}
+
+/**
+ * NT 002 için senkronizasyon fonksiyonu
+ */
+function syncSingleEmployee_NT_002() {
+  console.log('🔄 Starting sync for single employee: NT 002');
+  syncSingleEmployee('NT 002');
+}
+
+/**
+ * KO 003 için senkronizasyon fonksiyonu
+ */
+function syncSingleEmployee_KO_003() {
+  console.log('🔄 Starting sync for single employee: KO 003');
+  syncSingleEmployee('KO 003');
+}
+
+/**
+ * SB 004 için senkronizasyon fonksiyonu
+ */
+function syncSingleEmployee_SB_004() {
+  console.log('🔄 Starting sync for single employee: SB 004');
+  syncSingleEmployee('SB 004');
+}
+
+/**
+ * KM 005 için senkronizasyon fonksiyonu
+ */
+function syncSingleEmployee_KM_005() {
+  console.log('🔄 Starting sync for single employee: KM 005');
+  syncSingleEmployee('KM 005');
+}
+
+/**
+ * CA 006 için senkronizasyon fonksiyonu
+ */
+function syncSingleEmployee_CA_006() {
+  console.log('🔄 Starting sync for single employee: CA 006');
+  syncSingleEmployee('CA 006');
 }
 
 // ========================================
