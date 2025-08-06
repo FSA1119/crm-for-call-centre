@@ -1029,24 +1029,44 @@ function collectEmployeeData(managerFile, employeeCode) {
     for (const sheet of sheets) {
       const sheetName = sheet.getName();
       
-      // Skip system sheets
-      if (sheetName.includes('Günlük Rapor') || 
-          sheetName.includes('Haftalık Rapor') || 
-          sheetName.includes('Detaylı Rapor')) {
-        continue;
-      }
-      
-      try {
-        const sheetData = collectSheetData(sheet, employeeCode);
-        if (sheetData && sheetData.length > 0) {
-          employeeData[sheetName] = sheetData;
+      // Sadece önemli sayfaları topla: Randevularım, Fırsatlarım, Toplantılarım
+      // Ham veri ve diğer sayfaları atla
+      if (sheetName === 'Randevularım' || 
+          sheetName === 'Fırsatlarım' || 
+          sheetName === 'Toplantılarım') {
+        
+        try {
+          console.log(`📊 Collecting data from important sheet: ${sheetName}`);
+          const sheetData = collectSheetData(sheet, employeeCode);
+          if (sheetData && sheetData.length > 0) {
+            // Önemli sayfaları doğrudan eşleştir
+            const targetSheetName = sheetName === 'Randevularım' ? 'Randevular' : 
+                                   sheetName === 'Fırsatlarım' ? 'Fırsatlar' : 
+                                   sheetName === 'Toplantılarım' ? 'Toplantılar' : sheetName;
+            
+            employeeData[targetSheetName] = sheetData;
+          }
+        } catch (error) {
+          console.error(`❌ Error collecting data from sheet ${sheetName}:`, error);
         }
-      } catch (error) {
-        console.error(`❌ Error collecting data from sheet ${sheetName}:`, error);
+      } else if (sheetName.includes('Format Tablo')) {
+        // Format Tablo sayfalarını atla
+        console.log(`⏭️ Skipping Format Tablo sheet: ${sheetName}`);
+      } else if (sheetName.includes('Ham Veri')) {
+        // Ham Veri sayfalarını atla
+        console.log(`⏭️ Skipping Ham Veri sheet: ${sheetName}`);
+      } else if (sheetName.includes('Günlük Rapor') || 
+                sheetName.includes('Haftalık Rapor') || 
+                sheetName.includes('Detaylı Rapor')) {
+        // Rapor sayfalarını atla
+        console.log(`⏭️ Skipping Report sheet: ${sheetName}`);
+      } else {
+        // Diğer sayfaları atla
+        console.log(`⏭️ Skipping other sheet: ${sheetName}`);
       }
     }
     
-    console.log(`✅ Employee ${employeeCode} data collected from ${Object.keys(employeeData).length} sheets`);
+    console.log(`✅ Employee ${employeeCode} data collected from ${Object.keys(employeeData).length} important sheets`);
     return employeeData;
     
   } catch (error) {
@@ -1139,9 +1159,9 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode) {
       console.error('❌ Invalid parameters for manager sheet update');
       return;
     }
-    
+  
     let sheet = managerFile.getSheetByName(sheetName);
-    
+  
     // Create sheet if it doesn't exist
     if (!sheet) {
       sheet = managerFile.insertSheet(sheetName);
@@ -1153,18 +1173,18 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode) {
     
     // Clear old data for this employee
     clearEmployeeData(sheet, employeeCode);
-    
+  
     // Add new data
     if (data.length > 0) {
       console.log(`${sheetName} için ${data.length} kayıt ekleniyor...`);
-      
+    
       // Prepare all data in array format
       const allData = [];
       for (let i = 0; i < data.length; i++) {
         const rowData = data[i];
         // Replace first element (Kod) with temsilciKodu, keep others as is
         const rowDataCopy = [...rowData.data];
-        rowDataCopy[0] = rowData.temsilciKodu; // Replace Kod with temsilciKodu
+        rowDataCopy.unshift(rowData.temsilciKodu); // Temsilci kodunu ilk sütuna ekle
         allData.push(rowDataCopy);
       }
       
@@ -1179,11 +1199,14 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode) {
         console.log('No data to write for', sheetName);
         return;
       }
-      
+    
       console.log(`${sheetName} güncellendi: ${data.length} kayıt eklendi (satır ${startRow}-${startRow + data.length - 1})`);
       
       // Apply color coding to new data
       applyColorCodingToManagerData(sheet, sheetName, startRow, allData.length);
+      
+      // Optimize column widths
+      optimizeColumnWidths(sheet, sheetName);
     }
     
   } catch (error) {
