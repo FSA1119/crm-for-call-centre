@@ -1806,19 +1806,35 @@ function addOpportunity(parameters) {
             const firsatDurumu = existingOpportunity[firsatDurumuIndex];
             console.log('Debug - Existing opportunity status:', firsatDurumu);
             
+            // Fırsat durumunu kontrol et
+            if (firsatDurumu === null || firsatDurumu === undefined || firsatDurumu.toString().trim() === '') {
+              console.log('Debug - Existing opportunity has empty status - allowing new opportunity');
+              
+              // Kullanıcıya bilgi ver ama işlemi engelleme
+              SpreadsheetApp.getUi().alert(`Bu müşteri için daha önce bir fırsat kaydı var, ancak durumu belirtilmemiş. Yeni fırsat oluşturulacak.`);
+              
+              // İşleme devam et
+            } 
             // Eğer fırsat durumu "İlgilenmiyor" veya "Ulaşılamadı" ise, yeni fırsat eklenebilir
-            if (firsatDurumu === 'İlgilenmiyor' || firsatDurumu === 'Ulaşılamadı') {
+            else if (firsatDurumu === 'İlgilenmiyor' || firsatDurumu === 'Ulaşılamadı') {
               console.log('Debug - Existing opportunity has status:', firsatDurumu, '- allowing new opportunity');
               
               // Kullanıcıya bilgi ver ama işlemi engelleme
               SpreadsheetApp.getUi().alert(`Bu müşteri için daha önce "${firsatDurumu}" durumunda bir fırsat kaydı var. Yeni fırsat oluşturulacak.`);
               
               // İşleme devam et - return kullanma, showOpportunityDialog'a kadar git
-              // return; 
-            } else {
+            } 
+            else {
               // Diğer durumlarda (Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi) hata ver
               console.log('Debug - Existing opportunity has active status:', firsatDurumu, '- blocking new opportunity');
-              throw new Error(`Bu müşteri için zaten "${firsatDurumu}" durumunda bir fırsat kaydı mevcut (Fırsatlarım sayfasında)`);
+              
+              // Fırsat durumu boş değilse ve geçerli bir değerse hata ver
+              if (firsatDurumu && firsatDurumu.toString().trim() !== '') {
+                throw new Error(`Bu müşteri için zaten "${firsatDurumu}" durumunda bir fırsat kaydı mevcut (Fırsatlarım sayfasında)`);
+              } else {
+                // Geçersiz durum değeri için genel hata ver
+                throw new Error(`Bu müşteri için zaten bir fırsat kaydı mevcut (Fırsatlarım sayfasında)`);
+              }
             }
           } else {
             // Fırsat Durumu sütunu bulunamadıysa, kod kontrolü yap
