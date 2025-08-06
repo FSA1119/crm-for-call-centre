@@ -1732,38 +1732,63 @@ function addOpportunity(parameters) {
         
         console.log('Debug - Checking for existing opportunity with Company:', selectedCompany, 'Phone:', selectedPhone || 'BOŞ');
         
-        // Daha sıkı kontrol - sadece gerçekten dolu ve anlamlı satırları bul
-        const existingOpportunity = firsatlarimData.slice(1).find(row => {
-          // Boş satırları hemen atla
-          const hasData = row.some(cell => cell && cell.toString().trim() !== '');
-          if (!hasData) return false;
+        // Temizlenmiş ve geliştirilmiş kontrol - sadece gerçekten dolu ve anlamlı satırları bul
+        console.log('Debug - Searching through Fırsatlarım data for duplicates...');
+        
+        // Önce seçilen satırın Kod değerini al
+        const selectedKod = selectedRowData.Kod ? selectedRowData.Kod.toString().trim() : '';
+        console.log('Debug - Selected row Kod:', selectedKod);
+        
+        // Fırsatlarım'daki tüm satırları kontrol et (başlık hariç)
+        const existingOpportunity = firsatlarimData.slice(1).find((row, index) => {
+          // Boş satırları hemen atla (hızlı kontrol)
+          if (!row || row.every(cell => !cell || cell.toString().trim() === '')) {
+            console.log(`Debug - Row ${index + 2} is empty, skipping`);
+            return false;
+          }
           
-          const rowPhone = phoneIndex >= 0 ? row[phoneIndex] : '';
-          const rowCompany = companyIndex >= 0 ? row[companyIndex] : '';
+          // Gerekli değerleri al
           const kodIndex = firsatlarimHeaders.indexOf('Kod');
-          const rowKod = kodIndex >= 0 ? row[kodIndex] : '';
+          const rowKod = kodIndex >= 0 && row[kodIndex] ? row[kodIndex].toString().trim() : '';
           
-          // Kod varsa ve boş değilse, bu gerçek bir kayıttır
-          const hasKod = rowKod && rowKod.toString().trim() !== '';
+          // Kod boşsa, bu geçerli bir kayıt değil
+          if (!rowKod) {
+            console.log(`Debug - Row ${index + 2} has no Kod, skipping`);
+            return false;
+          }
+          
+          // Kod eşleşmesi kontrolü - bu en güvenilir yöntem
+          if (selectedKod && rowKod && selectedKod === rowKod) {
+            console.log(`Debug - EXACT KOD MATCH FOUND at row ${index + 2}: ${rowKod}`);
+            return true;
+          }
+          
+          // Kod eşleşmesi yoksa, telefon ve şirket adı kontrolü yap
+          const rowPhone = phoneIndex >= 0 && row[phoneIndex] ? row[phoneIndex].toString().trim() : '';
+          const rowCompany = companyIndex >= 0 && row[companyIndex] ? row[companyIndex].toString().trim() : '';
+          
+          // Şirket adı boşsa, bu muhtemelen geçerli bir kayıt değil
+          if (!rowCompany) {
+            console.log(`Debug - Row ${index + 2} has no Company name, skipping`);
+            return false;
+          }
           
           // Company name karşılaştırması
-          const companyMatch = rowCompany && 
-                              selectedCompany && 
-                              rowCompany.toString().trim() === selectedCompany;
+          const companyMatch = rowCompany && selectedCompany && rowCompany === selectedCompany;
           
           // Phone karşılaştırması (telefon boşsa atla)
           let phoneMatch = true; // Varsayılan olarak true
           if (selectedPhone && selectedPhone !== '') {
-            phoneMatch = rowPhone && rowPhone.toString().trim() === selectedPhone;
+            phoneMatch = rowPhone && rowPhone === selectedPhone;
           }
           
-          const match = phoneMatch && companyMatch && hasKod;
+          const match = phoneMatch && companyMatch;
           
-          console.log('Debug - Comparing row:', {
+          console.log(`Debug - Row ${index + 2} comparison:`, {
+            rowNumber: index + 2,
             kod: rowKod,
             company: rowCompany,
             phone: rowPhone,
-            hasKod: hasKod,
             companyMatch: companyMatch,
             phoneMatch: phoneMatch,
             finalMatch: match
@@ -1779,21 +1804,36 @@ function addOpportunity(parameters) {
           const firsatDurumuIndex = firsatlarimHeaders.indexOf('Fırsat Durumu');
           if (firsatDurumuIndex >= 0) {
             const firsatDurumu = existingOpportunity[firsatDurumuIndex];
+            console.log('Debug - Existing opportunity status:', firsatDurumu);
             
             // Eğer fırsat durumu "İlgilenmiyor" veya "Ulaşılamadı" ise, yeni fırsat eklenebilir
             if (firsatDurumu === 'İlgilenmiyor' || firsatDurumu === 'Ulaşılamadı') {
               console.log('Debug - Existing opportunity has status:', firsatDurumu, '- allowing new opportunity');
-              return; // İşleme devam et
+              
+              // Kullanıcıya bilgi ver ama işlemi engelleme
+              SpreadsheetApp.getUi().alert(`Bu müşteri için daha önce "${firsatDurumu}" durumunda bir fırsat kaydı var. Yeni fırsat oluşturulacak.`);
+              
+              // İşleme devam et - return kullanma, showOpportunityDialog'a kadar git
+              // return; 
+            } else {
+              // Diğer durumlarda (Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi) hata ver
+              console.log('Debug - Existing opportunity has active status:', firsatDurumu, '- blocking new opportunity');
+              throw new Error(`Bu müşteri için zaten "${firsatDurumu}" durumunda bir fırsat kaydı mevcut (Fırsatlarım sayfasında)`);
             }
-          }
-          
-          // Kod kontrolü - gerçekten anlamlı bir kayıt mı?
-          const kodIndex = firsatlarimHeaders.indexOf('Kod');
-          if (kodIndex >= 0 && existingOpportunity[kodIndex] && existingOpportunity[kodIndex].toString().trim() !== '') {
-            console.log('Debug - Valid opportunity with Kod found, showing error');
-            throw new Error('Bu satır zaten fırsat olarak işaretlenmiş (Fırsatlarım sayfasında mevcut)');
           } else {
-            console.log('Debug - No valid Kod found, allowing duplicate');
+            // Fırsat Durumu sütunu bulunamadıysa, kod kontrolü yap
+            console.log('Debug - Fırsat Durumu column not found, checking Kod instead');
+            
+            // Kod kontrolü - gerçekten anlamlı bir kayıt mı?
+            const kodIndex = firsatlarimHeaders.indexOf('Kod');
+            if (kodIndex >= 0 && existingOpportunity[kodIndex] && existingOpportunity[kodIndex].toString().trim() !== '') {
+              console.log('Debug - Valid opportunity with Kod found, showing error');
+              throw new Error('Bu satır zaten fırsat olarak işaretlenmiş (Fırsatlarım sayfasında mevcut)');
+            } else {
+              // Kod değeri boşsa, muhtemelen geçersiz bir kayıt - izin ver
+              console.log('Debug - No valid Kod found, allowing duplicate');
+              SpreadsheetApp.getUi().alert('Uyarı: Benzer bir kayıt Fırsatlarım sayfasında bulundu, ancak geçerli bir Kod değeri olmadığı için işleme devam ediliyor.');
+            }
           }
         }
       } else {
