@@ -594,7 +594,9 @@ function syncSingleEmployee(employeeCode) {
     
   } catch (error) {
     console.error(`❌ Error synchronizing employee ${employeeCode}:`, error);
-    SpreadsheetApp.getUi().alert(`❌ Hata: ${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`);
+    // Düzeltme: Ui.alert() için doğru imza kullanımı
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('Hata', `${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`, ui.ButtonSet.OK);
   }
 }
 
