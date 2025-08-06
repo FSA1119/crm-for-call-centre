@@ -17,19 +17,56 @@ Google Sheets üzerinde çok kullanıcılı CRM sistemi ile temsilci-yönetici s
 
 ```
 Google-Sheets-CRM/
-├── backend.js              # Ana CRM sistemi
-├── test.js                 # Test fonksiyonları
-├── appointmentDialog.html  # Randevu dialog template
-├── opportunityDialog.html  # Fırsat dialog template
-├── meetingDialog.html      # Toplantı dialog template
-├── README.md              # Bu dosya
+├── backend.js                    # Ana CRM sistemi (Temsilci)
+├── manager-sync.js              # Yönetici senkronizasyon sistemi
+├── test.js                      # Test fonksiyonları
+├── appointmentDialog.html       # Randevu dialog template
+├── opportunityDialog.html       # Fırsat dialog template
+├── meetingDialog.html           # Toplantı dialog template
+├── README.md                    # Bu dosya
 └── docs/
     ├── technical-specification.md  # Teknik özellikler
     ├── sistem_semasi.md           # Sistem şeması
-    └── sayfa_kolonlari.md         # Sayfa kolonları
+    ├── sayfa_kolonlari.md         # Sayfa kolonları
+    └── RENK_KODLARI.md            # Merkezi renk kodları
 ```
 
 ## 🚀 Kurulum
+
+### Git'ten En Son Versiyonu Yükleme
+
+```bash
+# Mevcut projeyi klonlayın
+git clone [repository-url]
+cd Google-Sheets-CRM
+
+# En son versiyonu kontrol edin
+git tag -l
+
+# En son versiyona geçin (v1.3)
+git checkout v1.3
+
+# Veya belirli bir versiyona geçmek için:
+git checkout v1.2  # veya v1.1, v1.0
+```
+
+#### Versiyon Değiştirme
+```bash
+# Farklı bir versiyona geçmek için:
+git checkout v1.2
+
+# Ana branch'e dönmek için:
+git checkout main
+```
+
+#### Mevcut Durumu Kontrol Etme
+```bash
+# Hangi versiyonda olduğunuzu görmek için:
+git describe --tags
+
+# Son commit bilgilerini görmek için:
+git log --oneline -10
+```
 
 ### 0. Ham Veri Formatı
 
@@ -45,6 +82,7 @@ hırdavat | izmit | MAZLUM TEKNİK HIRDAVAT | Department store | | 0532 748 04 2
 
 ### 1. Google Sheets'e Kod Ekleme
 
+#### Temsilci Dosyası İçin:
 1. Google Sheets dosyanızı açın
 2. **Extensions** → **Apps Script** seçin
 3. `backend.js` dosyasının içeriğini kopyalayıp yapıştırın
@@ -52,6 +90,12 @@ hırdavat | izmit | MAZLUM TEKNİK HIRDAVAT | Department store | | 0532 748 04 2
    - `appointmentDialog.html`
    - `opportunityDialog.html`
    - `meetingDialog.html`
+
+#### Yönetici Dosyası İçin:
+1. Google Sheets dosyanızı açın
+2. **Extensions** → **Apps Script** seçin
+3. `manager-sync.js` dosyasının içeriğini kopyalayıp yapıştırın
+4. HTML dosyalarını da ekleyin (aynı dosyalar)
 
 ### 2. Test Fonksiyonları
 
@@ -127,14 +171,21 @@ hırdavat | izmit | MAZLUM TEKNİK HIRDAVAT | Department store | | 0532 748 04 2
 
 ## 🎨 Renk Kodları
 
+Merkezi renk kodları `docs/RENK_KODLARI.md` dosyasında tanımlanmıştır.
+
 | Durum | Renk Kodu | Açıklama |
 |-------|-----------|----------|
-| Randevu Alındı | #E3F2FD | Açık Mavi |
-| Teyitlendi | #E8F5E8 | Yeşil |
-| Ertelendi | #FFF3E0 | Turuncu |
-| İptal | #FFEBEE | Kırmızı |
-| Fırsat | #FFF8E1 | Sarı |
-| Toplantı Tamamlandı | #C8E6C9 | Koyu Yeşil |
+| Randevu Alındı | rgb(227, 242, 253) | Açık Mavi |
+| İleri Tarih Randevu | rgb(227, 242, 253) | Açık Mavi |
+| Teyitlendi | rgb(232, 245, 232) | Yeşil |
+| Ertelendi | rgb(255, 243, 224) | Turuncu |
+| İptal | rgb(255, 235, 238) | Kırmızı |
+| Yeniden Aranacak | rgb(255, 248, 225) | Sarı |
+| Bilgi Verildi | rgb(199, 171, 235) | Mor |
+| Fırsat İletildi | rgb(255, 248, 225) | Sarı |
+| İlgilenmiyor | rgb(255, 235, 238) | Kırmızı |
+| Ulaşılamadı | rgb(255, 235, 238) | Kırmızı |
+| Toplantı Tamamlandı | rgb(200, 230, 201) | Koyu Yeşil |
 
 ## 📋 Kullanım Kılavuzu
 
@@ -227,15 +278,23 @@ testSpecificFunction('createNewTable');
 
 ### Otomatik Senkronizasyon
 
-- **Trigger:** Her hücre değişikliğinde
+- **Trigger:** Her hücre değişikliğinde (`onEdit`)
 - **Kapsam:** Randevularım, Fırsatlarım, Toplantılarım
 - **Hız:** Anında (1-2 saniye)
+- **Renk Kodları:** Kaynak ve hedef dosyalarda aynı renkler
 
 ### Manuel Senkronizasyon
 
 - **Buton:** CRM → "Senkronize Et"
 - **Kapsam:** Tüm veriler
 - **Kullanım:** İnternet sorunu, test, manuel kontrol
+
+### Günlük ve Haftalık Raporlar
+
+- **Günlük Rapor:** Bugünkü aktiviteleri listeler
+- **Haftalık Rapor:** Pazartesi-Pazar arası aktiviteleri sayar
+- **TOPLAM KONTAK:** "Ulaşılamadı" hariç tüm aktiviteler
+- **TOPLAM İŞLEM:** Tüm aktiviteler (Ulaşılamadı dahil)
 
 ## 🛠️ Sorun Giderme
 
@@ -284,6 +343,27 @@ function enableDebugMode() {
 
 ## 🔄 Güncellemeler
 
+### v1.3 (2025-01-27)
+- ✅ Core CRM fonksiyonları (1-5)
+- ✅ HTML dialog template'leri
+- ✅ Test sistemi
+- ✅ Renk kodlama sistemi (merkezi yapılandırma)
+- ✅ Pivot table raporlama
+- ✅ Temsilci-Yönetici senkronizasyonu
+- ✅ Günlük ve haftalık raporlar
+- ✅ Gelişmiş hata yönetimi
+- ✅ Dinamik renk kodlama (tüm durumlar için)
+
+### v1.2 (2025-01-27)
+- ✅ Renk kodlama iyileştirmeleri
+- ✅ Veri doğrulama düzeltmeleri
+- ✅ Senkronizasyon hata düzeltmeleri
+
+### v1.1 (2025-01-27)
+- ✅ Temel CRM sistemi
+- ✅ Renk kodlama sistemi
+- ✅ Senkronizasyon altyapısı
+
 ### v1.0 (2025-07-08)
 - ✅ Core CRM fonksiyonları (1-5)
 - ✅ HTML dialog template'leri
@@ -305,5 +385,5 @@ Bu proje özel kullanım için geliştirilmiştir.
 ---
 
 **📧 İletişim:** CRM Development Team  
-**📅 Son Güncelleme:** 08.07.2025  
-**🔧 Versiyon:** 1.0 
+**📅 Son Güncelleme:** 27.01.2025  
+**🔧 Versiyon:** 1.3 
