@@ -1100,35 +1100,59 @@ function collectSheetData(sheet, employeeCode) {
     
     const data = [];
     
+    // Hedef sütun düzeni (yönetici dosyasında olması gereken sıralama)
+    const targetColumns = [
+      'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+      'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
+      'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+      'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+      'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+    ];
+    
+    // Kaynak sütunların indekslerini bul
+    const columnIndices = {};
+    headers.forEach((header, index) => {
+      columnIndices[header] = index;
+    });
+    
     for (let i = 1; i < values.length; i++) {
       const row = values[i];
       
       // Skip empty rows with strict validation
       if (row.some(cell => cell !== '' && cell !== null && cell !== undefined && cell !== 'undefined' && cell !== 'null')) {
-        // Clean and format row data
-        const cleanRow = row.map((cell, index) => {
-          const headerName = headers[index];
-          
-          // Format time values
-          if (headerName === 'Saat') {
-            return formatTimeValue(cell);
-          }
-          
-          // Format date values
-          if (headerName && headerName.includes('Tarihi')) {
-            return formatDateValue(cell);
-          }
-          
-          return cell;
-        });
+        // Yeni sıralamaya göre veri oluştur
+        const orderedRow = [];
         
-        // Remove the original 'Kod' column (first element)
-        const dataWithoutKod = cleanRow.slice(1);
+        // İlk sütunu (Kod) atla, çünkü temsilciKodu olarak ayrıca ekleyeceğiz
+        for (let j = 1; j < targetColumns.length; j++) {
+          const columnName = targetColumns[j];
+          const columnIndex = columnIndices[columnName];
+          
+          // Eğer sütun varsa değerini al, yoksa boş değer ekle
+          if (columnIndex !== undefined) {
+            let cellValue = row[columnIndex];
+            
+            // Format time values
+            if (columnName === 'Saat') {
+              cellValue = formatTimeValue(cellValue);
+            }
+            
+            // Format date values
+            if (columnName && columnName.includes('Tarihi')) {
+              cellValue = formatDateValue(cellValue);
+            }
+            
+            orderedRow.push(cellValue);
+          } else {
+            // Sütun bulunamadıysa boş değer ekle
+            orderedRow.push('');
+          }
+        }
         
         const rowData = {
           temsilciKodu: employeeCode,
           rowIndex: i + 2,
-          data: dataWithoutKod
+          data: orderedRow
         };
         
         data.push(rowData);
