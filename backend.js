@@ -719,22 +719,22 @@ function setDataValidation(sheet) {
       .setAllowInvalid(false)
       .build();
     
-    // Only apply validation if there are data rows (more than 1 row)
-    if (sheet.getLastRow() > 1) {
-      const validationRange = sheet.getRange(2, aktiviteIndex, sheet.getLastRow() - 1, 1);
-      validationRange.setDataValidation(aktiviteRule);
-      console.log('Applied Aktivite validation to range:', validationRange.getA1Notation());
-      console.log('Validation rule created with options:', CRM_CONFIG.ACTIVITY_OPTIONS);
-      
-      // Force refresh the validation by clearing and reapplying
-      console.log('Forcing validation refresh...');
-      validationRange.clearDataValidations();
-      validationRange.setDataValidation(aktiviteRule);
-      console.log('Validation refreshed successfully');
-      
-    } else {
-      console.log('No data rows found, skipping validation');
-    }
+    // Apply validation to more rows than currently exist to ensure future rows are covered
+    const minRows = 1000; // Ensure validation covers at least 1000 rows
+    const lastRow = Math.max(sheet.getLastRow(), 2); // At least 2 to account for header
+    const rowsToValidate = Math.max(minRows, lastRow - 1);
+    
+    console.log(`Applying validation to ${rowsToValidate} rows starting from row 2`);
+    const validationRange = sheet.getRange(2, aktiviteIndex, rowsToValidate, 1);
+    
+    // Force refresh the validation by clearing and reapplying
+    console.log('Forcing validation refresh...');
+    validationRange.clearDataValidations();
+    validationRange.setDataValidation(aktiviteRule);
+    
+    console.log('Applied Aktivite validation to range:', validationRange.getA1Notation());
+    console.log('Validation rule created with options:', CRM_CONFIG.ACTIVITY_OPTIONS);
+    console.log('Validation refreshed successfully');
   } else {
     console.log('Aktivite column not found in headers');
   }
@@ -748,12 +748,19 @@ function setDataValidation(sheet) {
       .setAllowInvalid(false)
       .build();
     
-    // Only apply validation if there are data rows (more than 1 row)
-    if (sheet.getLastRow() > 1) {
-      const toplantiValidationRange = sheet.getRange(2, toplantiFormatIndex, sheet.getLastRow() - 1, 1);
-      toplantiValidationRange.setDataValidation(toplantiRule);
-      console.log('Applied Toplantı formatı validation to range:', toplantiValidationRange.getA1Notation());
-    }
+    // Apply validation to more rows than currently exist to ensure future rows are covered
+    const minRows = 1000; // Ensure validation covers at least 1000 rows
+    const lastRow = Math.max(sheet.getLastRow(), 2); // At least 2 to account for header
+    const rowsToValidate = Math.max(minRows, lastRow - 1);
+    
+    console.log(`Applying Toplantı formatı validation to ${rowsToValidate} rows starting from row 2`);
+    const toplantiValidationRange = sheet.getRange(2, toplantiFormatIndex, rowsToValidate, 1);
+    
+    // Force refresh the validation by clearing and reapplying
+    toplantiValidationRange.clearDataValidations();
+    toplantiValidationRange.setDataValidation(toplantiRule);
+    
+    console.log('Applied Toplantı formatı validation to range:', toplantiValidationRange.getA1Notation());
   } else {
     console.log('Toplantı formatı column not found in headers');
   }
