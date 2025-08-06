@@ -1806,50 +1806,16 @@ function addOpportunity(parameters) {
             const firsatDurumu = existingOpportunity[firsatDurumuIndex];
             console.log('Debug - Existing opportunity status:', firsatDurumu);
             
-            // Fırsat durumunu kontrol et
-            if (firsatDurumu === null || firsatDurumu === undefined || firsatDurumu.toString().trim() === '') {
-              console.log('Debug - Existing opportunity has empty status - allowing new opportunity');
-              
-              // Kullanıcıya bilgi ver ama işlemi engelleme
-              SpreadsheetApp.getUi().alert(`Bu müşteri için daha önce bir fırsat kaydı var, ancak durumu belirtilmemiş. Yeni fırsat oluşturulacak.`);
-              
-              // İşleme devam et
-            } 
-            // Eğer fırsat durumu "İlgilenmiyor" veya "Ulaşılamadı" ise, yeni fırsat eklenebilir
-            else if (firsatDurumu === 'İlgilenmiyor' || firsatDurumu === 'Ulaşılamadı') {
-              console.log('Debug - Existing opportunity has status:', firsatDurumu, '- allowing new opportunity');
-              
-              // Kullanıcıya bilgi ver ama işlemi engelleme
-              SpreadsheetApp.getUi().alert(`Bu müşteri için daha önce "${firsatDurumu}" durumunda bir fırsat kaydı var. Yeni fırsat oluşturulacak.`);
-              
-              // İşleme devam et - return kullanma, showOpportunityDialog'a kadar git
-            } 
-            else {
-              // Diğer durumlarda (Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi) hata ver
-              console.log('Debug - Existing opportunity has active status:', firsatDurumu, '- blocking new opportunity');
-              
-              // Fırsat durumu boş değilse ve geçerli bir değerse hata ver
-              if (firsatDurumu && firsatDurumu.toString().trim() !== '') {
-                throw new Error(`Bu müşteri için zaten "${firsatDurumu}" durumunda bir fırsat kaydı mevcut (Fırsatlarım sayfasında)`);
-              } else {
-                // Geçersiz durum değeri için genel hata ver
-                throw new Error(`Bu müşteri için zaten bir fırsat kaydı mevcut (Fırsatlarım sayfasında)`);
-              }
+            // Her durumda işleme devam et - mükerrer kontrolünü tamamen kaldır
+            console.log('Debug - Skipping duplicate check, allowing all opportunities');
+            
+            // Kullanıcıya bilgi ver ama işlemi engelleme
+            if (firsatDurumu) {
+              console.log('Debug - Found existing opportunity with status:', firsatDurumu);
             }
           } else {
-            // Fırsat Durumu sütunu bulunamadıysa, kod kontrolü yap
-            console.log('Debug - Fırsat Durumu column not found, checking Kod instead');
-            
-            // Kod kontrolü - gerçekten anlamlı bir kayıt mı?
-            const kodIndex = firsatlarimHeaders.indexOf('Kod');
-            if (kodIndex >= 0 && existingOpportunity[kodIndex] && existingOpportunity[kodIndex].toString().trim() !== '') {
-              console.log('Debug - Valid opportunity with Kod found, showing error');
-              throw new Error('Bu satır zaten fırsat olarak işaretlenmiş (Fırsatlarım sayfasında mevcut)');
-            } else {
-              // Kod değeri boşsa, muhtemelen geçersiz bir kayıt - izin ver
-              console.log('Debug - No valid Kod found, allowing duplicate');
-              SpreadsheetApp.getUi().alert('Uyarı: Benzer bir kayıt Fırsatlarım sayfasında bulundu, ancak geçerli bir Kod değeri olmadığı için işleme devam ediliyor.');
-            }
+            // Mükerrer kontrolünü tamamen kaldır - her durumda izin ver
+            console.log('Debug - Skipping Kod check, allowing all opportunities');
           }
         }
       } else {
