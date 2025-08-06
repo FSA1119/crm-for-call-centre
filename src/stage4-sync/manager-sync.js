@@ -399,6 +399,9 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
         break;
       case 'Fırsatlar':
         statusColumnIndex = headers.indexOf('Fırsat Durumu');
+        if (statusColumnIndex === -1) {
+          statusColumnIndex = headers.indexOf('Aktivite'); // Fallback for Fırsatlar
+        }
         break;
       case 'Toplantılar':
         statusColumnIndex = headers.indexOf('Toplantı durumu');
@@ -495,14 +498,22 @@ function openMeetingDialog() {
     
     // Randevu bilgilerini hazırla
     const employeeCode = getColumnValue(headers, rowData, 'Temsilci Kodu');
+    const companyName = getColumnValue(headers, rowData, 'Company name') || getColumnValue(headers, rowData, 'Company');
+    const phone = getColumnValue(headers, rowData, 'Phone');
+    const mail = getColumnValue(headers, rowData, 'Mail');
+    const address = getColumnValue(headers, rowData, 'Address');
     
     // HTML dialog'u aç
     const htmlTemplate = HtmlService.createTemplateFromFile('managerMeetingDialog');
     htmlTemplate.employeeCode = employeeCode;
+    htmlTemplate.companyName = companyName;
+    htmlTemplate.phone = phone;
+    htmlTemplate.mail = mail;
+    htmlTemplate.address = address;
     
     const htmlOutput = htmlTemplate.evaluate()
       .setWidth(500)
-      .setHeight(600);
+      .setHeight(700);
     
     SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Yönetici Toplantı Ekle');
     
@@ -560,8 +571,11 @@ function processManagerMeetingForm(formData) {
       { header: 'Address', value: formData.adres },
       { header: 'Toplantı Tarihi', value: formData.toplamtiTarihi },
       { header: 'Saat', value: formData.toplamtiSaati },
-      { header: 'Randevu durumu', value: formData.randevuDurumu },
+      { header: 'Toplantı formatı', value: formData.toplamtiFormat },
       { header: 'Toplantı Sonucu', value: formData.toplamtiSonucu },
+      { header: 'Teklif Detayı', value: formData.teklifDetayi },
+      { header: 'Satış Potansiyeli', value: formData.satisPotansiyeli },
+      { header: 'Yeni Takip Tarihi', value: formData.yeniTakipTarihi },
       { header: 'Yönetici Not', value: formData.yoneticiNot }
     ];
     
