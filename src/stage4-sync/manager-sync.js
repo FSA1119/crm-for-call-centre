@@ -1541,11 +1541,15 @@ function showSyncResults(totalStats) {
       }
     }
     
-    SpreadsheetApp.getUi().alert('📊 Senkronizasyon Sonuçları', resultMessage);
+    // Düzeltme: Ui.alert için doğru imza kullanımı
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('📊 Senkronizasyon Sonuçları', resultMessage, ui.ButtonSet.OK);
     
   } catch (error) {
     console.error('❌ Error showing sync results:', error);
-    SpreadsheetApp.getUi().alert('❌ Hata', 'Senkronizasyon sonuçları gösterilirken bir hata oluştu');
+    // Düzeltme: Ui.alert için doğru imza kullanımı
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('❌ Hata', 'Senkronizasyon sonuçları gösterilirken bir hata oluştu', ui.ButtonSet.OK);
   }
 }
 
@@ -1577,11 +1581,15 @@ function showSyncStatus() {
       statusMessage += `📄 **${sheetName}**: ${recordCount} kayıt\n`;
     }
     
-    SpreadsheetApp.getUi().alert('📊 Senkronizasyon Durumu', statusMessage);
+    // Düzeltme: Ui.alert için doğru imza kullanımı
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('📊 Senkronizasyon Durumu', statusMessage, ui.ButtonSet.OK);
     
   } catch (error) {
     console.error('❌ Error showing sync status:', error);
-    SpreadsheetApp.getUi().alert('❌ Hata', 'Senkronizasyon durumu gösterilirken bir hata oluştu');
+    // Düzeltme: Ui.alert için doğru imza kullanımı
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('❌ Hata', 'Senkronizasyon durumu gösterilirken bir hata oluştu', ui.ButtonSet.OK);
   }
 }
 
