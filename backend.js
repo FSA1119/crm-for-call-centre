@@ -2204,14 +2204,24 @@ function setFirsatlarimDataValidation(sheet) {
   // Fırsat Durumu validation (dropdown)
   const firsatDurumuIndex = headers.indexOf('Fırsat Durumu') + 1;
   if (firsatDurumuIndex > 0) {
-    const firsatDurumuOptions = ['Yeniden Aranacak', 'Bilgi Verildi', 'Fırsat İletildi', 'İlgilenmiyor', 'Ulaşılamadı'];
+    // Use centralized options from CRM_CONFIG
+    const firsatDurumuOptions = CRM_CONFIG.ACTIVITY_OPTIONS;
+    
+    console.log('Setting Fırsat Durumu validation with options:', firsatDurumuOptions);
+    
     const firsatRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(firsatDurumuOptions, true)
       .setAllowInvalid(false)
       .build();
     
-    sheet.getRange(2, firsatDurumuIndex, validationRows, 1).setDataValidation(firsatRule);
-    console.log('Applied Fırsat Durumu validation');
+    const validationRange = sheet.getRange(2, firsatDurumuIndex, validationRows, 1);
+    
+    // Force refresh validation
+    validationRange.clearDataValidations();
+    validationRange.setDataValidation(firsatRule);
+    
+    console.log('Applied Fırsat Durumu validation to range:', validationRange.getA1Notation());
+    console.log('Validation options:', firsatDurumuOptions);
   }
   
   // Fırsat Tarihi validation (datepicker)
