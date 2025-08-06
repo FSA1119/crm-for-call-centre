@@ -2224,7 +2224,9 @@ function setFirsatlarimDataValidation(sheet) {
     const firsatDurumuOptions = [
       'Yeniden Aranacak',
       'Bilgi Verildi',
-      'Fırsat İletildi'
+      'Fırsat İletildi',
+      'İlgilenmiyor',
+      'Ulaşılamadı'
     ];
     
     console.log('Setting Fırsat Durumu validation with options:', firsatDurumuOptions);
@@ -2300,23 +2302,30 @@ function applyOpportunityColorCoding(sheet, rowNumber) {
     let color = 'rgb(255, 255, 255)'; // Default white
     
     // Map status to color using centralized system
-    if (status === 'Fırsat İletildi') {
-      color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
-      console.log('🎨 Applied Fırsat İletildi color:', color);
-    } else if (status === 'Bilgi Verildi') {
-      color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
-      console.log('🎨 Applied Bilgi Verildi color:', color);
-    } else if (status === 'Yeniden Aranacak') {
-      color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
-      console.log('🎨 Applied Yeniden Aranacak color:', color);
-    } else if (status === 'İlgilenmiyor') {
-      color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
-      console.log('🎨 Applied İlgilenmiyor color:', color);
-    } else if (status === 'Ulaşılamadı') {
-      color = CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
-      console.log('🎨 Applied Ulaşılamadı color:', color);
+    if (status && status.toString().trim() !== '') {
+      // Normalize status - remove any case issues or extra spaces
+      const normalizedStatus = status.toString().trim();
+      
+      console.log('🔍 Looking for color for status:', normalizedStatus);
+      
+      // Check exact match first
+      if (CRM_CONFIG.COLOR_CODES[normalizedStatus]) {
+        color = CRM_CONFIG.COLOR_CODES[normalizedStatus];
+        console.log('✅ Found exact color match:', color, 'for status:', normalizedStatus);
+      }
+      // Special handling for Fırsat İletildi with potential case/spelling variations
+      else if (normalizedStatus.toLowerCase().includes('fırsat') && normalizedStatus.toLowerCase().includes('iletildi')) {
+        color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+        console.log('✅ Applied Fırsat İletildi color (fuzzy match):', color);
+        
+        // Fix the status value in the cell to ensure exact match for future
+        sheet.getRange(rowNumber, firsatDurumuIndex + 1).setValue('Fırsat İletildi');
+        console.log('🔧 Fixed status value to exact match: "Fırsat İletildi"');
+      } else {
+        console.log('⚠️ Unknown status:', normalizedStatus, '- using default white');
+      }
     } else {
-      console.log('⚠️ Unknown status:', status, '- using default white');
+      console.log('⚠️ Empty status - using default white');
     }
     
     // Apply color to entire row
