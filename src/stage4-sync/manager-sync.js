@@ -91,21 +91,11 @@ const CRM_CONFIG = {
  * @returns {boolean} - Validation result
  */
 function validateInput(parameters) {
-  console.log('🔍 Validating input:', parameters);
-  
-  try {
-    if (!parameters || typeof parameters !== 'object') {
-      console.error('❌ Invalid parameters object');
-      return false;
-    }
-    
-    console.log('✅ Input validation passed');
-    return true;
-    
-  } catch (error) {
-    console.error('❌ Input validation failed:', error);
+  if (!parameters || typeof parameters !== 'object') {
+    console.error('Invalid parameters object');
     return false;
   }
+  return true;
 }
 
 /**
@@ -115,12 +105,7 @@ function validateInput(parameters) {
  */
 function logActivity(action, data = {}) {
   const timestamp = new Date().toISOString();
-  
-  console.log('📝 Manager Activity Log:', {
-    timestamp,
-    action,
-    data
-  });
+  console.log('Manager Activity Log:', { timestamp, action, data });
 }
 
 // ========================================
@@ -136,16 +121,13 @@ function logActivity(action, data = {}) {
 function applyRowColor(sheet, rowNumber, color) {
   try {
     if (!sheet || !rowNumber || !color) {
-      console.error('❌ Invalid parameters for color application');
+      console.error('Invalid parameters for color application');
       return;
     }
-    
     const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
     range.setBackground(color);
-    console.log(`🎨 Applied color ${color} to row ${rowNumber}`);
-    
   } catch (error) {
-    console.error('❌ Color application failed:', error);
+    console.error('Color application failed:', error);
   }
 }
 
@@ -157,21 +139,16 @@ function applyRowColor(sheet, rowNumber, color) {
 function applyHeaderStyling(sheet, sheetType) {
   try {
     if (!sheet) {
-      console.error('❌ Invalid sheet for header styling');
+      console.error('Invalid sheet for header styling');
       return;
     }
-    
     const headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
     const headerColor = CRM_CONFIG.SHEET_HEADER_COLORS[sheetType] || 'rgb(227, 242, 253)';
-    
     headerRange.setBackground(headerColor);
     headerRange.setFontColor('white');
     headerRange.setFontWeight('bold');
-    
-    console.log(`🎨 Applied header styling for ${sheetType}`);
-    
   } catch (error) {
-    console.error('❌ Header styling failed:', error);
+    console.error('Header styling failed:', error);
   }
 }
 
@@ -409,18 +386,13 @@ function getOptimalColumnWidth(header, sheetType) {
  * @param {number} rowCount - Number of rows
  */
 function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
-  console.log(`🎨 Applying color coding to manager data: ${sheetName}, rows ${startRow}-${startRow + rowCount - 1}`);
-  
   try {
     if (!sheet || !sheetName || !startRow || !rowCount) {
-      console.error('❌ Invalid parameters for color coding');
+      console.error('Invalid parameters for color coding');
       return;
     }
-    
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     let statusColumnIndex = -1;
-    
-    // Find status column based on sheet type
     switch (sheetName) {
       case 'Randevular':
         statusColumnIndex = headers.indexOf('Randevu durumu');
@@ -434,22 +406,15 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
       default:
         statusColumnIndex = headers.indexOf('Aktivite');
     }
-    
     if (statusColumnIndex === -1) {
-      console.log('⚠️ No status column found for color coding');
       return;
     }
-    
-    // Apply colors to each row
     for (let i = 0; i < rowCount; i++) {
       const rowNumber = startRow + i;
       const statusCell = sheet.getRange(rowNumber, statusColumnIndex + 1);
       const status = statusCell.getValue();
-      
       if (status && status !== '') {
-        let color = 'rgb(255, 255, 255)'; // Default white
-        
-        // Map status to color
+        let color = 'rgb(255, 255, 255)';
         if (status === 'Randevu Alındı') {
           color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
         } else if (status === 'İleri Tarih Randevu') {
@@ -473,15 +438,11 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
         } else if (status === 'Toplantı Tamamlandı') {
           color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
         }
-        
         applyRowColor(sheet, rowNumber, color);
       }
     }
-    
-    console.log(`✅ Color coding applied to ${rowCount} rows in ${sheetName}`);
-    
   } catch (error) {
-    console.error(`❌ Error applying color coding to manager data:`, error);
+    console.error('Error applying color coding to manager data:', error);
   }
 }
 
@@ -493,53 +454,25 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
  * 🎨 Manager Menu Creation - Control Panel
  */
 function createManagerMenu() {
-  console.log('🎨 Creating manager menu');
-  
   try {
     const ui = SpreadsheetApp.getUi();
-    
-    // Remove existing manager menu if exists
-    try {
-      const existingMenus = ui.getMenus();
-      const managerMenu = existingMenus.find(menu => menu.getName() === 'YÖNETİCİ');
-      if (managerMenu) {
-        managerMenu.remove();
-      }
-    } catch (error) {
-      console.log('⚠️ No existing manager menu to remove');
-    }
-    
-    // Create main manager menu
     const menu = ui.createMenu('YÖNETİCİ');
-    
-    // Add main sync options
-    menu.addItem('🔄 Tüm Verileri Senkronize Et', 'collectAllData')
+    menu.addItem('Tüm Verileri Senkronize Et', 'collectAllData')
         .addSeparator();
-    
-    // Add individual employee sync options
-    const submenu = ui.createMenu('👤 Tek Temsilci Senkronize Et');
-    
-    // Add each employee as a menu item
+    const submenu = ui.createMenu('Tek Temsilci Senkronize Et');
     for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
       submenu.addItem(`${employeeCode} - ${employeeName}`, `syncSingleEmployee_${employeeCode.replace(/\s+/g, '_')}`);
     }
-    
-    // Add the submenu to the main menu
     menu.addSubMenu(submenu)
         .addSeparator();
-    
-    // Add other options
-    menu.addItem('📊 Senkronizasyon Durumu', 'showSyncStatus')
+    menu.addItem('Senkronizasyon Durumu', 'showSyncStatus')
         .addSeparator()
-        .addItem('🧹 Verileri Temizle', 'cleanManagerData')
+        .addItem('Verileri Temizle', 'cleanManagerData')
         .addSeparator()
-        .addItem('📅 Toplantıya Geç', 'openMeetingDialog')
+        .addItem('Toplantıya Geç', 'openMeetingDialog')
         .addToUi();
-      
-    console.log('✅ Manager menu created with individual employee sync options');
-    
   } catch (error) {
-    console.error('❌ Error creating manager menu:', error);
+    console.error('Error creating manager menu:', error);
   }
 }
 
@@ -567,31 +500,14 @@ function openMeetingDialog() {
  * @param {string} employeeCode - Employee code to synchronize
  */
 function syncSingleEmployee(employeeCode) {
-  console.log(`🔄 Synchronizing single employee: ${employeeCode}`);
-  
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    
     if (!managerFile) {
       throw new Error('Yönetici dosyası bulunamadı');
     }
-    
-    const totalStats = {
-      totalRecords: 0,
-      employeeStats: {},
-      errors: []
-    };
-    
-    console.log(`👤 Processing employee: ${employeeCode}`);
-    
+    const totalStats = { totalRecords: 0, employeeStats: {}, errors: [] };
     const employeeData = collectEmployeeData(managerFile, employeeCode);
-    const employeeStats = {
-      employeeCode,
-      totalRecords: 0,
-      sheetStats: {}
-    };
-    
-    // Update manager sheets with employee data
+    const employeeStats = { employeeCode, totalRecords: 0, sheetStats: {} };
     for (const [sheetName, data] of Object.entries(employeeData)) {
       if (data && data.length > 0) {
         updateManagerSheet(managerFile, sheetName, data, employeeCode);
@@ -599,23 +515,13 @@ function syncSingleEmployee(employeeCode) {
         employeeStats.totalRecords += data.length;
       }
     }
-    
     totalStats.employeeStats[employeeCode] = employeeStats;
     totalStats.totalRecords += employeeStats.totalRecords;
-    
-    console.log(`✅ Employee ${employeeCode} processed: ${employeeStats.totalRecords} records`);
-    
-    // Show results
     showSyncResults(totalStats);
-    
-    // Apply color coding to all sheets
     applyColorCodingToAllManagerSheets();
-    
     return totalStats;
-    
   } catch (error) {
-    console.error(`❌ Error synchronizing employee ${employeeCode}:`, error);
-    // Düzeltme: Ui.alert() için doğru imza kullanımı
+    console.error(`Error synchronizing employee ${employeeCode}:`, error);
     const ui = SpreadsheetApp.getUi();
     ui.alert('Hata', `${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`, ui.ButtonSet.OK);
   }
@@ -1033,63 +939,26 @@ function collectAllData() {
  * @returns {Object} - Employee data by sheet
  */
 function collectEmployeeData(managerFile, employeeCode) {
-  console.log(`🔄 Collecting data for employee: ${employeeCode}`);
-  
   try {
-    // Find employee file
     const employeeFile = findEmployeeFile(employeeCode);
     if (!employeeFile) {
-      console.log(`⚠️ Employee file not found for: ${employeeCode}`);
       return {};
     }
-    
     const employeeData = {};
-    
-    // Collect data from each relevant sheet
     const sheets = employeeFile.getSheets();
     for (const sheet of sheets) {
       const sheetName = sheet.getName();
-      
-      // Sadece önemli sayfaları topla: Randevularım, Fırsatlarım, Toplantılarım
-      // Ham veri ve diğer sayfaları atla
-      if (sheetName === 'Randevularım' || 
-          sheetName === 'Fırsatlarım' || 
-          sheetName === 'Toplantılarım') {
-        
-        try {
-          console.log(`📊 Collecting data from important sheet: ${sheetName}`);
-          const sheetData = collectSheetData(sheet, employeeCode);
-          if (sheetData && sheetData.length > 0) {
-            // Önemli sayfaları doğrudan eşleştir
-            const targetSheetName = sheetName === 'Randevularım' ? 'Randevular' : 
-                                   sheetName === 'Fırsatlarım' ? 'Fırsatlar' : 
-                                   sheetName === 'Toplantılarım' ? 'Toplantılar' : sheetName;
-            
-            employeeData[targetSheetName] = sheetData;
-          }
-        } catch (error) {
-          console.error(`❌ Error collecting data from sheet ${sheetName}:`, error);
+      if (sheetName === 'Randevularım' || sheetName === 'Fırsatlarım' || sheetName === 'Toplantılarım') {
+        const sheetData = collectSheetData(sheet, employeeCode);
+        if (sheetData && sheetData.length > 0) {
+          const targetSheetName = sheetName === 'Randevularım' ? 'Randevular' :
+                                 sheetName === 'Fırsatlarım' ? 'Fırsatlar' :
+                                 sheetName === 'Toplantılarım' ? 'Toplantılar' : sheetName;
+          employeeData[targetSheetName] = sheetData;
         }
-      } else if (sheetName.includes('Format Tablo')) {
-        // Format Tablo sayfalarını atla
-        console.log(`⏭️ Skipping Format Tablo sheet: ${sheetName}`);
-      } else if (sheetName.includes('Ham Veri')) {
-        // Ham Veri sayfalarını atla
-        console.log(`⏭️ Skipping Ham Veri sheet: ${sheetName}`);
-      } else if (sheetName.includes('Günlük Rapor') || 
-                sheetName.includes('Haftalık Rapor') || 
-                sheetName.includes('Detaylı Rapor')) {
-        // Rapor sayfalarını atla
-        console.log(`⏭️ Skipping Report sheet: ${sheetName}`);
-      } else {
-        // Diğer sayfaları atla
-        console.log(`⏭️ Skipping other sheet: ${sheetName}`);
       }
     }
-    
-    console.log(`✅ Employee ${employeeCode} data collected from ${Object.keys(employeeData).length} important sheets`);
     return employeeData;
-    
   } catch (error) {
     console.error(`❌ Error collecting employee data for ${employeeCode}:`, error);
     return {};
@@ -1103,25 +972,16 @@ function collectEmployeeData(managerFile, employeeCode) {
  * @returns {Array} - Sheet data
  */
 function collectSheetData(sheet, employeeCode) {
-  console.log(`📄 Collecting data from sheet: ${sheet.getName()}`);
-  
   try {
     if (!sheet) {
-      console.error('❌ Invalid sheet for data collection');
       return [];
     }
-    
     const values = sheet.getDataRange().getValues();
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
     if (!values || values.length <= 1) {
-      console.log(`⚠️ No data found in sheet: ${sheet.getName()}`);
       return [];
     }
-    
     const data = [];
-    
-    // Hedef sütun düzeni (yönetici dosyasında olması gereken sıralama)
     const targetColumns = [
       'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
       'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
@@ -1129,60 +989,35 @@ function collectSheetData(sheet, employeeCode) {
       'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
       'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
     ];
-    
-    // Kaynak sütunların indekslerini bul
     const columnIndices = {};
     headers.forEach((header, index) => {
       columnIndices[header] = index;
     });
-    
     for (let i = 1; i < values.length; i++) {
       const row = values[i];
-      
-      // Skip empty rows with strict validation
       if (row.some(cell => cell !== '' && cell !== null && cell !== undefined && cell !== 'undefined' && cell !== 'null')) {
-        // Yeni sıralamaya göre veri oluştur
         const orderedRow = [];
-        
-        // İlk sütunu (Kod) atla, çünkü temsilciKodu olarak ayrıca ekleyeceğiz
         for (let j = 1; j < targetColumns.length; j++) {
           const columnName = targetColumns[j];
           const columnIndex = columnIndices[columnName];
-          
-          // Eğer sütun varsa değerini al, yoksa boş değer ekle
           if (columnIndex !== undefined) {
             let cellValue = row[columnIndex];
-            
-            // Format time values
             if (columnName === 'Saat') {
               cellValue = formatTimeValue(cellValue);
             }
-            
-            // Format date values
             if (columnName && columnName.includes('Tarihi')) {
               cellValue = formatDateValue(cellValue);
             }
-            
             orderedRow.push(cellValue);
           } else {
-            // Sütun bulunamadıysa boş değer ekle
             orderedRow.push('');
           }
         }
-        
-        const rowData = {
-          temsilciKodu: employeeCode,
-          rowIndex: i + 2,
-          data: orderedRow
-        };
-        
+        const rowData = { temsilciKodu: employeeCode, rowIndex: i + 2, data: orderedRow };
         data.push(rowData);
       }
     }
-    
-    console.log(`✅ Collected ${data.length} records from sheet: ${sheet.getName()}`);
     return data;
-    
   } catch (error) {
     console.error(`❌ Error collecting sheet data from ${sheet.getName()}:`, error);
     return [];
@@ -1197,63 +1032,32 @@ function collectSheetData(sheet, employeeCode) {
  * @param {string} employeeCode - Employee code
  */
 function updateManagerSheet(managerFile, sheetName, data, employeeCode) {
-  console.log(`${sheetName} güncelleniyor (${employeeCode}): ${data.length} kayıt`);
-  
   try {
     if (!managerFile || !sheetName || !data || !employeeCode) {
-      console.error('❌ Invalid parameters for manager sheet update');
       return;
     }
-  
     let sheet = managerFile.getSheetByName(sheetName);
-  
-    // Create sheet if it doesn't exist
     if (!sheet) {
       sheet = managerFile.insertSheet(sheetName);
-      console.log(`${sheetName} sayfası oluşturuldu`);
-      
-      // Create proper headers based on sheet type
       createManagerSheetHeaders(sheet, sheetName);
     }
-    
-    // Clear old data for this employee
     clearEmployeeData(sheet, employeeCode);
-  
-    // Add new data
     if (data.length > 0) {
-      console.log(`${sheetName} için ${data.length} kayıt ekleniyor...`);
-    
-      // Prepare all data in array format
       const allData = [];
       for (let i = 0; i < data.length; i++) {
         const rowData = data[i];
-        // Replace first element (Kod) with temsilciKodu, keep others as is
         const rowDataCopy = [...rowData.data];
-        rowDataCopy.unshift(rowData.temsilciKodu); // Temsilci kodunu ilk sütuna ekle
+        rowDataCopy.unshift(rowData.temsilciKodu);
         allData.push(rowDataCopy);
       }
-      
-      // Write all data at once
       const startRow = sheet.getLastRow() + 1;
-      
-      // Check if there's data to write
       if (allData.length > 0 && allData[0].length > 0) {
         const targetRange = sheet.getRange(startRow, 1, allData.length, allData[0].length);
         targetRange.setValues(allData);
-      } else {
-        console.log('No data to write for', sheetName);
-        return;
       }
-    
-      console.log(`${sheetName} güncellendi: ${data.length} kayıt eklendi (satır ${startRow}-${startRow + data.length - 1})`);
-      
-      // Apply color coding to new data
       applyColorCodingToManagerData(sheet, sheetName, startRow, allData.length);
-      
-      // Optimize column widths
       optimizeColumnWidths(sheet, sheetName);
     }
-    
   } catch (error) {
     console.error(`❌ Error updating manager sheet ${sheetName}:`, error);
   }
@@ -1265,16 +1069,11 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode) {
  * @param {string} sheetName - Sheet name
  */
 function createManagerSheetHeaders(sheet, sheetName) {
-  console.log(`Creating headers for ${sheetName}`);
-  
   try {
     if (!sheet || !sheetName) {
-      console.error('❌ Invalid parameters for header creation');
       return;
     }
-    
     let headers = [];
-    
     switch (sheetName) {
       case 'Randevular':
         headers = [
@@ -1285,7 +1084,6 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
         ];
         break;
-        
       case 'Fırsatlar':
         headers = [
           'Temsilci Kodu', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
@@ -1295,7 +1093,6 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
         ];
         break;
-        
       case 'Toplantılar':
         headers = [
           'Temsilci Kodu', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
@@ -1305,9 +1102,7 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
         ];
         break;
-        
       default:
-        // For other sheets use basic structure
         headers = [
           'Temsilci Kodu', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
           'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Durum', 'Tarih',
@@ -1316,18 +1111,9 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
         ];
     }
-    
-    // Set headers
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    
-    // Apply header styling
     applyHeaderStyling(sheet, sheetName);
-    
-    // Optimize column widths using universal function
     optimizeColumnWidths(sheet, sheetName);
-    
-    console.log(`✅ Headers created for ${sheetName} with optimized column widths`);
-    
   } catch (error) {
     console.error(`❌ Error creating headers for ${sheetName}:`, error);
   }
@@ -1339,43 +1125,28 @@ function createManagerSheetHeaders(sheet, sheetName) {
  * @param {string} employeeCode - Employee code
  */
 function clearEmployeeData(sheet, employeeCode) {
-  console.log(`🧹 Clearing data for employee: ${employeeCode}`);
-  
   try {
     if (!sheet || !employeeCode) {
-      console.error('❌ Invalid parameters for data clearing');
       return;
     }
-    
     const data = sheet.getDataRange().getValues();
     if (!data || data.length <= 1) {
-      console.log('⚠️ No data to clear');
       return;
     }
-    
     const headers = data[0];
     const temsilciKoduIndex = headers.indexOf('Temsilci Kodu');
-    
     if (temsilciKoduIndex === -1) {
-      console.log('⚠️ No Temsilci Kodu column found');
       return;
     }
-    
     let deletedRows = 0;
-    
-    // Delete rows from bottom to top to avoid index issues
     for (let i = data.length - 1; i > 0; i--) {
       const row = data[i];
       const rowTemsilciKodu = row[temsilciKoduIndex];
-      
       if (rowTemsilciKodu === employeeCode) {
         sheet.deleteRow(i + 1);
         deletedRows++;
       }
     }
-    
-    console.log(`✅ Cleared ${deletedRows} rows for employee: ${employeeCode}`);
-    
   } catch (error) {
     console.error(`❌ Error clearing data for employee ${employeeCode}:`, error);
   }
@@ -1571,11 +1342,18 @@ function showSyncResults(totalStats) {
     resultMessage += `👥 **İşlenen Temsilci**: ${Object.keys(totalStats.employeeStats).length}\n`;
     resultMessage += `❌ **Hata Sayısı**: ${totalStats.errors.length}\n\n`;
     
-    // Add employee details
+    // Add employee details with sheet breakdown
     resultMessage += '**Temsilci Detayları:**\n';
     for (const [employeeCode, stats] of Object.entries(totalStats.employeeStats)) {
       const employeeName = CRM_CONFIG.EMPLOYEE_CODES[employeeCode] || employeeCode;
       resultMessage += `• ${employeeCode} (${employeeName}): ${stats.totalRecords} kayıt\n`;
+      
+      // Add sheet breakdown if available
+      if (stats.sheetStats && Object.keys(stats.sheetStats).length > 0) {
+        for (const [sheetName, recordCount] of Object.entries(stats.sheetStats)) {
+          resultMessage += `  - ${sheetName}: ${recordCount} kayıt\n`;
+        }
+      }
     }
     
     // Add errors if any
