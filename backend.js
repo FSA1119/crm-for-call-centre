@@ -1083,9 +1083,9 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
   
   applyAppointmentColorCoding(randevularimSheet, nextRow);
   
-  // Force refresh the color coding for İleri Tarih Randevu
-  if (appointmentData.aktivite === 'İleri Tarih Randevu') {
-    console.log('🎨 Special handling for İleri Tarih Randevu');
+  // Force refresh the color coding for all appointment types
+  if (appointmentData.aktivite === 'Randevu Alındı' || appointmentData.aktivite === 'İleri Tarih Randevu') {
+    console.log('🎨 Special handling for appointment type:', appointmentData.aktivite);
     
     // Get the Randevu Durumu column index
     const headers = randevularimSheet.getRange(1, 1, 1, randevularimSheet.getLastColumn()).getValues()[0];
@@ -1093,12 +1093,12 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
     
     if (randevuDurumuIndex !== -1) {
       // Set the status explicitly
-      randevularimSheet.getRange(nextRow, randevuDurumuIndex + 1).setValue('İleri Tarih Randevu');
-      console.log('🎨 Set Randevu Durumu to İleri Tarih Randevu');
+      randevularimSheet.getRange(nextRow, randevuDurumuIndex + 1).setValue(appointmentData.aktivite);
+      console.log('🎨 Set Randevu Durumu to:', appointmentData.aktivite);
       
       // Apply color coding again
-      updateRandevularimRowColor(randevularimSheet, nextRow, 'İleri Tarih Randevu');
-      console.log('🎨 Applied İleri Tarih Randevu color coding');
+      updateRandevularimRowColor(randevularimSheet, nextRow, appointmentData.aktivite);
+      console.log('🎨 Applied color coding for:', appointmentData.aktivite);
     }
   }
   
