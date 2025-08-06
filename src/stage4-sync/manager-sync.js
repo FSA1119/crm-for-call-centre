@@ -509,23 +509,111 @@ function createManagerMenu() {
       console.log('⚠️ No existing manager menu to remove');
     }
     
-    // Create manager menu
-    ui.createMenu('YÖNETİCİ')
-      .addItem('🔄 Tüm Verileri Senkronize Et', 'collectAllData')
-      .addItem('👤 Sadece Çalışan Verilerini Topla', 'collectEmployeeDataOnly')
-      .addSeparator()
-      .addItem('📊 Senkronizasyon Durumu', 'showSyncStatus')
-      .addSeparator()
-      .addItem('🎨 Force Refresh Manager Colors', 'forceRefreshManagerColorCoding')
-      .addItem('🧹 Clean Manager Data', 'cleanManagerData')
-      .addSeparator()
-      .addItem('🧪 Test Sistemi', 'runAllTests')
-      .addToUi();
+    // Create main manager menu
+    const menu = ui.createMenu('YÖNETİCİ');
+    
+    // Add main sync options
+    menu.addItem('🔄 Tüm Verileri Senkronize Et', 'collectAllData')
+        .addSeparator();
+    
+    // Add individual employee sync options
+    const submenu = ui.createMenu('👤 Tek Temsilci Senkronize Et');
+    
+    // Add each employee as a menu item
+    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
+      submenu.addItem(`${employeeCode} - ${employeeName}`, `syncSingleEmployee_${employeeCode.replace(/\s+/g, '_')}`);
+    }
+    
+    // Add the submenu to the main menu
+    menu.addSubMenu(submenu)
+        .addSeparator();
+    
+    // Add other options
+    menu.addItem('📊 Senkronizasyon Durumu', 'showSyncStatus')
+        .addSeparator()
+        .addItem('🎨 Renkleri Yenile', 'forceRefreshManagerColorCoding')
+        .addItem('🧹 Verileri Temizle', 'cleanManagerData')
+        .addToUi();
       
-    console.log('✅ Manager menu created');
+    console.log('✅ Manager menu created with individual employee sync options');
+    
+    // Create the handler functions for each employee
+    createEmployeeSyncHandlers();
     
   } catch (error) {
     console.error('❌ Error creating manager menu:', error);
+  }
+}
+
+/**
+ * Creates handler functions for each employee sync option
+ */
+function createEmployeeSyncHandlers() {
+  for (const employeeCode of Object.keys(CRM_CONFIG.EMPLOYEE_CODES)) {
+    const functionName = `syncSingleEmployee_${employeeCode.replace(/\s+/g, '_')}`;
+    
+    // Create the function dynamically
+    this[functionName] = function() {
+      console.log(`🔄 Starting sync for single employee: ${employeeCode}`);
+      syncSingleEmployee(employeeCode);
+    };
+  }
+}
+
+/**
+ * 🔄 Synchronize a single employee
+ * @param {string} employeeCode - Employee code to synchronize
+ */
+function syncSingleEmployee(employeeCode) {
+  console.log(`🔄 Synchronizing single employee: ${employeeCode}`);
+  
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    
+    if (!managerFile) {
+      throw new Error('Yönetici dosyası bulunamadı');
+    }
+    
+    const totalStats = {
+      totalRecords: 0,
+      employeeStats: {},
+      errors: []
+    };
+    
+    console.log(`👤 Processing employee: ${employeeCode}`);
+    
+    const employeeData = collectEmployeeData(managerFile, employeeCode);
+    const employeeStats = {
+      employeeCode,
+      totalRecords: 0,
+      sheetStats: {}
+    };
+    
+    // Update manager sheets with employee data
+    for (const [sheetName, data] of Object.entries(employeeData)) {
+      if (data && data.length > 0) {
+        updateManagerSheet(managerFile, sheetName, data, employeeCode);
+        employeeStats.sheetStats[sheetName] = data.length;
+        employeeStats.totalRecords += data.length;
+      }
+    }
+    
+    totalStats.employeeStats[employeeCode] = employeeStats;
+    totalStats.totalRecords += employeeStats.totalRecords;
+    
+    console.log(`✅ Employee ${employeeCode} processed: ${employeeStats.totalRecords} records`);
+    
+    // Show results
+    showSyncResults(totalStats);
+    
+    // Apply color coding to all sheets
+    applyColorCodingToAllManagerSheets();
+    
+    return totalStats;
+    
+  } catch (error) {
+    console.error(`❌ Error synchronizing employee ${employeeCode}:`, error);
+    SpreadsheetApp.getUi().alert(`❌ Hata: ${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`);
   }
 }
 
@@ -717,11 +805,11 @@ function forceRefreshManagerColorCoding() {
   
   try {
     applyColorCodingToAllManagerSheets();
-    SpreadsheetApp.getUi().alert('✅ Готово', 'Цветовое кодирование обновлено для всех листов');
+    SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Tüm sayfalar için renk kodlaması yenilendi');
     
   } catch (error) {
     console.error('❌ Error refreshing manager colors:', error);
-    SpreadsheetApp.getUi().alert('❌ Ошибка', 'Не удалось обновить цветовое кодирование');
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Renk kodlaması yenilenirken bir hata oluştu');
   }
 }
 
@@ -756,11 +844,11 @@ function cleanManagerData() {
       }
     }
     
-    SpreadsheetApp.getUi().alert('🧹 Готово', `Очищено ${cleanedCount} листов`);
+    SpreadsheetApp.getUi().alert('🧹 Tamamlandı', `${cleanedCount} sayfa temizlendi. Başlıklar korundu.`);
     
   } catch (error) {
     console.error('❌ Error cleaning manager data:', error);
-    SpreadsheetApp.getUi().alert('❌ Ошибка', 'Не удалось очистить данные');
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Veriler temizlenirken bir hata oluştu');
   }
 }
 
@@ -778,32 +866,32 @@ function runAllTests() {
     const requiredSheets = ['Randevular', 'Fırsatlar', 'Toplantılar'];
     for (const requiredSheet of requiredSheets) {
       if (sheetNames.includes(requiredSheet)) {
-        testResults.push(`✅ ${requiredSheet} - найден`);
+        testResults.push(`✅ ${requiredSheet} - mevcut`);
       } else {
-        testResults.push(`❌ ${requiredSheet} - НЕ найден`);
+        testResults.push(`❌ ${requiredSheet} - bulunamadı`);
       }
     }
     
     // Test 2: Check CRM_CONFIG
     if (CRM_CONFIG && CRM_CONFIG.COLOR_CODES) {
-      testResults.push('✅ CRM_CONFIG - корректный');
+      testResults.push('✅ CRM_CONFIG - doğru yapılandırılmış');
     } else {
-      testResults.push('❌ CRM_CONFIG - НЕ корректный');
+      testResults.push('❌ CRM_CONFIG - yapılandırma hatası');
     }
     
     // Test 3: Check employee codes
     if (CRM_CONFIG.EMPLOYEE_CODES && Object.keys(CRM_CONFIG.EMPLOYEE_CODES).length > 0) {
-      testResults.push(`✅ Коды сотрудников - ${Object.keys(CRM_CONFIG.EMPLOYEE_CODES).length} найдено`);
+      testResults.push(`✅ Temsilci kodları - ${Object.keys(CRM_CONFIG.EMPLOYEE_CODES).length} temsilci bulundu`);
     } else {
-      testResults.push('❌ Коды сотрудников - НЕ найдено');
+      testResults.push('❌ Temsilci kodları - bulunamadı');
     }
     
     const resultMessage = testResults.join('\n');
-    SpreadsheetApp.getUi().alert('🧪 Результаты тестов', resultMessage);
+    SpreadsheetApp.getUi().alert('🧪 Test Sonuçları', resultMessage);
     
   } catch (error) {
     console.error('❌ Error running tests:', error);
-    SpreadsheetApp.getUi().alert('❌ Ошибка', 'Не удалось выполнить тесты');
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Testler çalıştırılırken bir hata oluştu');
   }
 }
 
@@ -1296,10 +1384,23 @@ function findEmployeeFile(employeeCode) {
   console.log(`🔍 Finding employee file for ${employeeCode}`); 
   
   try {
-    // This is a placeholder - in real implementation, you would search for employee files
-    // For now, we'll return null to indicate file not found
-    console.log(`⚠️ Employee file search not implemented for ${employeeCode}`);
-    return null;
+    // Check if employee code exists in the EMPLOYEE_FILES mapping
+    if (EMPLOYEE_FILES[employeeCode]) {
+      const fileId = EMPLOYEE_FILES[employeeCode];
+      console.log(`📄 Found employee file ID for ${employeeCode}: ${fileId}`);
+      
+      try {
+        const employeeFile = SpreadsheetApp.openById(fileId);
+        console.log(`✅ Successfully opened employee file for ${employeeCode}`);
+        return employeeFile;
+      } catch (openError) {
+        console.error(`❌ Error opening employee file for ${employeeCode}:`, openError);
+        return null;
+      }
+    } else {
+      console.log(`⚠️ No file ID found for employee code: ${employeeCode}`);
+      return null;
+    }
     
   } catch (error) {
     console.error(`❌ Error finding employee file for ${employeeCode}:`, error);
@@ -1366,30 +1467,31 @@ function showSyncResults(totalStats) {
       return;
     }
     
-    let resultMessage = '📊 **РЕЗУЛЬТАТЫ СИНХРОНИЗАЦИИ**\n\n';
-    resultMessage += `📈 **Общий результат**: ${totalStats.totalRecords} записей\n`;
-    resultMessage += `👥 **Сотрудников обработано**: ${Object.keys(totalStats.employeeStats).length}\n`;
-    resultMessage += `❌ **Ошибок**: ${totalStats.errors.length}\n\n`;
+    let resultMessage = '📊 **SENKRONİZASYON SONUÇLARI**\n\n';
+    resultMessage += `📈 **Toplam Kayıt**: ${totalStats.totalRecords} kayıt\n`;
+    resultMessage += `👥 **İşlenen Temsilci**: ${Object.keys(totalStats.employeeStats).length}\n`;
+    resultMessage += `❌ **Hata Sayısı**: ${totalStats.errors.length}\n\n`;
     
     // Add employee details
-    resultMessage += '**Детали по сотрудникам:**\n';
+    resultMessage += '**Temsilci Detayları:**\n';
     for (const [employeeCode, stats] of Object.entries(totalStats.employeeStats)) {
-      resultMessage += `• ${employeeCode}: ${stats.totalRecords} записей\n`;
+      const employeeName = CRM_CONFIG.EMPLOYEE_CODES[employeeCode] || employeeCode;
+      resultMessage += `• ${employeeCode} (${employeeName}): ${stats.totalRecords} kayıt\n`;
     }
     
     // Add errors if any
     if (totalStats.errors.length > 0) {
-      resultMessage += '\n**Ошибки:**\n';
+      resultMessage += '\n**Hatalar:**\n';
       for (const error of totalStats.errors) {
         resultMessage += `• ${error.employeeCode}: ${error.error}\n`;
       }
     }
     
-    SpreadsheetApp.getUi().alert('📊 Результаты синхронизации', resultMessage);
+    SpreadsheetApp.getUi().alert('📊 Senkronizasyon Sonuçları', resultMessage);
     
   } catch (error) {
     console.error('❌ Error showing sync results:', error);
-    SpreadsheetApp.getUi().alert('❌ Ошибка', 'Не удалось показать результаты синхронизации');
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Senkronizasyon sonuçları gösterilirken bir hata oluştu');
   }
 }
 
@@ -1403,7 +1505,7 @@ function showSyncStatus() {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sheets = spreadsheet.getSheets();
     
-    let statusMessage = '📊 **СИНХРОНИЗАЦИЯ СТАТУС**\n\n';
+    let statusMessage = '📊 **SENKRONİZASYON DURUMU**\n\n';
     
     for (const sheet of sheets) {
       const sheetName = sheet.getName();
@@ -1418,14 +1520,14 @@ function showSyncStatus() {
       const data = sheet.getDataRange().getValues();
       const recordCount = data.length > 1 ? data.length - 1 : 0;
       
-      statusMessage += `📄 **${sheetName}**: ${recordCount} записей\n`;
+      statusMessage += `📄 **${sheetName}**: ${recordCount} kayıt\n`;
     }
     
-    SpreadsheetApp.getUi().alert('📊 Статус синхронизации', statusMessage);
+    SpreadsheetApp.getUi().alert('📊 Senkronizasyon Durumu', statusMessage);
     
   } catch (error) {
     console.error('❌ Error showing sync status:', error);
-    SpreadsheetApp.getUi().alert('❌ Ошибка', 'Не удалось получить статус синхронизации');
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Senkronizasyon durumu gösterilirken bir hata oluştu');
   }
 }
 
