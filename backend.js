@@ -3687,6 +3687,8 @@ function onOpen() {
     
     // Create CRM menu for all sheets
                    ui.createMenu('CRM')
+                 .addItem('Yeni Tablo oluştur', 'showCreateTableDialog')
+                 .addSeparator()
                  .addItem('Randevu al', 'showTakeAppointmentDialog')
                  .addItem('Fırsat ekle', 'showAddOpportunityDialog')
                  .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
@@ -4162,8 +4164,8 @@ function createAdminMenu() {
   try {
     const ui = SpreadsheetApp.getUi();
     
-    // Create Admin Panel menu
-    const menu = ui.createMenu('🔧 Admin Paneli');
+    // Create Admin menu
+    const menu = ui.createMenu('Admin');
     
     // Add menu items
     menu.addItem('Yeni Tablo oluştur', 'showCreateTableDialog');
@@ -4181,12 +4183,13 @@ function createAdminMenu() {
     // Add menu to UI
     menu.addToUi();
     
-    console.log('Admin Paneli created');
+    console.log('Admin menu created');
     
   } catch (error) {
     console.error('Failed to create admin menu:', error);
   }
 }
+
 
 /**
  * Applies appointment color coding to Fırsatlarım row (when appointment is taken)
