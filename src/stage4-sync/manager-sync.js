@@ -532,6 +532,8 @@ function createManagerMenu() {
     menu.addItem('📊 Senkronizasyon Durumu', 'showSyncStatus')
         .addSeparator()
         .addItem('🧹 Verileri Temizle', 'cleanManagerData')
+        .addSeparator()
+        .addItem('📅 Toplantıya Geç', 'openMeetingDialog')
         .addToUi();
       
     console.log('✅ Manager menu created with individual employee sync options');
@@ -539,6 +541,25 @@ function createManagerMenu() {
   } catch (error) {
     console.error('❌ Error creating manager menu:', error);
   }
+}
+
+/**
+ * 📅 Open Meeting Dialog - Opens a dialog for the selected appointment
+ */
+function openMeetingDialog() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const range = sheet.getActiveRange();
+  
+  if (!range || range.getNumRows() !== 1) {
+    SpreadsheetApp.getUi().alert('Lütfen bir randevu satırı seçin.');
+    return;
+  }
+  
+  const rowIndex = range.getRow();
+  const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  // Toplantı penceresini aç (örnek olarak basit bir alert)
+  SpreadsheetApp.getUi().alert('Toplantı Penceresi', `Randevu: ${rowData.join(', ')}`, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
