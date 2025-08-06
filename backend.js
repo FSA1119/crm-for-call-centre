@@ -4340,10 +4340,12 @@ function createAdminMenu() {
   try {
     const ui = SpreadsheetApp.getUi();
     
-    // Create CRM Admin menu
-    const menu = ui.createMenu('🔧 CRM Admin');
+    // Create Admin Panel menu
+    const menu = ui.createMenu('🔧 Admin Paneli');
     
     // Add menu items
+    menu.addItem('Yeni Tablo oluştur', 'showCreateTableDialog');
+    menu.addSeparator();
     menu.addItem('🧪 Test Data Validation', 'testDataValidation');
     menu.addSeparator();
     menu.addItem('🔄 Apply Data Validation to All Sheets', 'applyDataValidationToExistingSheets');
@@ -4357,7 +4359,7 @@ function createAdminMenu() {
     // Add menu to UI
     menu.addToUi();
     
-    console.log('Admin menu created');
+    console.log('Admin Paneli created');
     
   } catch (error) {
     console.error('Failed to create admin menu:', error);
