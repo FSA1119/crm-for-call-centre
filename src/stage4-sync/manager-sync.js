@@ -494,23 +494,17 @@ function openMeetingDialog() {
     const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
     
     // Randevu bilgilerini hazırla
-    const appointmentInfo = {
-      employeeCode: getColumnValue(headers, rowData, 'Temsilci Kodu'),
-      companyName: getColumnValue(headers, rowData, 'Company name') || getColumnValue(headers, rowData, 'Company'),
-      appointmentDate: getColumnValue(headers, rowData, 'Randevu Tarihi'),
-      appointmentTime: getColumnValue(headers, rowData, 'Saat'),
-      appointmentStatus: getColumnValue(headers, rowData, 'Randevu durumu')
-    };
+    const employeeCode = getColumnValue(headers, rowData, 'Temsilci Kodu');
     
     // HTML dialog'u aç
-    const htmlTemplate = HtmlService.createTemplateFromFile('meetingDialog');
-    htmlTemplate.appointmentInfo = appointmentInfo;
+    const htmlTemplate = HtmlService.createTemplateFromFile('managerMeetingDialog');
+    htmlTemplate.employeeCode = employeeCode;
     
     const htmlOutput = htmlTemplate.evaluate()
-      .setWidth(650)
+      .setWidth(500)
       .setHeight(600);
     
-    SpreadsheetApp.getUi().showModalDialog(htmlOutput, '📅 Toplantı Penceresi');
+    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Yönetici Toplantı Ekle');
     
   } catch (error) {
     console.error('❌ Error opening meeting dialog:', error);
@@ -538,51 +532,21 @@ function getColumnValue(headers, rowData, headerName) {
   }
 }
 
-/**
- * 📋 Get appointment info for HTML dialog
- * @returns {Object} - Appointment information
- */
-function getAppointmentInfo() {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    const range = sheet.getActiveRange();
-    
-    if (!range || range.getNumRows() !== 1) {
-      return null;
-    }
-    
-    const rowIndex = range.getRow();
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    return {
-      employeeCode: getColumnValue(headers, rowData, 'Temsilci Kodu'),
-      companyName: getColumnValue(headers, rowData, 'Company name') || getColumnValue(headers, rowData, 'Company'),
-      appointmentDate: getColumnValue(headers, rowData, 'Randevu Tarihi'),
-      appointmentTime: getColumnValue(headers, rowData, 'Saat'),
-      appointmentStatus: getColumnValue(headers, rowData, 'Randevu durumu')
-    };
-    
-  } catch (error) {
-    console.error('❌ Error getting appointment info:', error);
-    return null;
-  }
-}
+
 
 /**
- * 💾 Save meeting data to spreadsheet
+ * 💾 Process manager meeting form data
  * @param {Object} formData - Form data from HTML dialog
- * @returns {Object} - Success/error result
  */
-function saveMeetingData(formData) {
+function processManagerMeetingForm(formData) {
   try {
-    console.log('💾 Saving meeting data:', formData);
+    console.log('💾 Processing manager meeting form:', formData);
     
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     const range = sheet.getActiveRange();
     
     if (!range || range.getNumRows() !== 1) {
-      return { success: false, error: 'Geçerli bir satır seçilmedi' };
+      throw new Error('Geçerli bir satır seçilmedi');
     }
     
     const rowIndex = range.getRow();
@@ -590,10 +554,15 @@ function saveMeetingData(formData) {
     
     // Toplantı bilgilerini güncelle
     const updates = [
-      { header: 'Toplantı Tarihi', value: formData.meetingDate },
-      { header: 'Toplantı formatı', value: formData.meetingFormat },
-      { header: 'Toplantı Sonucu', value: formData.meetingResult },
-      { header: 'Yönetici Not', value: formData.meetingNotes }
+      { header: 'Company name', value: formData.sirketAdi },
+      { header: 'Phone', value: formData.telefon },
+      { header: 'Mail', value: formData.mail },
+      { header: 'Address', value: formData.adres },
+      { header: 'Toplantı Tarihi', value: formData.toplamtiTarihi },
+      { header: 'Saat', value: formData.toplamtiSaati },
+      { header: 'Randevu durumu', value: formData.randevuDurumu },
+      { header: 'Toplantı Sonucu', value: formData.toplamtiSonucu },
+      { header: 'Yönetici Not', value: formData.yoneticiNot }
     ];
     
     for (const update of updates) {
@@ -606,12 +575,11 @@ function saveMeetingData(formData) {
     // Renk kodlamasını yenile
     applyColorCodingToManagerData(sheet, sheet.getName(), rowIndex, 1);
     
-    console.log('✅ Meeting data saved successfully');
-    return { success: true };
+    console.log('✅ Manager meeting data saved successfully');
     
   } catch (error) {
-    console.error('❌ Error saving meeting data:', error);
-    return { success: false, error: error.message };
+    console.error('❌ Error processing manager meeting form:', error);
+    throw error;
   }
 }
 

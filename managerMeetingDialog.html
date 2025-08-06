@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #555;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    textarea {
+      height: 80px;
+      resize: vertical;
+    }
+    .button-group {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .btn {
+      padding: 10px 20px;
+      margin: 0 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-primary {
+      background-color: #007bff;
+      color: white;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+      color: white;
+    }
+    .btn:hover {
+      opacity: 0.8;
+    }
+    .employee-info {
+      background-color: #e9ecef;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      text-align: center;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Yönetici Toplantı Ekle</h2>
+    </div>
+    
+    <div class="employee-info">
+      Temsilci: <?= employeeCode ?>
+    </div>
+    
+    <form id="meetingForm">
+      <div class="form-group">
+        <label for="sirketAdi">Şirket Adı *</label>
+        <input type="text" id="sirketAdi" name="sirketAdi" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="telefon">Telefon</label>
+        <input type="tel" id="telefon" name="telefon">
+      </div>
+      
+      <div class="form-group">
+        <label for="mail">E-mail</label>
+        <input type="email" id="mail" name="mail">
+      </div>
+      
+      <div class="form-group">
+        <label for="adres">Adres</label>
+        <textarea id="adres" name="adres"></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label for="toplamtiTarihi">Toplantı Tarihi *</label>
+        <input type="date" id="toplamtiTarihi" name="toplamtiTarihi" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="toplamtiSaati">Toplantı Saati *</label>
+        <input type="time" id="toplamtiSaati" name="toplamtiSaati" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="randevuDurumu">Randevu Durumu *</label>
+        <select id="randevuDurumu" name="randevuDurumu" required>
+          <option value="">Seçiniz</option>
+          <option value="Randevu Alındı">Randevu Alındı</option>
+          <option value="İleri Tarih Randevu">İleri Tarih Randevu</option>
+          <option value="Teyitlendi">Teyitlendi</option>
+          <option value="Ertelendi">Ertelendi</option>
+          <option value="İptal">İptal</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="toplamtiSonucu">Toplantı Sonucu *</label>
+        <select id="toplamtiSonucu" name="toplamtiSonucu" required>
+          <option value="">Seçiniz</option>
+          <option value="Toplantı Tamamlandı">Toplantı Tamamlandı</option>
+          <option value="Toplantı Ertelendi">Toplantı Ertelendi</option>
+          <option value="Toplantı İptal oldu">Toplantı İptal oldu</option>
+          <option value="Satış Yapıldı">Satış Yapıldı</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="yoneticiNot">Yönetici Not</label>
+        <textarea id="yoneticiNot" name="yoneticiNot" placeholder="Yönetici notları..."></textarea>
+      </div>
+      
+      <div class="button-group">
+        <button type="button" class="btn btn-secondary" onclick="closeDialog()">İptal</button>
+        <button type="submit" class="btn btn-primary">Toplantı Ekle</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Set default date to today
+    document.getElementById('toplamtiTarihi').value = new Date().toISOString().split('T')[0];
+    
+    // Set default time to current time + 1 hour
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    document.getElementById('toplamtiSaati').value = now.toTimeString().slice(0, 5);
+    
+    // Form submission
+    document.getElementById('meetingForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const formData = {
+        employeeCode: '<?= employeeCode ?>',
+        sirketAdi: document.getElementById('sirketAdi').value,
+        telefon: document.getElementById('telefon').value,
+        mail: document.getElementById('mail').value,
+        adres: document.getElementById('adres').value,
+        toplamtiTarihi: document.getElementById('toplamtiTarihi').value,
+        toplamtiSaati: document.getElementById('toplamtiSaati').value,
+        randevuDurumu: document.getElementById('randevuDurumu').value,
+        toplamtiSonucu: document.getElementById('toplamtiSonucu').value,
+        yoneticiNot: document.getElementById('yoneticiNot').value
+      };
+      
+      // Validate required fields
+      if (!formData.sirketAdi || !formData.toplamtiTarihi || !formData.toplamtiSaati || 
+          !formData.randevuDurumu || !formData.toplamtiSonucu) {
+        alert('Lütfen tüm zorunlu alanları doldurun.');
+        return;
+      }
+      
+      // Submit form
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onError)
+        .processManagerMeetingForm(formData);
+    });
+    
+    function onSuccess() {
+      google.script.host.close();
+    }
+    
+    function onError(error) {
+      alert('Hata: ' + error.message);
+    }
+    
+    function closeDialog() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html> 
