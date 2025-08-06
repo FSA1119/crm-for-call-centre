@@ -531,7 +531,6 @@ function createManagerMenu() {
     // Add other options
     menu.addItem('📊 Senkronizasyon Durumu', 'showSyncStatus')
         .addSeparator()
-        .addItem('🎨 Renkleri Yenile', 'forceRefreshManagerColorCoding')
         .addItem('🧹 Verileri Temizle', 'cleanManagerData')
         .addToUi();
       
