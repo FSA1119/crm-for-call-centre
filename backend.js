@@ -2224,9 +2224,7 @@ function setFirsatlarimDataValidation(sheet) {
     const firsatDurumuOptions = [
       'Yeniden Aranacak',
       'Bilgi Verildi',
-      'Fırsat İletildi',
-      'İlgilenmiyor',
-      'Ulaşılamadı'
+      'Fırsat İletildi'
     ];
     
     console.log('Setting Fırsat Durumu validation with options:', firsatDurumuOptions);
