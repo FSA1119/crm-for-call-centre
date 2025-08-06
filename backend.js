@@ -3834,9 +3834,12 @@ function onOpen() {
     
     // Automatically apply data validation to all sheets
     try {
-      console.log('Auto-applying data validation to all sheets...');
-      applyDataValidationToExistingSheets({});
-      console.log('Data validation applied successfully');
+      console.log('Auto-applying data validation to all sheets with extended coverage...');
+      
+      // Directly apply refreshFormatTabloValidation for maximum coverage
+      refreshFormatTabloValidation();
+      
+      console.log('Extended data validation applied successfully');
     } catch (error) {
       console.warn('Auto data validation failed:', error.message);
     }
