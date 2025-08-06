@@ -23,14 +23,26 @@ const CRM_CONFIG = {
   // Manager file
   MANAGER_FILE: 'FSA_019 - Yonetici Takip Dosyasi',
   
-  // Color codes for status
+  // 🎨 Centralized Color System - Visual Harmony (SYNCED WITH RENK_KODLARI.md)
   COLOR_CODES: {
-    'Randevu Alındı': '#4FC3F7',
-    'Teyitlendi': '#E8F5E8', 
-    'Ertelendi': '#FFF3E0',
-    'İptal': '#FFEBEE',
-    'Fırsat': '#FFF8E1',
-    'Toplantı Tamamlandı': '#C8E6C9'
+    // Primary Status Colors
+    'Randevu Alındı': 'rgb(25, 172, 240)',      // Professional Blue
+    'İleri Tarih Randevu': 'rgb(135, 206, 250)', // Light Blue
+    'Randevu Teyitlendi': 'rgb(67, 206, 67)',    // Success Green
+    'Randevu Ertelendi': 'rgb(195, 169, 128)',   // Warning Orange
+    'Randevu İptal oldu': 'rgb(218, 92, 111)',   // Error Red
+    
+    // Opportunity Colors
+    'Fırsat İletildi': 'rgb(199, 171, 235)',     // Purple
+    'Bilgi Verildi': 'rgb(199, 171, 235)',       // Purple (same as Fırsat İletildi)
+    'Yeniden Aranacak': 'rgb(228, 145, 226)',    // Pink
+    
+    // Negative Status Colors
+    'İlgilenmiyor': 'rgb(138, 118, 89)',         // Brown
+    'Ulaşılamadı': 'rgb(255, 205, 210)',         // Light Red
+    
+    // Meeting Colors
+    'Toplantı Tamamlandı': 'rgb(72, 224, 77)'    // Success Green
   },
   
   // Activity options (all)
@@ -63,12 +75,125 @@ const CRM_CONFIG = {
 };
 
 // ========================================
-// UTILITY FUNCTIONS
+// 🔧 UTILITY FUNCTIONS - FOUNDATION LAYER
 // ========================================
 
 /**
- * Validates input parameters
- * @param {Object} parameters - Input parameters
+ * 📅 Date Validation - Temporal Integrity
+ * @param {*} date - Date to validate
+ * @returns {boolean} - Validation result
+ */
+function isValidDate(date) {
+  if (!date || date === '' || date === null || date === undefined || date === '30.12.1899') return false;
+  
+  if (date === 'Invalid Date' || date === 'NaN') return false;
+  
+  try {
+    // Handle Date objects directly
+    if (date instanceof Date) {
+      if (isNaN(date.getTime())) return false;
+      const year = date.getFullYear();
+      if (year < 1900 || year > 2100) return false;
+      return true;
+    }
+    
+    const testDate = new Date(date);
+    
+    if (isNaN(testDate.getTime())) return false;
+    
+    const year = testDate.getFullYear();
+    if (year < 1900 || year > 2100) return false;
+    
+    return true;
+  } catch (error) {
+    console.log('📅 Date validation error:', error, 'for date:', date);
+    return false;
+  }
+}
+
+/**
+ * 🕐 Time Value Formatting - Temporal Display
+ * @param {*} value - Time value to format
+ * @returns {string} - Formatted time
+ */
+function formatTimeValue(value) {
+  try {
+    if (!value || value === '' || value === null || value === undefined) return '';
+    
+    // Handle Date objects
+    if (value instanceof Date) {
+      const hours = value.getHours().toString().padStart(2, '0');
+      const minutes = value.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+    
+    // Handle string dates (like "30.12.1899")
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      if (!isNaN(date.getTime()) && date.getFullYear() !== 1899) {
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+    }
+    
+    // Handle invalid dates
+    if (value === '30.12.1899' || value === 'Invalid Date') {
+      return '';
+    }
+    
+    return value.toString();
+    
+  } catch (error) {
+    console.log('🕐 Time formatting error:', error, 'for value:', value);
+    return '';
+  }
+}
+
+/**
+ * 📅 Date Value Formatting - Temporal Display
+ * @param {*} value - Date value to format
+ * @returns {string} - Formatted date
+ */
+function formatDateValue(value) {
+  try {
+    if (!value || value === '' || value === null || value === undefined) return '';
+    
+    // Handle Date objects
+    if (value instanceof Date) {
+      const day = value.getDate().toString().padStart(2, '0');
+      const month = (value.getMonth() + 1).toString().padStart(2, '0');
+      const year = value.getFullYear();
+      return `${day}.${month}.${year}`;
+    }
+    
+    // Handle string dates
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      if (!isNaN(date.getTime()) && date.getFullYear() !== 1899) {
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}.${month}.${year}`;
+      }
+    }
+    
+    // Handle invalid dates
+    if (value === '30.12.1899' || value === 'Invalid Date') {
+      return '';
+    }
+    
+    return value.toString();
+    
+  } catch (error) {
+    console.log('📅 Date formatting error:', error, 'for value:', value);
+    return '';
+  }
+}
+
+/**
+ * 🛡️ Input Validation - Data Integrity Guardian
+ * @param {Object} parameters - Input parameters to validate
  * @returns {boolean} - Validation result
  */
 function validateInput(parameters) {
@@ -80,6 +205,107 @@ function validateInput(parameters) {
   }
   
   return true;
+}
+
+/**
+ * 📏 Universal Column Width Optimizer - Professional Layout
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetType - Type of sheet for specific optimizations
+ */
+function optimizeColumnWidths(sheet, sheetType = 'default') {
+  console.log(`📏 Optimizing column widths for ${sheetType} sheet`);
+  
+  try {
+    if (!sheet) {
+      console.error('❌ Invalid sheet for column width optimization');
+      return;
+    }
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    headers.forEach((header, index) => {
+      const columnIndex = index + 1;
+      const optimalWidth = getOptimalColumnWidth(header, sheetType);
+      sheet.setColumnWidth(columnIndex, optimalWidth);
+    });
+    
+    console.log(`✅ Column widths optimized for ${sheetType} sheet`);
+    
+  } catch (error) {
+    console.error(`❌ Error optimizing column widths for ${sheetType}:`, error);
+  }
+}
+
+/**
+ * 📏 Get Optimal Column Width - Smart Sizing
+ * @param {string} header - Column header
+ * @param {string} sheetType - Sheet type
+ * @returns {number} - Optimal width in pixels
+ */
+function getOptimalColumnWidth(header, sheetType) {
+  // Base widths for different column types
+  const widthMap = {
+    // Employee/Manager Codes
+    'Kod': 120,
+    'Temsilci Kodu': 120,
+    
+    // Company Information
+    'Company name': 200,
+    'Kaynak': 100,
+    'Keyword': 150,
+    'Location': 120,
+    'Category': 120,
+    'Website': 200,
+    
+    // Contact Information
+    'Phone': 130,
+    'Yetkili Tel': 130,
+    'Mail': 180,
+    'İsim Soyisim': 150,
+    
+    // Status and Activity
+    'Aktivite': 140,
+    'Randevu durumu': 140,
+    'Fırsat Durumu': 140,
+    'Toplantı durumu': 140,
+    'Durum': 140,
+    
+    // Dates and Times
+    'Tarih': 100,
+    'Randevu Tarihi': 120,
+    'Fırsat Tarihi': 120,
+    'Toplantı Tarihi': 120,
+    'Aktivite Tarihi': 120,
+    'Saat': 80,
+    
+    // Notes and Comments
+    'Yorum': 250,
+    'Yönetici Not': 200,
+    
+    // Technical Information
+    'CMS Adı': 120,
+    'CMS Grubu': 120,
+    'E-Ticaret İzi': 120,
+    'Site Hızı': 100,
+    'Site Trafiği': 120,
+    'Log': 100,
+    'Toplantı formatı': 120,
+    
+    // Address Information
+    'Address': 300,
+    'City': 100,
+    
+    // Analytics
+    'Rating count': 100,
+    'Review': 100,
+    'Toplantı Sonucu': 150,
+    
+    // Links
+    'Maplink': 200
+  };
+  
+  // Return optimal width or default
+  return widthMap[header] || 100;
 }
 
 /**
@@ -1056,23 +1282,59 @@ function updateFormatTableRow(sheet, rowNumber, activity, formData = {}) {
  * @param {number} rowNumber - Row number
  * @param {string} activity - Activity status
  */
+/**
+ * 🎨 Format Table Color Coding - Visual Status
+ * @param {Sheet} sheet - Target sheet
+ * @param {number} rowNumber - Row number
+ * @param {string} activity - Activity status
+ */
 function applyFormatTableColorCoding(sheet, rowNumber, activity) {
-  console.log('Applying Format Tablo color coding to row:', rowNumber, 'activity:', activity);
+  console.log('🎨 Applying Format Tablo color coding to row:', rowNumber, 'activity:', activity);
   
-  let color = '#FFFFFF'; // Default white
-  
-  // Map activity to color
-  if (activity === 'Randevu Alındı' || activity === 'İleri Tarih Randevu') {
-    color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
-  } else if (activity === 'Fırsat İletildi' || activity === 'Bilgi Verildi') {
-    color = CRM_CONFIG.COLOR_CODES['Fırsat'];
-  } else if (activity === 'İlgilenmiyor' || activity === 'Ulaşılamadı') {
-    color = CRM_CONFIG.COLOR_CODES['İptal'];
+  try {
+    if (!sheet || !rowNumber || !activity) {
+      console.error('❌ Invalid parameters for color coding');
+      return;
+    }
+    
+    let color = 'rgb(255, 255, 255)'; // Default white
+    
+    // Map activity to color using centralized system
+    if (activity === 'Randevu Alındı') {
+      color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+    } else if (activity === 'İleri Tarih Randevu') {
+      color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
+    } else if (activity === 'Randevu Teyitlendi') {
+      color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
+    } else if (activity === 'Randevu Ertelendi') {
+      color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
+    } else if (activity === 'Randevu İptal oldu') {
+      color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
+    } else if (activity === 'Fırsat İletildi') {
+      color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+    } else if (activity === 'Bilgi Verildi') {
+      color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
+    } else if (activity === 'Yeniden Aranacak') {
+      color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
+    } else if (activity === 'İlgilenmiyor') {
+      color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
+    } else if (activity === 'Ulaşılamadı') {
+      color = CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
+    } else if (activity === 'Toplantı Tamamlandı') {
+      color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+    } else {
+      console.log('⚠️ Unknown activity:', activity, '- using default white');
+    }
+    
+    // Apply color to entire row
+    const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+    range.setBackground(color);
+    
+    console.log(`✅ Applied color ${color} to row ${rowNumber} for activity: ${activity}`);
+    
+  } catch (error) {
+    console.error('❌ Error applying Format Tablo color coding:', error);
   }
-  
-  // Apply color to entire row
-  sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).setBackground(color);
-  console.log('Applied color:', color, 'to row:', rowNumber);
 }
 
 /**
@@ -1254,15 +1516,28 @@ function setRandevularimDataValidation(sheet) {
 }
 
 /**
- * Applies color coding to appointment row
+ * 🎨 Appointment Color Coding - Visual Status
  * @param {Sheet} sheet - Randevularım sheet
  * @param {number} rowNumber - Row number
  */
 function applyAppointmentColorCoding(sheet, rowNumber) {
-  console.log('Applying appointment color coding to row:', rowNumber);
+  console.log('🎨 Applying appointment color coding to row:', rowNumber);
   
-  const color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
-  sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).setBackground(color);
+  try {
+    if (!sheet || !rowNumber) {
+      console.error('❌ Invalid parameters for appointment color coding');
+      return;
+    }
+    
+    const color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+    const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+    range.setBackground(color);
+    
+    console.log(`✅ Applied appointment color ${color} to row ${rowNumber}`);
+    
+  } catch (error) {
+    console.error('❌ Error applying appointment color coding:', error);
+  }
 }
 
 /**
@@ -1309,8 +1584,8 @@ function addOpportunity(parameters) {
     // Get selected row data
     const selectedRowData = getSelectedRowData(activeSheet, activeRange.getRow());
     
-    // Check if row already has opportunity
-    if (selectedRowData.Aktivite === 'Fırsat İletildi') {
+    // Check if row already has opportunity (only if Aktivite field exists and is not empty)
+    if (selectedRowData.Aktivite && selectedRowData.Aktivite.toString().trim() === 'Fırsat İletildi') {
       throw new Error('Bu satır zaten fırsat olarak işaretlenmiş');
     }
     
@@ -1357,7 +1632,11 @@ function addOpportunity(parameters) {
         
         if (existingOpportunity) {
           console.log('Debug - Found existing opportunity:', existingOpportunity);
-          throw new Error('Bu satır zaten fırsat olarak işaretlenmiş (Fırsatlarım sayfasında mevcut)');
+          // Sadece gerçekten dolu satırlar için hata ver
+          const hasValidData = existingOpportunity.some(cell => cell && cell.toString().trim() !== '');
+          if (hasValidData) {
+            throw new Error('Bu satır zaten fırsat olarak işaretlenmiş (Fırsatlarım sayfasında mevcut)');
+          }
         }
       } else {
         console.log('Debug - Skipping check: phoneIndex =', phoneIndex, 'companyIndex =', companyIndex);
@@ -1817,15 +2096,62 @@ function setFirsatlarimDataValidation(sheet) {
 }
 
 /**
- * Applies color coding to opportunity row
+ * 🎨 Opportunity Color Coding - Visual Status
  * @param {Sheet} sheet - Fırsatlarım sheet
  * @param {number} rowNumber - Row number
  */
 function applyOpportunityColorCoding(sheet, rowNumber) {
-  console.log('Applying opportunity color coding to row:', rowNumber);
+  console.log('🎨 Applying opportunity color coding to row:', rowNumber);
   
-  const color = CRM_CONFIG.COLOR_CODES['Fırsat'];
-  sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).setBackground(color);
+  try {
+    if (!sheet || !rowNumber) {
+      console.error('❌ Invalid parameters for opportunity color coding');
+      return;
+    }
+    
+    // Get the status from the Fırsat Durumu column
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+    
+    if (firsatDurumuIndex === -1) {
+      console.error('❌ Fırsat Durumu column not found');
+      return;
+    }
+    
+    const status = sheet.getRange(rowNumber, firsatDurumuIndex + 1).getValue();
+    console.log('📋 Status found:', status, 'in row:', rowNumber);
+    
+    let color = 'rgb(255, 255, 255)'; // Default white
+    
+    // Map status to color using centralized system
+    if (status === 'Fırsat İletildi') {
+      color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+      console.log('🎨 Applied Fırsat İletildi color:', color);
+    } else if (status === 'Bilgi Verildi') {
+      color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
+      console.log('🎨 Applied Bilgi Verildi color:', color);
+    } else if (status === 'Yeniden Aranacak') {
+      color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
+      console.log('🎨 Applied Yeniden Aranacak color:', color);
+    } else if (status === 'İlgilenmiyor') {
+      color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
+      console.log('🎨 Applied İlgilenmiyor color:', color);
+    } else if (status === 'Ulaşılamadı') {
+      color = CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
+      console.log('🎨 Applied Ulaşılamadı color:', color);
+    } else {
+      console.log('⚠️ Unknown status:', status, '- using default white');
+    }
+    
+    // Apply color to entire row
+    const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+    range.setBackground(color);
+    
+    console.log(`✅ Applied color ${color} to row ${rowNumber} for status: ${status}`);
+    
+  } catch (error) {
+    console.error('❌ Error applying opportunity color coding:', error);
+  }
 }
 
 /**
@@ -2491,15 +2817,28 @@ function setToplantilarimDataValidation(sheet) {
 }
 
 /**
- * Applies color coding to meeting row
+ * 🎨 Meeting Color Coding - Visual Status
  * @param {Sheet} sheet - Toplantılarım sheet
  * @param {number} rowNumber - Row number
  */
 function applyMeetingColorCoding(sheet, rowNumber) {
-  console.log('Applying meeting color coding to row:', rowNumber);
+  console.log('🎨 Applying meeting color coding to row:', rowNumber);
   
-  const color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
-  sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).setBackground(color);
+  try {
+    if (!sheet || !rowNumber) {
+      console.error('❌ Invalid parameters for meeting color coding');
+      return;
+    }
+    
+    const color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+    const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+    range.setBackground(color);
+    
+    console.log(`✅ Applied meeting color ${color} to row ${rowNumber}`);
+    
+  } catch (error) {
+    console.error('❌ Error applying meeting color coding:', error);
+  }
 }
 
 /**
@@ -3585,8 +3924,11 @@ function onEdit(e) {
   try {
     const sheet = e.source.getActiveSheet();
     const sheetName = sheet.getName();
+    const range = e.range;
+    const row = range.getRow();
+    const col = range.getColumn();
     
-    console.log('Sheet name:', sheetName);
+    console.log('Sheet name:', sheetName, 'Row:', row, 'Column:', col);
     
     // Process Randevularım sheet for status changes
     if (sheetName === 'Randevularım') {
@@ -3595,35 +3937,49 @@ function onEdit(e) {
       return;
     }
     
-    // Only process Format Tablo sheets and Fırsatlarım
-    if (!isFormatTable(sheet) && sheetName !== 'Fırsatlarım') {
-      console.log('Not a Format Tablo or Fırsatlarım sheet, skipping:', sheetName);
-      return;
-    }
-    
-    console.log('Format Tablo sheet edited:', sheetName);
-    
-    // Create CRM menu for Format Tablo sheets
-    const ui = SpreadsheetApp.getUi();
-    
-    // Check if CRM menu already exists
-    const existingMenus = ui.getMenus();
-    const hasCRMMenu = existingMenus.some(menu => menu.getName() === 'CRM');
-    if (hasCRMMenu) {
-      console.log('CRM menu already exists, skipping creation');
-      return;
-    }
-    
-    // Create new CRM menu
-    ui.createMenu('CRM')
-      .addItem('Randevu al', 'showTakeAppointmentDialog')
-      .addItem('Fırsat ekle', 'showAddOpportunityDialog')
-      .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
-      .addSeparator()
-      .addItem('📊 Rapor oluştur', 'showGenerateReportDialog')
-      .addToUi();
+    // Process Format Tablo sheets for activity changes
+    if (isFormatTable(sheet)) {
+      console.log('Format Tablo sheet detected, checking for activity changes');
       
-    console.log('CRM menu created for Format Tablo sheet');
+      // Check if the edited cell is in the Aktivite column
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const aktiviteIndex = headers.indexOf('Aktivite');
+      
+      if (aktiviteIndex !== -1 && col === aktiviteIndex + 1 && row > 1) {
+        console.log('Activity cell edited in row:', row);
+        const newActivity = range.getValue();
+        console.log('New activity value:', newActivity);
+        
+        // Apply color coding based on new activity
+        applyFormatTableColorCoding(sheet, row, newActivity);
+        console.log('Color coding applied for activity:', newActivity);
+      }
+      
+      return;
+    }
+    
+    // Process Fırsatlarım sheet for status changes
+    if (sheetName === 'Fırsatlarım') {
+      console.log('Fırsatlarım sheet detected, checking for status changes');
+      
+      // Check if the edited cell is in the Fırsat Durumu column
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+      
+      if (firsatDurumuIndex !== -1 && col === firsatDurumuIndex + 1 && row > 1) {
+        console.log('Fırsat Durumu cell edited in row:', row);
+        const newStatus = range.getValue();
+        console.log('New Fırsat Durumu value:', newStatus);
+        
+        // Apply color coding based on new status
+        applyOpportunityColorCoding(sheet, row);
+        console.log('Color coding applied for Fırsat Durumu:', newStatus);
+      }
+      
+      return;
+    }
+    
+    console.log('Not a Format Tablo, Randevularım, or Fırsatlarım sheet, skipping:', sheetName);
     
   } catch (error) {
     console.error('onEdit error:', error);
@@ -3833,51 +4189,62 @@ function handleRandevularimStatusChange(e, sheet) {
 
 
 /**
- * Updates Randevularım row color based on Randevu Durumu
+ * 🎨 Updates Randevularım Row Color - Visual Status
  * @param {Sheet} randevularimSheet - Randevularım sheet
  * @param {number} rowNumber - Row number
  * @param {string} status - Randevu Durumu
  */
 function updateRandevularimRowColor(randevularimSheet, rowNumber, status) {
-  console.log('Updating Randevularım row color:', rowNumber, status);
+  console.log('🎨 Updating Randevularım row color:', rowNumber, status);
   
-  // Parametre kontrolü
-  if (!randevularimSheet) {
-    console.error('randevularimSheet is undefined');
-    return;
+  try {
+    // Parametre kontrolü
+    if (!randevularimSheet) {
+      console.error('❌ randevularimSheet is undefined');
+      return;
+    }
+    
+    if (!rowNumber) {
+      console.error('❌ rowNumber is undefined');
+      return;
+    }
+    
+    if (!status) {
+      console.error('❌ status is undefined');
+      return;
+    }
+    
+    let color = 'rgb(255, 255, 255)'; // Default white
+    
+    // Map status to color using centralized system
+    switch (status) {
+      case 'Randevu Alındı':
+        color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+        break;
+      case 'İleri Tarih Randevu':
+        color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
+        break;
+      case 'Randevu Teyitlendi':
+        color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
+        break;
+      case 'Randevu Ertelendi':
+        color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
+        break;
+      case 'Randevu İptal oldu':
+        color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
+        break;
+      default:
+        color = 'rgb(255, 255, 255)'; // White (default)
+    }
+    
+    const range = randevularimSheet.getRange(rowNumber, 1, 1, randevularimSheet.getLastColumn());
+    range.setBackground(color);
+    
+    console.log(`✅ Randevularım color updated: ${color} for status: ${status}`);
+    
+  } catch (error) {
+    console.error('❌ Error updating Randevularım row color:', error);
   }
-  
-  if (!rowNumber) {
-    console.error('rowNumber is undefined');
-    return;
-  }
-  
-  if (!status) {
-    console.error('status is undefined');
-    return;
-  }
-  
-  let color;
-  
-  switch (status) {
-    case 'Randevu Alındı':
-      color = '#E3F2FD'; // Mavi
-      break;
-    case 'Randevu Teyitlendi':
-      color = '#E8F5E8'; // Yeşil
-      break;
-    case 'Randevu Ertelendi':
-      color = '#FFF3E0'; // Sarı
-      break;
-    case 'Randevu İptal oldu':
-      color = '#FFEBEE'; // Turuncu
-      break;
-    default:
-      color = '#FFFFFF'; // Beyaz (varsayılan)
-  }
-  
-  randevularimSheet.getRange(rowNumber, 1, 1, randevularimSheet.getLastColumn()).setBackground(color);
-  console.log('Randevularım color updated:', color);
 }
 
 // ========================================
