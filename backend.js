@@ -197,13 +197,10 @@ function formatDateValue(value) {
  * @returns {boolean} - Validation result
  */
 function validateInput(parameters) {
-  console.log('Validating input:', parameters);
-  
   if (!parameters || typeof parameters !== 'object') {
     console.error('Invalid parameters: must be an object');
     return false;
   }
-  
   return true;
 }
 
@@ -348,14 +345,7 @@ function getCurrentEmployeeCode() {
 function logActivity(action, data = {}) {
   const timestamp = new Date().toISOString();
   const employeeCode = getCurrentEmployeeCode();
-  
-  const logEntry = {
-    timestamp: timestamp,
-    employee: employeeCode,
-    action: action,
-    data: data
-  };
-  
+  const logEntry = { timestamp, employee: employeeCode, action, data };
   console.log('Activity logged:', logEntry);
   return logEntry;
 }
@@ -370,54 +360,32 @@ function logActivity(action, data = {}) {
  * @returns {Object} - Result object
  */
 function createNewTable(parameters) {
-  console.log('Function started: createNewTable', parameters);
-  
   try {
-    // Input validation
     if (!validateInput(parameters)) {
       throw new Error('Invalid input provided');
     }
-    
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const hamVeriSheet = spreadsheet.getSheetByName('Ham veri');
-    
     if (!hamVeriSheet) {
       throw new Error('Ham veri sayfası bulunamadı');
     }
-    
-    // Get table name from user
     const ui = SpreadsheetApp.getUi();
-    const response = ui.prompt(
-      'Yeni Tablo Oluştur',
-      'Yeni Format Tablo için isim girin (örn: t10):',
-      ui.ButtonSet.OK_CANCEL
-    );
-    
+    const response = ui.prompt('Yeni Tablo Oluştur', 'Yeni Format Tablo için isim girin (örn: t10):', ui.ButtonSet.OK_CANCEL);
     if (response.getSelectedButton() === ui.Button.OK) {
       const tableName = response.getResponseText().trim();
-      
       if (!tableName) {
         throw new Error('Tablo ismi boş olamaz');
       }
-      
-      // Check if table already exists
       const existingSheet = spreadsheet.getSheetByName(tableName);
       if (existingSheet) {
         throw new Error(`"${tableName}" isimli tablo zaten mevcut`);
       }
-      
-      // Create new Format Tablo
       const result = createFormatTable(spreadsheet, hamVeriSheet, tableName);
-      
-      console.log('Processing complete:', result);
-      logActivity('createNewTable', { tableName: tableName, rowCount: result.rowCount });
-      
+      logActivity('createNewTable', { tableName, rowCount: result.rowCount });
       return result;
     } else {
-      console.log('User cancelled table creation');
       return { success: false, message: 'İşlem iptal edildi' };
     }
-    
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata: ' + error.message);
@@ -433,91 +401,36 @@ function createNewTable(parameters) {
  * @returns {Object} - Result object
  */
 function createFormatTable(spreadsheet, hamVeriSheet, tableName) {
-  console.log('Creating Format Tablo:', tableName);
-  
-  // Create new sheet
   const newSheet = spreadsheet.insertSheet(tableName);
-  
-  // Activate the new sheet so getActiveSheet() returns the correct sheet
   newSheet.activate();
-  
-  // Define Format Tablo columns based on sayfa_kolonlari.md
   const formatTableColumns = [
-    'Kod',
-    'Keyword', 
-    'Location',
-    'Company name',
-    'Category',
-    'Website',
-    'Phone',
-    'Yetkili Tel',
-    'Mail',
-    'İsim Soyisim',
-    'Aktivite',
-    'Aktivite Tarihi',
-    'Yorum',
-    'Yönetici Not',
-    'CMS Adı',
-    'CMS Grubu',
-    'E-Ticaret İzi',
-    'Site Hızı',
-    'Site Trafiği',
-    'Log',
-    'Toplantı formatı',
-    'Address',
-    'City',
-    'Rating count',
-    'Review',
-    'Maplink'
+    'Kod', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+    'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Aktivite',
+    'Aktivite Tarihi', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu',
+    'E-Ticaret İzi', 'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı',
+    'Address', 'City', 'Rating count', 'Review', 'Maplink'
   ];
-  
-  // Set headers
   newSheet.getRange(1, 1, 1, formatTableColumns.length).setValues([formatTableColumns]);
-  
-  // Get data from Ham veri
   const hamVeriData = hamVeriSheet.getDataRange().getValues();
   const hamVeriHeaders = hamVeriData[0];
   const hamVeriRows = hamVeriData.slice(1);
-  
-  // Map columns from Ham veri to Format Tablo
   const mappedData = mapHamVeriToFormatTable(hamVeriRows, hamVeriHeaders, formatTableColumns, tableName);
-  
-  // Write mapped data to new sheet
   if (mappedData.length > 0) {
     newSheet.getRange(2, 1, mappedData.length, formatTableColumns.length).setValues(mappedData);
-    
-    // Force Review column to be plain text to prevent date conversion
     const reviewColumnIndex = formatTableColumns.indexOf('Review') + 1;
     if (reviewColumnIndex > 0 && mappedData.length > 0) {
       const reviewRange = newSheet.getRange(2, reviewColumnIndex, mappedData.length, 1);
-      reviewRange.setNumberFormat('@'); // Force plain text format
-      console.log('Review column forced to plain text format');
+      reviewRange.setNumberFormat('@');
     }
-    
-    // Force Kod column to be plain text to prevent int conversion
     const kodColumnIndex = formatTableColumns.indexOf('Kod') + 1;
     if (kodColumnIndex > 0 && mappedData.length > 0) {
       const kodRange = newSheet.getRange(2, kodColumnIndex, mappedData.length, 1);
-      kodRange.setNumberFormat('@'); // Force plain text format
-      console.log('Kod column forced to plain text format');
+      kodRange.setNumberFormat('@');
     }
   }
-  
-  // Apply formatting
   applyFormatTableStyling(newSheet);
-  
-  // Set data validation for dropdown columns
   setDataValidation(newSheet);
-  
-  const result = {
-    success: true,
-    tableName: tableName,
-    rowCount: mappedData.length,
-    message: `${tableName} başarıyla oluşturuldu. ${mappedData.length} satır aktarıldı.`
-  };
-  
-  console.log('Format Tablo created successfully:', result);
-  return result;
+  return { success: true, tableName, rowCount: mappedData.length, message: `${tableName} başarıyla oluşturuldu. ${mappedData.length} satır aktarıldı.` };
 }
 
 /**
@@ -572,99 +485,59 @@ function decodeTurkishText(text) {
  * @returns {Array} - Mapped data
  */
 function mapHamVeriToFormatTable(hamVeriRows, hamVeriHeaders, formatTableColumns, tableName) {
-  console.log('Mapping Ham veri to Format Tablo');
-  console.log('Table name parameter:', tableName);
-  
   const mappedData = [];
   const employeeCode = getCurrentEmployeeCode();
-  
-  hamVeriRows.forEach((row, index) => {
+  hamVeriRows.forEach((row) => {
     const mappedRow = new Array(formatTableColumns.length).fill('');
-    
-    // Map each column
     formatTableColumns.forEach((formatCol, formatIndex) => {
       const hamVeriIndex = hamVeriHeaders.indexOf(formatCol);
-      
       if (hamVeriIndex !== -1 && row[hamVeriIndex]) {
-        // Special handling for Review column to prevent date conversion
         if (formatCol === 'Review') {
-          // Get the original value and ensure it's treated as a number/string
           let reviewValue = row[hamVeriIndex];
-          
-          // If it's already a Date object, convert it back to original format
           if (reviewValue instanceof Date) {
-            // Try to extract the original numeric value
-            const month = reviewValue.getMonth() + 1; // 0-based to 1-based
+            const month = reviewValue.getMonth() + 1;
             const day = reviewValue.getDate();
             reviewValue = `${month}.${day}`;
-            console.log(`Converted Date back to numeric: ${reviewValue}`);
           }
-          
-          // Force as string with R prefix
           mappedRow[formatIndex] = `R${String(reviewValue)}`;
-          console.log(`Review value preserved as text: ${row[hamVeriIndex]} → ${mappedRow[formatIndex]}`);
         } else {
-          // Decode Turkish characters and preserve original data type
           mappedRow[formatIndex] = decodeTurkishText(row[hamVeriIndex]);
         }
       } else {
-        // Handle special column mappings
         switch (formatCol) {
           case 'Kod':
-            // Use dynamic sheet name before tire as code
             const sheetName = SpreadsheetApp.getActiveSpreadsheet().getName();
             const beforeTire = sheetName.split(' - ')[0];
-            // Use original format with space
             mappedRow[formatIndex] = beforeTire || 'Unknown';
-            console.log(`Using dynamic sheet name as code: ${beforeTire} from ${sheetName}`);
             break;
           case 'Aktivite':
-            // Aktivite kolonu boş bırakılır, kullanıcı manuel seçer
             mappedRow[formatIndex] = '';
             break;
           case 'Aktivite Tarihi':
-            mappedRow[formatIndex] = new Date(); // Current date
+            mappedRow[formatIndex] = new Date();
             break;
           case 'Log':
             mappedRow[formatIndex] = `Ham veri'den aktarıldı - ${new Date().toLocaleString('tr-TR')}`;
             break;
           case 'Maplink':
-            // Convert Cid to Maplink format
             const cidIndex = hamVeriHeaders.indexOf('Cid');
             if (cidIndex !== -1 && row[cidIndex]) {
               const cid = row[cidIndex];
-              // Extract CID from Google Maps URL if it's a full URL
               const cidMatch = cid.match(/cid=(\d+)/);
               if (cidMatch) {
                 mappedRow[formatIndex] = `https://maps.google.com/?cid=${cidMatch[1]}`;
               } else {
-                // If it's just the CID number
                 mappedRow[formatIndex] = `https://maps.google.com/?cid=${cid}`;
               }
             }
             break;
-          case 'Yetkili Tel':
-          case 'Mail':
-          case 'İsim Soyisim':
-          case 'Yorum':
-          case 'Yönetici Not':
-          case 'CMS Adı':
-          case 'CMS Grubu':
-          case 'E-Ticaret İzi':
-          case 'Site Hızı':
-          case 'Site Trafiği':
-          case 'Toplantı formatı':
-            // These columns are left empty for manual input
+          default:
             mappedRow[formatIndex] = '';
-            break;
         }
       }
     });
-    
     mappedData.push(mappedRow);
   });
-  
-  console.log(`Mapped ${mappedData.length} rows`);
   return mappedData;
 }
 
@@ -673,21 +546,12 @@ function mapHamVeriToFormatTable(hamVeriRows, hamVeriHeaders, formatTableColumns
  * @param {Sheet} sheet - Target sheet
  */
 function applyFormatTableStyling(sheet) {
-  console.log('Applying Format Tablo styling');
-  
-  // Header styling
   const headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
   headerRange.setBackground('#4285f4');
   headerRange.setFontColor('white');
   headerRange.setFontWeight('bold');
-  
-  // Freeze header row
   sheet.setFrozenRows(1);
-  
-  // Auto-resize columns
   sheet.autoResizeColumns(1, sheet.getLastColumn());
-  
-  // Add borders
   const dataRange = sheet.getDataRange();
   dataRange.setBorder(true, true, true, true, true, true);
 }
@@ -697,72 +561,32 @@ function applyFormatTableStyling(sheet) {
  * @param {Sheet} sheet - Target sheet
  */
 function setDataValidation(sheet) {
-  console.log('Setting data validation for dropdown columns');
-  
-  // Find column indices
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  console.log('Sheet headers:', headers);
-  
   const aktiviteIndex = headers.indexOf('Aktivite') + 1;
   const toplantiFormatIndex = headers.indexOf('Toplantı formatı') + 1;
-  
-  console.log('Aktivite column index:', aktiviteIndex);
-  console.log('Toplantı formatı column index:', toplantiFormatIndex);
-  
-  // Set validation for Aktivite column
   if (aktiviteIndex > 0) {
-    console.log('Setting Aktivite validation with options:', CRM_CONFIG.ACTIVITY_OPTIONS);
-    
-    // Create validation rule with all options
     const aktiviteRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
       .setAllowInvalid(false)
       .build();
-    
-    // Apply validation to more rows than currently exist to ensure future rows are covered
-    const minRows = 1000; // Ensure validation covers at least 1000 rows
-    const lastRow = Math.max(sheet.getLastRow(), 2); // At least 2 to account for header
+    const minRows = 1000;
+    const lastRow = Math.max(sheet.getLastRow(), 2);
     const rowsToValidate = Math.max(minRows, lastRow - 1);
-    
-    console.log(`Applying validation to ${rowsToValidate} rows starting from row 2`);
     const validationRange = sheet.getRange(2, aktiviteIndex, rowsToValidate, 1);
-    
-    // Force refresh the validation by clearing and reapplying
-    console.log('Forcing validation refresh...');
     validationRange.clearDataValidations();
     validationRange.setDataValidation(aktiviteRule);
-    
-    console.log('Applied Aktivite validation to range:', validationRange.getA1Notation());
-    console.log('Validation rule created with options:', CRM_CONFIG.ACTIVITY_OPTIONS);
-    console.log('Validation refreshed successfully');
-  } else {
-    console.log('Aktivite column not found in headers');
   }
-  
-  // Set validation for Toplantı formatı column
   if (toplantiFormatIndex > 0) {
-    console.log('Setting Toplantı formatı validation with options:', CRM_CONFIG.MEETING_FORMAT_OPTIONS);
-    
     const toplantiRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
       .setAllowInvalid(false)
       .build();
-    
-    // Apply validation to more rows than currently exist to ensure future rows are covered
-    const minRows = 1000; // Ensure validation covers at least 1000 rows
-    const lastRow = Math.max(sheet.getLastRow(), 2); // At least 2 to account for header
+    const minRows = 1000;
+    const lastRow = Math.max(sheet.getLastRow(), 2);
     const rowsToValidate = Math.max(minRows, lastRow - 1);
-    
-    console.log(`Applying Toplantı formatı validation to ${rowsToValidate} rows starting from row 2`);
     const toplantiValidationRange = sheet.getRange(2, toplantiFormatIndex, rowsToValidate, 1);
-    
-    // Force refresh the validation by clearing and reapplying
     toplantiValidationRange.clearDataValidations();
     toplantiValidationRange.setDataValidation(toplantiRule);
-    
-    console.log('Applied Toplantı formatı validation to range:', toplantiValidationRange.getA1Notation());
-  } else {
-    console.log('Toplantı formatı column not found in headers');
   }
 }
 

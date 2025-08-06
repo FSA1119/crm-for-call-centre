@@ -480,19 +480,139 @@ function createManagerMenu() {
  * 📅 Open Meeting Dialog - Opens a dialog for the selected appointment
  */
 function openMeetingDialog() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const range = sheet.getActiveRange();
-  
-  if (!range || range.getNumRows() !== 1) {
-    SpreadsheetApp.getUi().alert('Lütfen bir randevu satırı seçin.');
-    return;
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const range = sheet.getActiveRange();
+    
+    if (!range || range.getNumRows() !== 1) {
+      SpreadsheetApp.getUi().alert('Lütfen bir randevu satırı seçin.');
+      return;
+    }
+    
+    const rowIndex = range.getRow();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Randevu bilgilerini hazırla
+    const appointmentInfo = {
+      employeeCode: getColumnValue(headers, rowData, 'Temsilci Kodu'),
+      companyName: getColumnValue(headers, rowData, 'Company name') || getColumnValue(headers, rowData, 'Company'),
+      appointmentDate: getColumnValue(headers, rowData, 'Randevu Tarihi'),
+      appointmentTime: getColumnValue(headers, rowData, 'Saat'),
+      appointmentStatus: getColumnValue(headers, rowData, 'Randevu durumu')
+    };
+    
+    // HTML dialog'u aç
+    const htmlTemplate = HtmlService.createTemplateFromFile('meetingDialog');
+    htmlTemplate.appointmentInfo = appointmentInfo;
+    
+    const htmlOutput = htmlTemplate.evaluate()
+      .setWidth(650)
+      .setHeight(600);
+    
+    SpreadsheetApp.getUi().showModalDialog(htmlOutput, '📅 Toplantı Penceresi');
+    
+  } catch (error) {
+    console.error('❌ Error opening meeting dialog:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Toplantı penceresi açılırken bir hata oluştu: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
   }
-  
-  const rowIndex = range.getRow();
-  const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
-  
-  // Toplantı penceresini aç (örnek olarak basit bir alert)
-  SpreadsheetApp.getUi().alert('Toplantı Penceresi', `Randevu: ${rowData.join(', ')}`, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/**
+ * 🔍 Get column value by header name
+ * @param {Array} headers - Column headers
+ * @param {Array} rowData - Row data
+ * @param {string} headerName - Header name to find
+ * @returns {string} - Column value
+ */
+function getColumnValue(headers, rowData, headerName) {
+  try {
+    const columnIndex = headers.findIndex(header => header === headerName);
+    if (columnIndex !== -1 && rowData[columnIndex]) {
+      return rowData[columnIndex].toString();
+    }
+    return '';
+  } catch (error) {
+    console.error('❌ Error getting column value:', error);
+    return '';
+  }
+}
+
+/**
+ * 📋 Get appointment info for HTML dialog
+ * @returns {Object} - Appointment information
+ */
+function getAppointmentInfo() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const range = sheet.getActiveRange();
+    
+    if (!range || range.getNumRows() !== 1) {
+      return null;
+    }
+    
+    const rowIndex = range.getRow();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    return {
+      employeeCode: getColumnValue(headers, rowData, 'Temsilci Kodu'),
+      companyName: getColumnValue(headers, rowData, 'Company name') || getColumnValue(headers, rowData, 'Company'),
+      appointmentDate: getColumnValue(headers, rowData, 'Randevu Tarihi'),
+      appointmentTime: getColumnValue(headers, rowData, 'Saat'),
+      appointmentStatus: getColumnValue(headers, rowData, 'Randevu durumu')
+    };
+    
+  } catch (error) {
+    console.error('❌ Error getting appointment info:', error);
+    return null;
+  }
+}
+
+/**
+ * 💾 Save meeting data to spreadsheet
+ * @param {Object} formData - Form data from HTML dialog
+ * @returns {Object} - Success/error result
+ */
+function saveMeetingData(formData) {
+  try {
+    console.log('💾 Saving meeting data:', formData);
+    
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const range = sheet.getActiveRange();
+    
+    if (!range || range.getNumRows() !== 1) {
+      return { success: false, error: 'Geçerli bir satır seçilmedi' };
+    }
+    
+    const rowIndex = range.getRow();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Toplantı bilgilerini güncelle
+    const updates = [
+      { header: 'Toplantı Tarihi', value: formData.meetingDate },
+      { header: 'Toplantı formatı', value: formData.meetingFormat },
+      { header: 'Toplantı Sonucu', value: formData.meetingResult },
+      { header: 'Yönetici Not', value: formData.meetingNotes }
+    ];
+    
+    for (const update of updates) {
+      const columnIndex = headers.findIndex(header => header === update.header);
+      if (columnIndex !== -1) {
+        sheet.getRange(rowIndex, columnIndex + 1).setValue(update.value);
+      }
+    }
+    
+    // Renk kodlamasını yenile
+    applyColorCodingToManagerData(sheet, sheet.getName(), rowIndex, 1);
+    
+    console.log('✅ Meeting data saved successfully');
+    return { success: true };
+    
+  } catch (error) {
+    console.error('❌ Error saving meeting data:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
