@@ -3824,6 +3824,8 @@ function onOpen() {
     
     // Create CRM menu for all sheets
                    ui.createMenu('CRM')
+                 .addItem('Yeni Tablo oluştur', 'showCreateTableDialog')
+                 .addSeparator()
                  .addItem('Randevu al', 'showTakeAppointmentDialog')
                  .addItem('Fırsat ekle', 'showAddOpportunityDialog')
                  .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
