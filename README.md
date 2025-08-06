@@ -40,32 +40,59 @@ Google-Sheets-CRM/
 git clone [repository-url]
 cd Google-Sheets-CRM
 
-# En son versiyonu kontrol edin
+# Tüm versiyonları görün
 git tag -l
 
-# En son versiyona geçin (v1.3)
-git checkout v1.3
+# En son versiyona geçin (v3.7)
+git checkout v3.7-etap3.7
 
 # Veya belirli bir versiyona geçmek için:
-git checkout v1.2  # veya v1.1, v1.0
+git checkout v3.6-etap3.6  # veya v3.5, v3.4, vb.
 ```
 
-#### Versiyon Değiştirme
+## 🔄 **Versiyon Yönetimi**
+
+### 📋 **Mevcut Versiyonlar:**
+- `v1.3-etap1.3` - İlk stabil versiyon
+- `v2.6-etap2.6` - Senkronizasyon sistemi
+- `v3.0-etap3.0` - Admin paneli
+- `v3.1-etap3.1` - Detaylı senkronizasyon raporları
+- `v3.2-etap3.2` - Toplantıya Geç butonu
+- `v3.3-etap3.3` - CRM menüsü düzenlemesi
+- `v3.4-etap3.4` - Admin menüsü adı değişikliği
+- `v3.5-etap3.5` - Manager toplantı dialog
+- `v3.6-etap3.6` - Toplantı soruları ve otomatik bilgi alma
+- **`v3.7-etap3.7`** - CRM menüsünden Yeni Tablo kaldırma
+
+### 🔙 **İstediğin Versiyona Dönme:**
 ```bash
-# Farklı bir versiyona geçmek için:
-git checkout v1.2
+# v3.7'e dönmek için:
+git checkout v3.7-etap3.7
 
-# Ana branch'e dönmek için:
-git checkout main
+# v3.6'ya dönmek için:
+git checkout v3.6-etap3.6
+
+# v3.5'e dönmek için:
+git checkout v3.5-etap3.5
 ```
 
-#### Mevcut Durumu Kontrol Etme
+### 🔙 **Versiyondan Devam Etme:**
+```bash
+# v3.7'den devam etmek için:
+git checkout v3.7-etap3.7
+git checkout -b devam-branch
+```
+
+### 📊 **Mevcut Durumu Kontrol Etme:**
 ```bash
 # Hangi versiyonda olduğunuzu görmek için:
 git describe --tags
 
 # Son commit bilgilerini görmek için:
 git log --oneline -10
+
+# Tüm versiyonları görmek için:
+git tag -l
 ```
 
 ### 0. Ham Veri Formatı
