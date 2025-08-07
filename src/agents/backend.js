@@ -5408,7 +5408,7 @@ function detectCMSAltyapisi(parameters) {
     
     // Progress bar başlat
     const ui = SpreadsheetApp.getUi();
-    ui.alert('🔍 CMS Analizi', `${rowCount} satır analiz ediliyor...\nLütfen bekleyin.`);
+    ui.alert(`${rowCount} satır analiz ediliyor...\nLütfen bekleyin.`);
     
     // Website kolonunu bul
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -5482,7 +5482,7 @@ function detectCMSAltyapisi(parameters) {
     }
     
     console.log(`✅ CMS Analizi tamamlandı: ${processedCount} satır işlendi`);
-    ui.alert('✅ Tamamlandı', `CMS Analizi tamamlandı!\n${processedCount} satır işlendi.`);
+    ui.alert(`CMS Analizi tamamlandı!\n${processedCount} satır işlendi.`);
     
     return {
       success: true,
@@ -5670,7 +5670,7 @@ function detectEcommerceIzi(parameters) {
     
     // Progress bar başlat
     const ui = SpreadsheetApp.getUi();
-    ui.alert('🛒 E-ticaret Analizi', `${rowCount} satır analiz ediliyor...\nLütfen bekleyin.`);
+    ui.alert(`${rowCount} satır analiz ediliyor...\nLütfen bekleyin.`);
     
     // Website kolonunu bul
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -5734,7 +5734,7 @@ function detectEcommerceIzi(parameters) {
     }
     
     console.log(`✅ E-ticaret Analizi tamamlandı: ${processedCount} satır işlendi`);
-    ui.alert('✅ Tamamlandı', `E-ticaret Analizi tamamlandı!\n${processedCount} satır işlendi.`);
+    ui.alert(`E-ticaret Analizi tamamlandı!\n${processedCount} satır işlendi.`);
     
     return {
       success: true,
@@ -5869,7 +5869,7 @@ function testSiteHizi(parameters) {
     
     // Progress bar başlat
     const ui = SpreadsheetApp.getUi();
-    ui.alert('⚡ Hız Testi', `${rowCount} satır test ediliyor...\nLütfen bekleyin.`);
+    ui.alert(`${rowCount} satır test ediliyor...\nLütfen bekleyin.`);
     
     // Website kolonunu bul
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -5933,7 +5933,7 @@ function testSiteHizi(parameters) {
     }
     
     console.log(`✅ Hız Testi tamamlandı: ${processedCount} satır işlendi`);
-    ui.alert('✅ Tamamlandı', `Hız Testi tamamlandı!\n${processedCount} satır işlendi.`);
+    ui.alert(`Hız Testi tamamlandı!\n${processedCount} satır işlendi.`);
     
     return {
       success: true,
