@@ -5920,6 +5920,12 @@ function detectEcommerceIzi(parameters) {
       console.log('✅ E-Ticaret İzi kolonu eklendi');
     }
     
+    // CMS Adı kolonunu bul
+    let cmsAdiIndex = headers.findIndex(header => header === 'CMS Adı');
+    if (cmsAdiIndex === -1) {
+      console.log('⚠️ CMS Adı kolonu bulunamadı, E-ticaret analizi yapılacak');
+    }
+    
     // Performans optimizasyonu
     const BATCH_SIZE = Math.min(25, rowCount);
     let processedCount = 0;
@@ -5940,17 +5946,31 @@ function detectEcommerceIzi(parameters) {
           const website = sheet.getRange(currentRow, websiteIndex + 1).getValue();
           
           if (website && website.toString().trim() !== '') {
-            const ecommerceResult = analyzeEcommerce(website.toString());
+            // CMS tespit edilmişse E-ticaret analizi yap
+            const cmsAdi = sheet.getRange(currentRow, cmsAdiIndex + 1).getValue();
             
-            // Sonucu yaz
-            sheet.getRange(currentRow, ecommerceIndex + 1).setValue(ecommerceResult);
+            if (cmsAdi && cmsAdi !== 'Erişilemiyor' && cmsAdi !== 'Sayfa Bulunamadı') {
+              // CMS tespit edilmiş, E-ticaret analizi yap
+              const ecommerceResult = analyzeEcommerce(website.toString());
+              sheet.getRange(currentRow, ecommerceIndex + 1).setValue(ecommerceResult);
+            } else {
+              // CMS tespit edilmemiş, E-ticaret analizi yapma
+              sheet.getRange(currentRow, ecommerceIndex + 1).setValue('CMS Tespit Edilmedi');
+            }
             
             processedCount++;
           }
           
         } catch (error) {
           console.error(`❌ Satır ${currentRow} analiz hatası:`, error);
-          sheet.getRange(currentRow, ecommerceIndex + 1).setValue('Erişilemiyor');
+          
+          // CMS tespit edilmişse "Erişilemiyor" yazma
+          const cmsAdi = sheet.getRange(currentRow, cmsAdiIndex + 1).getValue();
+          if (cmsAdi && cmsAdi !== 'Erişilemiyor' && cmsAdi !== 'Sayfa Bulunamadı') {
+            sheet.getRange(currentRow, ecommerceIndex + 1).setValue('Analiz Hatası');
+          } else {
+            sheet.getRange(currentRow, ecommerceIndex + 1).setValue('Erişilemiyor');
+          }
           errorCount++;
         }
         
