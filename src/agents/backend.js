@@ -5602,8 +5602,11 @@ function analyzeCMS(website) {
         return { cmsName: `HTTP ${statusCode}`, cmsGroup: 'Erişilemiyor' };
       }
     } else if (statusCode >= 300 && statusCode < 400) {
-      // 3xx yönlendirmeler için devam et
+      // 3xx yönlendirmeler için devam et - Yönlendirme takip edildi
       console.log(`Yönlendirme tespit edildi: ${statusCode}`);
+    } else if (statusCode !== 200) {
+      // 200 olmayan ama 300-399 arası olan durumlar için devam et
+      console.log(`HTTP ${statusCode} - Devam ediliyor`);
     }
     
     const html = response.getContentText();
@@ -5612,13 +5615,49 @@ function analyzeCMS(website) {
       return { cmsName: 'Boş Sayfa', cmsGroup: 'Erişilemiyor' };
     }
     
-    // HTML içeriğinde hata sayfası kontrolü
+    // HTML içeriğinde hata sayfası kontrolü - Daha akıllı yaklaşım
     const lowerHtml = html.toLowerCase();
-    if (lowerHtml.includes('404') || 
-        lowerHtml.includes('sayfa bulunamadı') || 
-        lowerHtml.includes('page not found') ||
-        lowerHtml.includes('error 404')) {
+    
+    // Gerçek 404 sayfası kontrolü - Daha spesifik
+    const isReal404 = (
+      lowerHtml.includes('404') && 
+      (lowerHtml.includes('sayfa bulunamadı') || 
+       lowerHtml.includes('page not found') ||
+       lowerHtml.includes('error 404') ||
+       lowerHtml.includes('not found')) &&
+      html.length < 2000 // Çok kısa içerik
+    );
+    
+    if (isReal404) {
       return { cmsName: '404 Sayfa Bulunamadı', cmsGroup: 'Erişilemiyor' };
+    }
+    
+    // Site kalitesi kontrolü - Yeni özellik
+    let siteQuality = 'Normal';
+    let qualityIssues = [];
+    
+    // 404 linkleri kontrolü
+    const brokenLinks = (lowerHtml.match(/404/g) || []).length;
+    if (brokenLinks > 5) {
+      qualityIssues.push(`${brokenLinks} adet 404 link`);
+    }
+    
+    // Hata mesajları kontrolü
+    const errorMessages = [
+      'error', 'hata', 'sorun', 'problem', 'broken', 'kırık'
+    ];
+    let errorCount = 0;
+    errorMessages.forEach(msg => {
+      if (lowerHtml.includes(msg)) errorCount++;
+    });
+    
+    if (errorCount > 3) {
+      qualityIssues.push(`${errorCount} adet hata mesajı`);
+    }
+    
+    // Site kalitesi belirleme
+    if (qualityIssues.length > 0) {
+      siteQuality = 'Kritik Eksikler';
     }
     
     // CMS Tespit Algoritması
@@ -5693,6 +5732,20 @@ function analyzeCMS(website) {
       'Tilda': {
         patterns: ['tilda', 'tilda.ws', 'tilda.cc'],
         group: 'Website Builder'
+      },
+      
+      // Pazar Yeri Dükkanları
+      'Trendyol Mağaza': {
+        patterns: ['trendyol.com/magaza', 'trendyol.com/store'],
+        group: 'Pazar Yeri'
+      },
+      'N11 Mağaza': {
+        patterns: ['n11.com/magaza', 'n11.com/store'],
+        group: 'Pazar Yeri'
+      },
+      'GittiGidiyor Mağaza': {
+        patterns: ['gittigidiyor.com/magaza', 'gittigidiyor.com/store'],
+        group: 'Pazar Yeri'
       }
     };
     
@@ -5702,7 +5755,9 @@ function analyzeCMS(website) {
         if (lowerHtml.includes(pattern.toLowerCase())) {
           return {
             cmsName: cmsName,
-            cmsGroup: cmsData.group
+            cmsGroup: cmsData.group,
+            siteQuality: siteQuality,
+            qualityIssues: qualityIssues
           };
         }
       }
@@ -5730,14 +5785,18 @@ function analyzeCMS(website) {
     if (ecommerceScore >= 3) {
       return {
         cmsName: 'Özel E-ticaret',
-        cmsGroup: 'Özel Sistem'
+        cmsGroup: 'Özel Sistem',
+        siteQuality: siteQuality,
+        qualityIssues: qualityIssues
       };
     }
     
     // Tanınmayan CMS
     return {
       cmsName: 'Tanınmayan CMS',
-      cmsGroup: 'Bilinmeyen'
+      cmsGroup: 'Bilinmeyen',
+      siteQuality: siteQuality,
+      qualityIssues: qualityIssues
     };
     
   } catch (error) {
