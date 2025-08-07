@@ -5599,7 +5599,8 @@ function analyzeCMS(website) {
       } else if (statusCode === 429) {
         return { cmsName: 'Rate Limit', cmsGroup: 'Erişilemiyor' };
       } else {
-        return { cmsName: `HTTP ${statusCode}`, cmsGroup: 'Erişilemiyor' };
+        // Diğer 4xx/5xx hatalar için site kalitesi kontrolü
+        return { cmsName: `HTTP ${statusCode}`, cmsGroup: 'Güvenli Değil' };
       }
     } else if (statusCode >= 300 && statusCode < 400) {
       // 3xx yönlendirmeler için devam et - Yönlendirme takip edildi
@@ -5633,9 +5634,10 @@ function analyzeCMS(website) {
       return { cmsName: '404 Sayfa Bulunamadı', cmsGroup: 'Erişilemiyor' };
     }
     
-    // Site kalitesi kontrolü - Yeni özellik
+    // Site kalitesi kontrolü - Genişletilmiş özellik
     let siteQuality = 'Normal';
     let qualityIssues = [];
+    let siteSegment = 'Normal';
     
     // 404 linkleri kontrolü
     const brokenLinks = (lowerHtml.match(/404/g) || []).length;
@@ -5659,6 +5661,38 @@ function analyzeCMS(website) {
     // Site kalitesi belirleme
     if (qualityIssues.length > 0) {
       siteQuality = 'Kritik Eksikler';
+    }
+    
+    // Site segmenti belirleme
+    const lowQualityPatterns = [
+      'table', 'td', 'tr', 'font', 'center', 'marquee', 'blink',
+      'bgcolor', 'align', 'valign', 'width', 'height',
+      'javascript:void(0)', 'onclick', 'onload',
+      '<!--', '-->', '&nbsp;', '&amp;', '&lt;', '&gt;'
+    ];
+    
+    let lowQualityCount = 0;
+    lowQualityPatterns.forEach(pattern => {
+      if (lowerHtml.includes(pattern)) lowQualityCount++;
+    });
+    
+    if (lowQualityCount > 10) {
+      siteSegment = 'Düşük Segment';
+    }
+    
+    // Güvenlik kontrolü
+    const securityIssues = [
+      'admin', 'login', 'password', 'user', 'test',
+      'debug', 'error', 'exception', 'stack trace'
+    ];
+    
+    let securityCount = 0;
+    securityIssues.forEach(issue => {
+      if (lowerHtml.includes(issue)) securityCount++;
+    });
+    
+    if (securityCount > 5) {
+      siteSegment = 'Güvenli Değil';
     }
     
     // CMS Tespit Algoritması
@@ -5767,7 +5801,8 @@ function analyzeCMS(website) {
               cmsName: cmsName,
               cmsGroup: cmsData.group,
               siteQuality: siteQuality,
-              qualityIssues: qualityIssues
+              qualityIssues: qualityIssues,
+              siteSegment: siteSegment
             };
           }
         }
@@ -5798,7 +5833,8 @@ function analyzeCMS(website) {
         cmsName: 'Özel E-ticaret',
         cmsGroup: 'Özel Sistem',
         siteQuality: siteQuality,
-        qualityIssues: qualityIssues
+        qualityIssues: qualityIssues,
+        siteSegment: siteSegment
       };
     }
     
@@ -5807,7 +5843,8 @@ function analyzeCMS(website) {
       cmsName: 'Tanınmayan CMS',
       cmsGroup: 'Bilinmeyen',
       siteQuality: siteQuality,
-      qualityIssues: qualityIssues
+      qualityIssues: qualityIssues,
+      siteSegment: siteSegment
     };
     
   } catch (error) {
