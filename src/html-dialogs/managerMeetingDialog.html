@@ -87,22 +87,22 @@
     <form id="meetingForm">
       <div class="form-group">
         <label for="sirketAdi">Şirket Adı *</label>
-        <input type="text" id="sirketAdi" name="sirketAdi" required>
+        <input type="text" id="sirketAdi" name="sirketAdi" value="<?= companyName ?>" required>
       </div>
       
       <div class="form-group">
         <label for="telefon">Telefon</label>
-        <input type="tel" id="telefon" name="telefon">
+        <input type="tel" id="telefon" name="telefon" value="<?= phone ?>">
       </div>
       
       <div class="form-group">
         <label for="mail">E-mail</label>
-        <input type="email" id="mail" name="mail">
+        <input type="email" id="mail" name="mail" value="<?= mail ?>">
       </div>
       
       <div class="form-group">
         <label for="adres">Adres</label>
-        <textarea id="adres" name="adres"></textarea>
+        <textarea id="adres" name="adres"><?= address ?></textarea>
       </div>
       
       <div class="form-group">
@@ -116,14 +116,12 @@
       </div>
       
       <div class="form-group">
-        <label for="randevuDurumu">Randevu Durumu *</label>
-        <select id="randevuDurumu" name="randevuDurumu" required>
+        <label for="toplamtiFormat">Toplantı Formatı *</label>
+        <select id="toplamtiFormat" name="toplamtiFormat" required>
           <option value="">Seçiniz</option>
-          <option value="Randevu Alındı">Randevu Alındı</option>
-          <option value="İleri Tarih Randevu">İleri Tarih Randevu</option>
-          <option value="Teyitlendi">Teyitlendi</option>
-          <option value="Ertelendi">Ertelendi</option>
-          <option value="İptal">İptal</option>
+          <option value="Yüz Yüze">Yüz Yüze</option>
+          <option value="Online">Online</option>
+          <option value="Telefon">Telefon</option>
         </select>
       </div>
       
@@ -131,11 +129,42 @@
         <label for="toplamtiSonucu">Toplantı Sonucu *</label>
         <select id="toplamtiSonucu" name="toplamtiSonucu" required>
           <option value="">Seçiniz</option>
-          <option value="Toplantı Tamamlandı">Toplantı Tamamlandı</option>
-          <option value="Toplantı Ertelendi">Toplantı Ertelendi</option>
-          <option value="Toplantı İptal oldu">Toplantı İptal oldu</option>
           <option value="Satış Yapıldı">Satış Yapıldı</option>
+          <option value="Teklif iletildi">Teklif iletildi</option>
+          <option value="Beklemede">Beklemede</option>
+          <option value="Satış İptal">Satış İptal</option>
         </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="teklifDetayi">Teklif Detayı</label>
+        <select id="teklifDetayi" name="teklifDetayi" multiple>
+          <option value="Custom">Custom</option>
+          <option value="Elite">Elite</option>
+          <option value="Platinium Plus">Platinium Plus</option>
+          <option value="Platinium">Platinium</option>
+          <option value="Entegre">Entegre</option>
+          <option value="Digifirst Custom">Digifirst Custom</option>
+          <option value="Digifirst Plus">Digifirst Plus</option>
+          <option value="Digifirst">Digifirst</option>
+          <option value="Digifirst Setup">Digifirst Setup</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="satisPotansiyeli">Satış Potansiyeli</label>
+        <select id="satisPotansiyeli" name="satisPotansiyeli">
+          <option value="">Seçiniz</option>
+          <option value="Yerinde Satış">Yerinde Satış</option>
+          <option value="Sıcak">Sıcak</option>
+          <option value="Orta">Orta</option>
+          <option value="Soğuk">Soğuk</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="yeniTakipTarihi">Yeni Takip Tarihi</label>
+        <input type="date" id="yeniTakipTarihi" name="yeniTakipTarihi">
       </div>
       
       <div class="form-group">
@@ -163,6 +192,10 @@
     document.getElementById('meetingForm').addEventListener('submit', function(e) {
       e.preventDefault();
       
+      // Get selected teklif detayı values
+      const teklifDetayiSelect = document.getElementById('teklifDetayi');
+      const selectedTeklifDetayi = Array.from(teklifDetayiSelect.selectedOptions).map(option => option.value);
+      
       const formData = {
         employeeCode: '<?= employeeCode ?>',
         sirketAdi: document.getElementById('sirketAdi').value,
@@ -171,14 +204,17 @@
         adres: document.getElementById('adres').value,
         toplamtiTarihi: document.getElementById('toplamtiTarihi').value,
         toplamtiSaati: document.getElementById('toplamtiSaati').value,
-        randevuDurumu: document.getElementById('randevuDurumu').value,
+        toplamtiFormat: document.getElementById('toplamtiFormat').value,
         toplamtiSonucu: document.getElementById('toplamtiSonucu').value,
+        teklifDetayi: selectedTeklifDetayi.join(', '),
+        satisPotansiyeli: document.getElementById('satisPotansiyeli').value,
+        yeniTakipTarihi: document.getElementById('yeniTakipTarihi').value,
         yoneticiNot: document.getElementById('yoneticiNot').value
       };
       
       // Validate required fields
       if (!formData.sirketAdi || !formData.toplamtiTarihi || !formData.toplamtiSaati || 
-          !formData.randevuDurumu || !formData.toplamtiSonucu) {
+          !formData.toplamtiFormat || !formData.toplamtiSonucu) {
         alert('Lütfen tüm zorunlu alanları doldurun.');
         return;
       }

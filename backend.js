@@ -26,23 +26,23 @@ const CRM_CONFIG = {
   // 🎨 Centralized Color System - Visual Harmony (SYNCED WITH RENK_KODLARI.md)
   COLOR_CODES: {
     // Primary Status Colors
-    'Randevu Alındı': 'rgb(25, 172, 240)',      // Professional Blue
-    'İleri Tarih Randevu': 'rgb(135, 206, 250)', // Light Blue
-    'Randevu Teyitlendi': 'rgb(67, 206, 67)',    // Success Green
-    'Randevu Ertelendi': 'rgb(195, 169, 128)',   // Warning Orange
-    'Randevu İptal oldu': 'rgb(218, 92, 111)',   // Error Red
+    'Randevu Alındı': 'rgb(227, 242, 253)',      // Light Blue
+    'İleri Tarih Randevu': 'rgb(227, 242, 253)', // Light Blue
+    'Randevu Teyitlendi': 'rgb(232, 245, 232)',  // Light Green
+    'Randevu Ertelendi': 'rgb(255, 243, 224)',   // Light Orange
+    'Randevu İptal oldu': 'rgb(255, 235, 238)',  // Light Red
     
     // Opportunity Colors
-    'Fırsat İletildi': 'rgb(199, 171, 235)',     // Purple
-    'Bilgi Verildi': 'rgb(199, 171, 235)',       // Purple (same as Fırsat İletildi)
-    'Yeniden Aranacak': 'rgb(228, 145, 226)',    // Pink
+    'Fırsat İletildi': 'rgb(255, 248, 225)',     // Light Yellow
+    'Bilgi Verildi': 'rgb(199, 171, 235)',       // Purple
+    'Yeniden Aranacak': 'rgb(255, 248, 225)',    // Light Yellow
     
     // Negative Status Colors
-    'İlgilenmiyor': 'rgb(138, 118, 89)',         // Brown
-    'Ulaşılamadı': 'rgb(255, 205, 210)',         // Light Red
+    'İlgilenmiyor': 'rgb(255, 235, 238)',        // Light Red
+    'Ulaşılamadı': 'rgb(255, 235, 238)',         // Light Red
     
     // Meeting Colors
-    'Toplantı Tamamlandı': 'rgb(72, 224, 77)'    // Success Green
+    'Toplantı Tamamlandı': 'rgb(200, 230, 201)'  // Light Green
   },
   
   // Activity options (all)
@@ -2144,11 +2144,12 @@ function applyOpportunityColorCoding(sheet, rowNumber) {
     
     if (firsatDurumuIndex === -1) {
       console.error('❌ Fırsat Durumu column not found');
+      console.log('Available headers:', headers);
       return;
     }
     
     const status = sheet.getRange(rowNumber, firsatDurumuIndex + 1).getValue();
-    console.log('📋 Status found:', status, 'in row:', rowNumber);
+    console.log('📋 Status found:', status, 'in row:', rowNumber, 'column:', firsatDurumuIndex + 1);
     
     let color = 'rgb(255, 255, 255)'; // Default white
     
@@ -2158,6 +2159,7 @@ function applyOpportunityColorCoding(sheet, rowNumber) {
       const normalizedStatus = status.toString().trim();
       
       console.log('🔍 Looking for color for status:', normalizedStatus);
+      console.log('Available colors in CRM_CONFIG:', Object.keys(CRM_CONFIG.COLOR_CODES));
       
       // Check exact match first
       if (CRM_CONFIG.COLOR_CODES[normalizedStatus]) {
@@ -2174,6 +2176,7 @@ function applyOpportunityColorCoding(sheet, rowNumber) {
         console.log('🔧 Fixed status value to exact match: "Fırsat İletildi"');
       } else {
         console.log('⚠️ Unknown status:', normalizedStatus, '- using default white');
+        console.log('Available statuses for opportunities:', ['Yeniden Aranacak', 'Bilgi Verildi', 'Fırsat İletildi']);
       }
     } else {
       console.log('⚠️ Empty status - using default white');

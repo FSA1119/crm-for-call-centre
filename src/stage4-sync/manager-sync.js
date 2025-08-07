@@ -416,6 +416,7 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
       const rowNumber = startRow + i;
       const statusCell = sheet.getRange(rowNumber, statusColumnIndex + 1);
       const status = statusCell.getValue();
+      console.log(`Manager color coding - Row ${rowNumber}, Status: "${status}", Sheet: ${sheetName}`);
       if (status && status !== '') {
         let color = 'rgb(255, 255, 255)';
         if (status === 'Randevu Alındı') {
@@ -434,6 +435,10 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
         } else if (status === 'Yeniden Aranacak') {
           color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
+        } else {
+          // Debug: Log unknown status
+          console.log('Unknown status in manager:', status);
+        }
         } else if (status === 'İlgilenmiyor') {
           color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
         } else if (status === 'Ulaşılamadı') {

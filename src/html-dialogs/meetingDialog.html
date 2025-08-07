@@ -3,69 +3,85 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toplantı Penceresi</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
       padding: 20px;
-      background-color: #f8f9fa;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
     .container {
-      max-width: 100%;
       background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      overflow: hidden;
+      border-radius: 15px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      padding: 30px;
+      width: 100%;
+      max-width: 600px;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
     
     .header {
-      background: linear-gradient(135deg, #17a2b8, #138496);
-      color: white;
-      padding: 15px 20px;
-      font-size: 18px;
-      font-weight: bold;
+      text-align: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #f0f0f0;
+      padding-bottom: 20px;
     }
     
-    .form-container {
-      padding: 20px;
+    .header h1 {
+      color: #333;
+      margin: 0;
+      font-size: 28px;
+      font-weight: 600;
+    }
+    
+    .header p {
+      color: #666;
+      margin: 10px 0 0 0;
+      font-size: 16px;
     }
     
     .form-group {
-      margin-bottom: 15px;
+      margin-bottom: 20px;
     }
     
     .form-group label {
       display: block;
-      margin-bottom: 5px;
-      font-weight: 600;
+      margin-bottom: 8px;
       color: #333;
+      font-weight: 500;
       font-size: 14px;
     }
     
     .form-group input,
-    .form-group select,
-    .form-group textarea {
+    .form-group textarea,
+    .form-group select {
       width: 100%;
-      padding: 10px;
+      padding: 12px 15px;
       border: 2px solid #e1e5e9;
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 14px;
-      transition: border-color 0.3s ease;
+      transition: all 0.3s ease;
       box-sizing: border-box;
     }
     
     .form-group input:focus,
-    .form-group select:focus,
-    .form-group textarea:focus {
+    .form-group textarea:focus,
+    .form-group select:focus {
       outline: none;
-      border-color: #17a2b8;
-      box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.1);
-    }
-    
-    .form-group textarea {
-      resize: vertical;
-      min-height: 80px;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
     
     .form-row {
@@ -77,336 +93,254 @@
       flex: 1;
     }
     
-    .required {
-      color: #dc3545;
-    }
-    
-    .pre-filled {
-      background-color: #f8f9fa;
-      color: #6c757d;
+    .form-group textarea {
+      resize: vertical;
+      min-height: 100px;
     }
     
     .buttons {
       display: flex;
-      gap: 10px;
+      gap: 15px;
       justify-content: flex-end;
-      margin-top: 20px;
+      margin-top: 30px;
       padding-top: 20px;
-      border-top: 1px solid #e1e5e9;
+      border-top: 2px solid #f0f0f0;
     }
     
     .btn {
-      padding: 10px 20px;
+      padding: 12px 25px;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 500;
       cursor: pointer;
       transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+    }
+    
+    .btn-secondary {
+      background: #f8f9fa;
+      color: #6c757d;
+      border: 2px solid #e9ecef;
+    }
+    
+    .btn-secondary:hover {
+      background: #e9ecef;
+      color: #495057;
     }
     
     .btn-primary {
-      background-color: #17a2b8;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
     }
     
     .btn-primary:hover {
-      background-color: #138496;
-    }
-    
-    .btn-secondary {
-      background-color: #6c757d;
-      color: white;
-    }
-    
-    .btn-secondary:hover {
-      background-color: #5a6268;
-    }
-    
-    .error {
-      color: #dc3545;
-      font-size: 12px;
-      margin-top: 5px;
-    }
-    
-    .success {
-      color: #28a745;
-      font-size: 12px;
-      margin-top: 5px;
-    }
-    
-    .company-info {
-      background-color: #d1ecf1;
-      border: 1px solid #bee5eb;
-      border-radius: 6px;
-      padding: 15px;
-      margin-bottom: 20px;
-    }
-    
-    .company-info h3 {
-      margin: 0 0 10px 0;
-      color: #0c5460;
-      font-size: 16px;
-    }
-    
-    .company-info p {
-      margin: 5px 0;
-      font-size: 14px;
-      color: #333;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
     }
     
     .appointment-info {
-      background-color: #e8f5e8;
-      border: 1px solid #c3e6c3;
-      border-radius: 6px;
-      padding: 15px;
-      margin-bottom: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 25px;
+      border-left: 4px solid #667eea;
     }
     
     .appointment-info h3 {
-      margin: 0 0 10px 0;
-      color: #2d8f47;
-      font-size: 16px;
+      margin: 0 0 15px 0;
+      color: #333;
+      font-size: 18px;
     }
     
-    .appointment-info p {
-      margin: 5px 0;
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
       font-size: 14px;
+    }
+    
+    .info-label {
+      font-weight: 500;
+      color: #666;
+    }
+    
+    .info-value {
       color: #333;
+      font-weight: 600;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    
+    .status-confirmed {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+    
+    .status-cancelled {
+      background: #f8d7da;
+      color: #721c24;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      🤝 Toplantıya Geç
+      <h1>📅 Toplantı Penceresi</h1>
+      <p>Seçilen randevu için toplantı detaylarını girin</p>
     </div>
     
-    <div class="form-container">
-      <!-- Company Information -->
-      <div class="company-info">
-        <h3>🏢 Firma Bilgileri</h3>
-        <p><strong>Firma:</strong> <?= rowData['Company name'] || 'Belirtilmemiş' ?></p>
-        <p><strong>Kategori:</strong> <?= rowData['Category'] || 'Belirtilmemiş' ?></p>
-        <p><strong>Website:</strong> <?= rowData['Website'] || 'Belirtilmemiş' ?></p>
-        <p><strong>Telefon:</strong> <?= rowData['Phone'] || 'Belirtilmemiş' ?></p>
-        <p><strong>Adres:</strong> <?= rowData['Address'] ? rowData['Address'] + ', ' + rowData['City'] : 'Belirtilmemiş' ?></p>
+    <div class="appointment-info">
+      <h3>📋 Randevu Bilgileri</h3>
+      <div class="info-row">
+        <span class="info-label">Temsilci:</span>
+        <span class="info-value" id="employeeCode">-</span>
       </div>
-      
-      <!-- Appointment Information -->
-      <div class="appointment-info">
-        <h3>📅 Randevu Bilgileri</h3>
-        <p><strong>İletişim Kişisi:</strong> <?= rowData['İsim Soyisim'] || 'Belirtilmemiş' ?></p>
-        <p><strong>Randevu Tarihi:</strong> <?= rowData['Randevu Tarihi'] || 'Belirtilmemiş' ?></p>
-        <p><strong>Saat:</strong> <?= rowData['Saat'] || 'Belirtilmemiş' ?></p>
-        <p><strong>Format:</strong> <?= rowData['Toplantı formatı'] || 'Belirtilmemiş' ?></p>
+      <div class="info-row">
+        <span class="info-label">Şirket:</span>
+        <span class="info-value" id="companyName">-</span>
       </div>
-      
-      <form id="meetingForm">
-        <!-- Meeting Details -->
-        <div class="form-row">
-          <div class="form-group">
-            <label for="toplantiTarihi">Toplantı Tarihi <span class="required">*</span></label>
-            <input type="date" id="toplantiTarihi" name="toplantiTarihi" value="<?= rowData['Randevu Tarihi'] ?>" required>
-          </div>
-          <div class="form-group">
-                          <label for="toplantiFormat">Toplantı Formatı</label>
-              <select id="toplantiFormat" name="toplantiFormat">
-              <? for (let i = 0; i < meetingFormats.length; i++) { ?>
-                <option value="<?= meetingFormats[i] ?>" <?= meetingFormats[i] === 'Yüz Yüze' ? 'selected' : '' ?>>
-                  <?= meetingFormats[i] ?>
-                </option>
-              <? } ?>
-            </select>
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-                            <label for="toplantiSonucu">Toplantı Sonucu</label>
-                <select id="toplantiSonucu" name="toplantiSonucu">
-              <option value="">Seçiniz</option>
-              <option value="Satış Yapıldı">Satış Yapıldı</option>
-              <option value="Teklif İletildi">Teklif İletildi</option>
-              <option value="Beklemede">Beklemede</option>
-              <option value="Satış İptal">Satış İptal</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="satisPotansiyeli">Satış Potansiyeli</label>
-            <select id="satisPotansiyeli" name="satisPotansiyeli">
-              <option value="">Seçiniz</option>
-              <option value="Yerinde Satış">Yerinde Satış</option>
-              <option value="Sıcak">Sıcak</option>
-              <option value="Orta">Orta</option>
-              <option value="Soğuk">Soğuk</option>
-            </select>
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="teklifDetayi">Teklif Detayı</label>
-          <select id="teklifDetayi" name="teklifDetayi">
-            <option value="">Seçiniz</option>
-            <option value="Custom">Custom</option>
-            <option value="Elite">Elite</option>
-            <option value="Platinium Plus">Platinium Plus</option>
-            <option value="Platinium">Platinium</option>
-            <option value="Entegre">Entegre</option>
-            <option value="Digifirst Custom">Digifirst Custom</option>
-            <option value="Digifirst Plus">Digifirst Plus</option>
-            <option value="Digifirst">Digifirst</option>
-            <option value="Digifirst Setup">Digifirst Setup</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label for="yeniTakipTarihi">Yeni Takip Tarihi</label>
-          <input type="date" id="yeniTakipTarihi" name="yeniTakipTarihi">
-        </div>
-        
-        <!-- Notes -->
-        <div class="form-group">
-          <label for="yorum">Toplantı Notları</label>
-          <textarea id="yorum" name="yorum" placeholder="Toplantı ile ilgili notlarınızı buraya yazın..."><?= rowData['Yorum'] || '' ?></textarea>
-        </div>
-        
-        <div class="form-group">
-          <label for="yoneticiNot">Yönetici Notu</label>
-          <textarea id="yoneticiNot" name="yoneticiNot" placeholder="Yönetici için özel notlar..."><?= rowData['Yönetici Not'] || '' ?></textarea>
-        </div>
-        
-        <!-- Validation Messages -->
-        <div id="errorMessage" class="error" style="display: none;"></div>
-        <div id="successMessage" class="success" style="display: none;"></div>
-        
-        <!-- Buttons -->
-        <div class="buttons">
-          <button type="button" class="btn btn-secondary" onclick="cancelForm()">İptal</button>
-          <button type="submit" class="btn btn-primary">Toplantı Oluştur</button>
-        </div>
-      </form>
+      <div class="info-row">
+        <span class="info-label">Tarih:</span>
+        <span class="info-value" id="appointmentDate">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Saat:</span>
+        <span class="info-value" id="appointmentTime">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Durum:</span>
+        <span class="info-value">
+          <span class="status-badge status-confirmed" id="appointmentStatus">-</span>
+        </span>
+      </div>
     </div>
+    
+    <form id="meetingForm">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="meetingDate">📅 Toplantı Tarihi *</label>
+          <input type="date" id="meetingDate" name="meetingDate" required>
+        </div>
+        <div class="form-group">
+          <label for="meetingTime">🕐 Toplantı Saati *</label>
+          <input type="time" id="meetingTime" name="meetingTime" required>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="meetingFormat">📋 Toplantı Formatı *</label>
+        <select id="meetingFormat" name="meetingFormat" required>
+          <option value="">Format seçin</option>
+          <option value="Yüz yüze">Yüz yüze</option>
+          <option value="Online">Online</option>
+          <option value="Telefon">Telefon</option>
+          <option value="WhatsApp">WhatsApp</option>
+          <option value="E-posta">E-posta</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="meetingNotes">📝 Toplantı Notları</label>
+        <textarea id="meetingNotes" name="meetingNotes" placeholder="Toplantı ile ilgili notlarınızı buraya yazın..."></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label for="meetingResult">✅ Toplantı Sonucu</label>
+        <select id="meetingResult" name="meetingResult">
+          <option value="">Sonuç seçin</option>
+          <option value="Başarılı">Başarılı</option>
+          <option value="Kısmi Başarı">Kısmi Başarı</option>
+          <option value="Başarısız">Başarısız</option>
+          <option value="Ertelendi">Ertelendi</option>
+          <option value="İptal Edildi">İptal Edildi</option>
+        </select>
+      </div>
+      
+      <div class="buttons">
+        <button type="button" class="btn btn-secondary" onclick="closeDialog()">❌ İptal</button>
+        <button type="submit" class="btn btn-primary">💾 Kaydet</button>
+      </div>
+    </form>
   </div>
   
   <script>
-    // Pre-fill meeting format from appointment
-    const appointmentFormat = '<?= rowData['Toplantı formatı'] || '' ?>';
-    if (appointmentFormat) {
-      document.getElementById('toplantiFormat').value = appointmentFormat;
+    // Sayfa yüklendiğinde bugünün tarihini varsayılan olarak ayarla
+    window.onload = function() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('meetingDate').value = today;
+      
+      // Randevu bilgilerini doldur
+      fillAppointmentInfo();
+    };
+    
+    function fillAppointmentInfo() {
+      // Google Apps Script'ten gelen verileri kullan
+      if (typeof google !== 'undefined' && google.script) {
+        google.script.run
+          .withSuccessHandler(function(appointmentData) {
+            if (appointmentData) {
+              document.getElementById('employeeCode').textContent = appointmentData.employeeCode || '-';
+              document.getElementById('companyName').textContent = appointmentData.companyName || '-';
+              document.getElementById('appointmentDate').textContent = appointmentData.appointmentDate || '-';
+              document.getElementById('appointmentTime').textContent = appointmentData.appointmentTime || '-';
+              document.getElementById('appointmentStatus').textContent = appointmentData.appointmentStatus || '-';
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('Randevu bilgileri alınamadı:', error);
+          })
+          .getAppointmentInfo();
+      }
     }
     
-
+    function closeDialog() {
+      if (typeof google !== 'undefined' && google.script) {
+        google.script.host.close();
+      }
+    }
     
-    // Form validation and submission
+    // Form gönderimi
     document.getElementById('meetingForm').addEventListener('submit', function(e) {
       e.preventDefault();
       
-      // Prevent double submission
-      const submitButton = document.querySelector('button[type="submit"]');
-      if (submitButton.disabled) {
-        return; // Already processing
-      }
-      
-      // Disable submit button
-      submitButton.disabled = true;
-      submitButton.textContent = 'Kaydediliyor...';
-      
-      // Clear previous messages
-      document.getElementById('errorMessage').style.display = 'none';
-      document.getElementById('successMessage').style.display = 'none';
-      
-      // Validate required fields
-      const toplantiTarihi = document.getElementById('toplantiTarihi').value;
-      
-      if (!toplantiTarihi) {
-        showError('Toplantı tarihi zorunludur');
-        return;
-      }
-      
-      // Collect form data
       const formData = {
-        toplantiTarihi: toplantiTarihi,
-        toplantiFormat: document.getElementById('toplantiFormat').value,
-        toplantiSonucu: document.getElementById('toplantiSonucu').value,
-        satisPotansiyeli: document.getElementById('satisPotansiyeli').value,
-        teklifDetayi: document.getElementById('teklifDetayi').value,
-        yeniTakipTarihi: document.getElementById('yeniTakipTarihi').value,
-        yorum: document.getElementById('yorum').value.trim(),
-        yoneticiNot: document.getElementById('yoneticiNot').value.trim()
+        meetingDate: document.getElementById('meetingDate').value,
+        meetingTime: document.getElementById('meetingTime').value,
+        meetingFormat: document.getElementById('meetingFormat').value,
+        meetingNotes: document.getElementById('meetingNotes').value,
+        meetingResult: document.getElementById('meetingResult').value
       };
       
-      // Submit to Google Apps Script
-      google.script.run
-        .withSuccessHandler(onSuccess)
-        .withFailureHandler(onError)
-        .processMeetingForm(formData);
-    });
-    
-    function showError(message) {
-      const errorDiv = document.getElementById('errorMessage');
-      errorDiv.textContent = message;
-      errorDiv.style.display = 'block';
-    }
-    
-    function showSuccess(message) {
-      const successDiv = document.getElementById('successMessage');
-      successDiv.textContent = message;
-      successDiv.style.display = 'block';
-    }
-    
-    function onSuccess(result) {
-      // Re-enable submit button
-      const submitButton = document.querySelector('button[type="submit"]');
-      submitButton.disabled = false;
-      submitButton.textContent = 'Toplantı Oluştur';
-      
-      if (result.success) {
-        showSuccess(result.message);
-        setTimeout(() => {
-          google.script.host.close();
-        }, 1500);
-      } else {
-        showError(result.message || 'Bir hata oluştu');
-      }
-    }
-    
-    function onError(error) {
-      // Re-enable submit button
-      const submitButton = document.querySelector('button[type="submit"]');
-      submitButton.disabled = false;
-      submitButton.textContent = 'Toplantı Oluştur';
-      
-      showError('Sistem hatası: ' + error.message);
-    }
-    
-    function cancelForm() {
-      google.script.host.close();
-    }
-    
-    // Auto-fill follow-up date based on meeting result
-    document.getElementById('toplantiSonucu').addEventListener('change', function() {
-      const result = this.value;
-      const followUpDate = document.getElementById('yeniTakipTarihi');
-      
-      if (result === 'Beklemede') {
-        // Set follow-up date to 1 week later
-        const nextWeek = new Date();
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        const year = nextWeek.getFullYear();
-        const month = (nextWeek.getMonth() + 1).toString().padStart(2, '0');
-        const day = nextWeek.getDate().toString().padStart(2, '0');
-        followUpDate.value = `${year}-${month}-${day}`;
-      } else if (result === 'Teklif İletildi') {
-        // Set follow-up date to 3 days later
-        const threeDays = new Date();
-        threeDays.setDate(threeDays.getDate() + 3);
-        const year = threeDays.getFullYear();
-        const month = (threeDays.getMonth() + 1).toString().padStart(2, '0');
-        const day = threeDays.getDate().toString().padStart(2, '0');
-        followUpDate.value = `${year}-${month}-${day}`;
-      } else {
-        followUpDate.value = '';
+      // Google Apps Script'e veriyi gönder
+      if (typeof google !== 'undefined' && google.script) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              alert('✅ Toplantı başarıyla kaydedildi!');
+              closeDialog();
+            } else {
+              alert('❌ Hata: ' + result.error);
+            }
+          })
+          .withFailureHandler(function(error) {
+            alert('❌ Hata: ' + error.message);
+          })
+          .saveMeetingData(formData);
       }
     });
   </script>
