@@ -22,21 +22,21 @@ const CRM_CONFIG = {
   
   // 🎨 Centralized Color System - Visual Harmony (SYNCED WITH TEMSILCI)
   COLOR_CODES: {
-    // Primary Status Colors
-    'Randevu Alındı': 'rgb(227, 242, 253)',      // Light Blue
-    'İleri Tarih Randevu': 'rgb(227, 242, 253)', // Light Blue
-    'Randevu Teyitlendi': 'rgb(232, 245, 232)',  // Light Green
-    'Randevu Ertelendi': 'rgb(255, 243, 224)',   // Light Orange
-    'Randevu İptal oldu': 'rgb(255, 235, 238)',  // Light Red
+    // Primary Status Colors - Görseldeki Renkler
+    'Randevu Alındı': 'rgb(232, 245, 232)',      // #E8F5E8 - Light Green
+    'İleri Tarih Randevu': 'rgb(245, 245, 245)', // #F5F5F5 - Light Gray
+    'Randevu Teyitlendi': 'rgb(232, 245, 232)',  // #E8F5E8 - Light Green
+    'Randevu Ertelendi': 'rgb(255, 243, 224)',   // #FFF3E0 - Light Orange
+    'Randevu İptal oldu': 'rgb(255, 235, 238)',  // #FFEBEE - Light Red
     
-    // Opportunity Colors
-    'Fırsat İletildi': 'rgb(255, 248, 225)',     // Light Yellow
-    'Bilgi Verildi': 'rgb(199, 171, 235)',       // Purple
-    'Yeniden Aranacak': 'rgb(255, 248, 225)',    // Light Yellow
+    // Opportunity Colors - Görseldeki Renkler
+    'Fırsat İletildi': 'rgb(255, 235, 238)',     // #FFEBEE - Light Red
+    'Bilgi Verildi': 'rgb(243, 229, 245)',       // #F3E5F5 - Light Purple
+    'Yeniden Aranacak': 'rgb(227, 242, 253)',    // #E3F2FD - Light Blue
     
-    // Negative Status Colors
-    'İlgilenmiyor': 'rgb(255, 235, 238)',        // Light Red
-    'Ulaşılamadı': 'rgb(255, 235, 238)',         // Light Red
+    // Negative Status Colors - Görseldeki Renkler
+    'İlgilenmiyor': 'rgb(255, 248, 225)',        // #FFF8E1 - Light Yellow
+    'Ulaşılamadı': 'rgb(255, 243, 224)',         // #FFF3E0 - Light Orange
     
     // Meeting Colors
     'Toplantı Tamamlandı': 'rgb(200, 230, 201)'  // Light Green

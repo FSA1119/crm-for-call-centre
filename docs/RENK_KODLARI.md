@@ -6,17 +6,17 @@
 
 | Status (Статус) | Renk Kodu (Цвет) | Sayfalar (Страницы) | Açıklama (Описание) |
 |-----------------|------------------|-------------------|---------------------|
-| Randevu Alındı | rgb(25, 172, 240) | Format Tablo, Randevularım | Mavi (Синий) |
-| İleri Tarih Randevu | rgb(135, 206, 250) | Format Tablo, Randevularım | Açık Mavi (Голубой) |
-| Teyitlendi | rgb(67, 206, 67) | Randevularım | Yeşil (Зеленый) |
-| Ertelendi | rgb(195, 169, 128) | Randevularım | Turuncu (Оранжевый) |
-| İptal | rgb(218, 92, 111) | Randevularım | Kırmızı (Красный) |
-| Fırsat İletildi | rgb(199, 171, 235) | Format Tablo, Fırsatlarım | Mor (Фиолетовый) |
-| Toplantı Tamamlandı | rgb(72, 224, 77) | Toplantılarım | Koyu Yeşil (Темно-зеленый) |
-| İlgilenmiyor | rgb(138, 118, 89) | Format Tablo | Açık Turuncu (Светло-оранжевый) |
-| Ulaşılamadı | rgb(255, 205, 210) | Format Tablo | Açık Pembe (Светло-розовый) |
-| Yeniden Aranacak | rgb(228, 145, 226) | Fırsatlarım | Mor (Фиолетовый) |
-| Bilgi Verildi | rgb(199, 171, 235) | Fırsatlarım | Mor (Фиолетовый) |
+| Randevu Alındı | rgb(232, 245, 232) | Format Tablo, Randevularım | Açık Yeşil (Светло-зеленый) |
+| İleri Tarih Randevu | rgb(245, 245, 245) | Format Tablo, Randevularım | Açık Gri (Светло-серый) |
+| Teyitlendi | rgb(232, 245, 232) | Randevularım | Açık Yeşil (Светло-зеленый) |
+| Ertelendi | rgb(255, 243, 224) | Randevularım | Açık Turuncu (Светло-оранжевый) |
+| İptal | rgb(255, 235, 238) | Randevularım | Açık Kırmızı (Светло-красный) |
+| Fırsat İletildi | rgb(255, 235, 238) | Format Tablo, Fırsatlarım | Açık Kırmızı (Светло-красный) |
+| Toplantı Tamamlandı | rgb(200, 230, 201) | Toplantılarım | Açık Yeşil (Светло-зеленый) |
+| İlgilenmiyor | rgb(255, 248, 225) | Format Tablo | Açık Sarı (Светло-желтый) |
+| Ulaşılamadı | rgb(255, 243, 224) | Format Tablo | Açık Turuncu (Светло-оранжевый) |
+| Yeniden Aranacak | rgb(227, 242, 253) | Fırsatlarım | Açık Mavi (Светло-голубой) |
+| Bilgi Verildi | rgb(243, 229, 245) | Fırsatlarım | Açık Mor (Светло-фиолетовый) |
 
 ### 📊 SAYFA BAŞLIK RENKLERI (Цвета заголовков страниц)
 
@@ -43,19 +43,19 @@
 ### TÜM RENKLER TEK YERDE (ВСЕ ЦВЕТА В ОДНОМ МЕСТЕ):
 ```javascript
 CRM_CONFIG = {
-  // Status colors (Цвета статусов)
+  // Status colors (Цвета статусов) - Görseldeki Renkler
   COLOR_CODES: {
-    'Randevu Alındı': 'rgb(25, 172, 240)',
-    'İleri Tarih Randevu': 'rgb(135, 206, 250)',
-    'Teyitlendi': 'rgb(67, 206, 67)', 
-    'Ertelendi': 'rgb(195, 169, 128)',
-    'İptal': 'rgb(218, 92, 111)',
-    'Fırsat İletildi': 'rgb(199, 171, 235)',
-    'Toplantı Tamamlandı': 'rgb(72, 224, 77)',
-    'İlgilenmiyor': 'rgb(138, 118, 89)',
-    'Ulaşılamadı': 'rgb(255, 205, 210)',
-    'Yeniden Aranacak': 'rgb(228, 145, 226)',
-    'Bilgi Verildi': 'rgb(199, 171, 235)'
+    'Randevu Alındı': 'rgb(232, 245, 232)',      // #E8F5E8 - Açık Yeşil
+    'İleri Tarih Randevu': 'rgb(245, 245, 245)', // #F5F5F5 - Açık Gri
+    'Teyitlendi': 'rgb(232, 245, 232)',          // #E8F5E8 - Açık Yeşil
+    'Ertelendi': 'rgb(255, 243, 224)',           // #FFF3E0 - Açık Turuncu
+    'İptal': 'rgb(255, 235, 238)',               // #FFEBEE - Açık Kırmızı
+    'Fırsat İletildi': 'rgb(255, 235, 238)',     // #FFEBEE - Açık Kırmızı
+    'Toplantı Tamamlandı': 'rgb(200, 230, 201)', // #C8E6C9 - Açık Yeşil
+    'İlgilenmiyor': 'rgb(255, 248, 225)',        // #FFF8E1 - Açık Sarı
+    'Ulaşılamadı': 'rgb(255, 243, 224)',         // #FFF3E0 - Açık Turuncu
+    'Yeniden Aranacak': 'rgb(227, 242, 253)',    // #E3F2FD - Açık Mavi
+    'Bilgi Verildi': 'rgb(243, 229, 245)'        // #F3E5F5 - Açık Mor
   },
   
   // Page header colors (Цвета заголовков страниц)
