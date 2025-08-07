@@ -5561,19 +5561,20 @@ function analyzeCMS(website) {
     let url = website.toString().trim();
     
     // URL format kontrolü
-    if (!url) {
-      return { cmsName: 'Geçersiz URL', cmsGroup: 'Geçersiz' };
+    if (!url || url === '') {
+      return { cmsName: 'Boş URL', cmsGroup: 'Geçersiz' };
     }
     
-    // HTTP protokolü ekle
-    if (!url.startsWith('http')) {
-      url = 'https://' + url;
-    }
+    // Basit URL temizleme
+    url = url.replace(/^https?:\/\//, ''); // http:// veya https:// kaldır
+    url = url.replace(/^www\./, ''); // www. kaldır
+    url = url.replace(/\/$/, ''); // Sondaki / kaldır
     
-    // URL doğrulama
-    try {
-      new URL(url);
-    } catch (e) {
+    // URL'yi yeniden oluştur
+    url = 'https://' + url;
+    
+    // Basit URL doğrulama
+    if (!url.includes('.') || url.length < 5) {
       return { cmsName: 'Geçersiz URL', cmsGroup: 'Geçersiz' };
     }
     
@@ -5864,17 +5865,20 @@ function analyzeEcommerce(website) {
     // URL'yi temizle ve doğrula
     let url = website.toString().trim();
     
-    if (!url) {
-      return 'Geçersiz URL';
+    if (!url || url === '') {
+      return 'Boş URL';
     }
     
-    if (!url.startsWith('http')) {
-      url = 'https://' + url;
-    }
+    // Basit URL temizleme
+    url = url.replace(/^https?:\/\//, ''); // http:// veya https:// kaldır
+    url = url.replace(/^www\./, ''); // www. kaldır
+    url = url.replace(/\/$/, ''); // Sondaki / kaldır
     
-    try {
-      new URL(url);
-    } catch (e) {
+    // URL'yi yeniden oluştur
+    url = 'https://' + url;
+    
+    // Basit URL doğrulama
+    if (!url.includes('.') || url.length < 5) {
       return 'Geçersiz URL';
     }
     
@@ -6104,17 +6108,20 @@ function measureSiteSpeed(website) {
     // URL'yi temizle ve doğrula
     let url = website.toString().trim();
     
-    if (!url) {
-      return 'Geçersiz URL';
+    if (!url || url === '') {
+      return 'Boş URL';
     }
     
-    if (!url.startsWith('http')) {
-      url = 'https://' + url;
-    }
+    // Basit URL temizleme
+    url = url.replace(/^https?:\/\//, ''); // http:// veya https:// kaldır
+    url = url.replace(/^www\./, ''); // www. kaldır
+    url = url.replace(/\/$/, ''); // Sondaki / kaldır
     
-    try {
-      new URL(url);
-    } catch (e) {
+    // URL'yi yeniden oluştur
+    url = 'https://' + url;
+    
+    // Basit URL doğrulama
+    if (!url.includes('.') || url.length < 5) {
       return 'Geçersiz URL';
     }
     
