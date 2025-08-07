@@ -5624,8 +5624,9 @@ function analyzeCMS(website) {
       (lowerHtml.includes('sayfa bulunamadı') || 
        lowerHtml.includes('page not found') ||
        lowerHtml.includes('error 404') ||
-       lowerHtml.includes('not found')) &&
-      html.length < 2000 // Çok kısa içerik
+       lowerHtml.includes('not found') ||
+       lowerHtml.includes('bulunamadı')) &&
+      html.length < 1500 // Daha kısa içerik
     );
     
     if (isReal404) {
@@ -5680,7 +5681,7 @@ function analyzeCMS(website) {
         group: 'Türkiye E-ticaret'
       },
       'İkas': {
-        patterns: ['ikas', 'ikas.com.tr', 'ikas.com', 'ikas-cms', 'ikas-cart', 'ikas-shopping'],
+        patterns: ['ikas-cms', 'ikas-cart', 'ikas-shopping', 'ikas-admin', 'ikas-panel'],
         group: 'Türkiye E-ticaret'
       },
       
@@ -5708,7 +5709,7 @@ function analyzeCMS(website) {
       
       // Blog CMS'leri
       'WordPress': {
-        patterns: ['wordpress', 'wp-content', 'wp-includes', 'wp-admin', 'wordpress.org'],
+        patterns: ['wordpress', 'wp-content', 'wp-includes', 'wp-admin', 'wordpress.org', 'wp-json', 'wp-embed', 'wp-head', 'wp-footer'],
         group: 'Blog CMS'
       },
       'Joomla': {
@@ -5749,16 +5750,26 @@ function analyzeCMS(website) {
       }
     };
     
-    // CMS Tespiti
-    for (const [cmsName, cmsData] of Object.entries(cmsPatterns)) {
-      for (const pattern of cmsData.patterns) {
-        if (lowerHtml.includes(pattern.toLowerCase())) {
-          return {
-            cmsName: cmsName,
-            cmsGroup: cmsData.group,
-            siteQuality: siteQuality,
-            qualityIssues: qualityIssues
-          };
+    // CMS Tespiti - Öncelik sırası ile
+    const priorityOrder = [
+      'WordPress', 'WooCommerce', 'Shopify', 'Magento', 'OpenCart', 'PrestaShop',
+      'İdeasoft', 'Ticimax', 'T-Soft', 'Softtr', 'İkas',
+      'Joomla', 'Drupal', 'Wix', 'Squarespace', 'Tilda',
+      'Trendyol Mağaza', 'N11 Mağaza', 'GittiGidiyor Mağaza'
+    ];
+    
+    for (const cmsName of priorityOrder) {
+      const cmsData = cmsPatterns[cmsName];
+      if (cmsData) {
+        for (const pattern of cmsData.patterns) {
+          if (lowerHtml.includes(pattern.toLowerCase())) {
+            return {
+              cmsName: cmsName,
+              cmsGroup: cmsData.group,
+              siteQuality: siteQuality,
+              qualityIssues: qualityIssues
+            };
+          }
         }
       }
     }
