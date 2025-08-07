@@ -36,7 +36,7 @@ const CRM_CONFIG = {
     
     // Negative Status Colors - Görseldeki Renkler
     'İlgilenmiyor': 'rgb(255, 248, 225)',        // #FFF8E1 - Light Yellow
-    'Ulaşılamadı': 'rgb(255, 243, 224)',         // #FFF3E0 - Light Orange
+    'Ulaşılamadı': 'rgb(255, 235, 238)',         // #FFEBEE - Light Red (Yeniden arama için farklı)
     
     // Meeting Colors
     'Toplantı Tamamlandı': 'rgb(200, 230, 201)'  // Light Green

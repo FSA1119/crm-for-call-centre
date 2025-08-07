@@ -14,7 +14,7 @@
 | Fırsat İletildi | rgb(255, 235, 238) | Format Tablo, Fırsatlarım | Açık Kırmızı (Светло-красный) |
 | Toplantı Tamamlandı | rgb(200, 230, 201) | Toplantılarım | Açık Yeşil (Светло-зеленый) |
 | İlgilenmiyor | rgb(255, 248, 225) | Format Tablo | Açık Sarı (Светло-желтый) |
-| Ulaşılamadı | rgb(255, 243, 224) | Format Tablo | Açık Turuncu (Светло-оранжевый) |
+| Ulaşılamadı | rgb(255, 235, 238) | Format Tablo | Açık Kırmızı (Светло-красный) |
 | Yeniden Aranacak | rgb(227, 242, 253) | Fırsatlarım | Açık Mavi (Светло-голубой) |
 | Bilgi Verildi | rgb(243, 229, 245) | Fırsatlarım | Açık Mor (Светло-фиолетовый) |
 
@@ -53,7 +53,7 @@ CRM_CONFIG = {
     'Fırsat İletildi': 'rgb(255, 235, 238)',     // #FFEBEE - Açık Kırmızı
     'Toplantı Tamamlandı': 'rgb(200, 230, 201)', // #C8E6C9 - Açık Yeşil
     'İlgilenmiyor': 'rgb(255, 248, 225)',        // #FFF8E1 - Açık Sarı
-    'Ulaşılamadı': 'rgb(255, 243, 224)',         // #FFF3E0 - Açık Turuncu
+    'Ulaşılamadı': 'rgb(255, 235, 238)',         // #FFEBEE - Açık Kırmızı (Yeniden arama için farklı)
     'Yeniden Aranacak': 'rgb(227, 242, 253)',    // #E3F2FD - Açık Mavi
     'Bilgi Verildi': 'rgb(243, 229, 245)'        // #F3E5F5 - Açık Mor
   },
