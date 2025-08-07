@@ -5699,7 +5699,7 @@ function analyzeCMS(website) {
     const cmsPatterns = {
       // Türkiye E-ticaret Platformları
       'İdeasoft': {
-        patterns: ['ideasoft', 'ideacms', 'ideasoft.com.tr', 'ideasoft.com'],
+        patterns: ['ideasoft', 'ideacms', 'ideasoft.com.tr', 'ideasoft.com', 'ideasoft®', 'akıllı e-ticaret paketleri'],
         group: 'Türkiye E-ticaret'
       },
       'Ticimax': {
@@ -5781,6 +5781,28 @@ function analyzeCMS(website) {
       'GittiGidiyor Mağaza': {
         patterns: ['gittigidiyor.com/magaza', 'gittigidiyor.com/store'],
         group: 'Pazar Yeri'
+      },
+      
+      // Sosyal Medya Platformları
+      'Instagram': {
+        patterns: ['instagram.com', 'instagram.com/'],
+        group: 'Sosyal Medya'
+      },
+      'Facebook': {
+        patterns: ['facebook.com', 'fb.com', 'facebook.com/'],
+        group: 'Sosyal Medya'
+      },
+      'Twitter': {
+        patterns: ['twitter.com', 'x.com', 'twitter.com/'],
+        group: 'Sosyal Medya'
+      },
+      'YouTube': {
+        patterns: ['youtube.com', 'youtu.be', 'youtube.com/'],
+        group: 'Sosyal Medya'
+      },
+      'LinkedIn': {
+        patterns: ['linkedin.com', 'linkedin.com/'],
+        group: 'Sosyal Medya'
       }
     };
     
@@ -5789,7 +5811,8 @@ function analyzeCMS(website) {
       'WordPress', 'WooCommerce', 'Shopify', 'Magento', 'OpenCart', 'PrestaShop',
       'İdeasoft', 'Ticimax', 'T-Soft', 'Softtr', 'İkas',
       'Joomla', 'Drupal', 'Wix', 'Squarespace', 'Tilda',
-      'Trendyol Mağaza', 'N11 Mağaza', 'GittiGidiyor Mağaza'
+      'Trendyol Mağaza', 'N11 Mağaza', 'GittiGidiyor Mağaza',
+      'Instagram', 'Facebook', 'Twitter', 'YouTube', 'LinkedIn'
     ];
     
     for (const cmsName of priorityOrder) {
