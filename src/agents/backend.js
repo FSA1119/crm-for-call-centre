@@ -4088,23 +4088,31 @@ function onEdit(e) {
       if (sheetName === 'Randevularım') {
         console.log('Randevularım sheet found, testing status change...');
         
-        // Test with row 2, column 12
-        const testRange = sheet.getRange(2, 12);
-        const currentValue = testRange.getValue();
-        console.log('Current value in L2:', currentValue);
+        // Find Randevu Durumu column dynamically
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const randevuDurumuIndex = headers.indexOf('Randevu Durumu');
         
-        // Show alert with current info
-        SpreadsheetApp.getUi().alert('Test Info', 
-          `Sheet: ${sheetName}\nRow 2, Column 12 value: ${currentValue}`, 
-          SpreadsheetApp.getUi().ButtonSet.OK);
-        
-        // Simulate an edit event
-        const testEvent = {
-          range: testRange,
-          source: SpreadsheetApp.getActiveSpreadsheet()
-        };
-        
-        handleRandevularimStatusChange(testEvent, sheet);
+        if (randevuDurumuIndex !== -1) {
+          const testRange = sheet.getRange(2, randevuDurumuIndex + 1);
+          const currentValue = testRange.getValue();
+          console.log('Current value in Randevu Durumu column:', currentValue);
+          
+          // Show alert with current info
+          SpreadsheetApp.getUi().alert('Test Info', 
+            `Sheet: ${sheetName}\nRandevu Durumu value: ${currentValue}\nColumn: ${randevuDurumuIndex + 1}`, 
+            SpreadsheetApp.getUi().ButtonSet.OK);
+          
+          // Simulate an edit event
+          const testEvent = {
+            range: testRange,
+            source: SpreadsheetApp.getActiveSpreadsheet()
+          };
+          
+          handleRandevularimStatusChange(testEvent, sheet);
+        } else {
+          console.log('Randevu Durumu column not found');
+          SpreadsheetApp.getUi().alert('Error', 'Randevu Durumu column not found', SpreadsheetApp.getUi().ButtonSet.OK);
+        }
       }
       
       if (sheetName === 'Fırsatlarım') {
@@ -4137,6 +4145,66 @@ function onEdit(e) {
       console.error('Manual test error:', error);
       SpreadsheetApp.getUi().alert('Test Error', 'Error: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
     }
+}
+
+/**
+ * 🎨 Manual Color Coding - Force Apply Colors
+ */
+function applyManualColorCoding() {
+  console.log('🎨 Applying manual color coding');
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const sheetName = sheet.getName();
+    
+    console.log('Current sheet:', sheetName);
+    
+    if (sheetName === 'Randevularım') {
+      console.log('Applying color coding to Randevularım');
+      
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const randevuDurumuIndex = headers.indexOf('Randevu Durumu');
+      
+      if (randevuDurumuIndex !== -1) {
+        for (let i = 1; i < data.length; i++) {
+          const status = data[i][randevuDurumuIndex];
+          if (status && status !== '') {
+            console.log(`Row ${i + 1}: ${status}`);
+            updateRandevularimRowColor(sheet, i + 1, status);
+          }
+        }
+        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Randevularım renk kodlaması uygulandı');
+      } else {
+        SpreadsheetApp.getUi().alert('❌ Hata', 'Randevu Durumu sütunu bulunamadı');
+      }
+    } else if (sheetName === 'Fırsatlarım') {
+      console.log('Applying color coding to Fırsatlarım');
+      
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+      
+      if (firsatDurumuIndex !== -1) {
+        for (let i = 1; i < data.length; i++) {
+          const status = data[i][firsatDurumuIndex];
+          if (status && status !== '') {
+            console.log(`Row ${i + 1}: ${status}`);
+            applyOpportunityColorCoding(sheet, i + 1);
+          }
+        }
+        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Fırsatlarım renk kodlaması uygulandı');
+      } else {
+        SpreadsheetApp.getUi().alert('❌ Hata', 'Fırsat Durumu sütunu bulunamadı');
+      }
+    } else {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu fonksiyon sadece Randevularım veya Fırsatlarım sayfalarında çalışır');
+    }
+    
+  } catch (error) {
+    console.error('Error applying manual color coding:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Renk kodlaması uygulanırken hata: ' + error.message);
+  }
 }
 
 function testMonthlyReport() {
@@ -4213,6 +4281,7 @@ function createAdminMenu() {
     menu.addItem('📝 Update Existing Codes', 'updateExistingCodes');
     menu.addSeparator();
     menu.addItem('🧪 Test onEdit Trigger', 'testOnEditTrigger');
+    menu.addItem('🎨 Manuel Renk Uygula', 'applyManualColorCoding');
     menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
     
     // Add menu to UI
@@ -4375,6 +4444,8 @@ function updateRandevularimRowColor(randevularimSheet, rowNumber, status) {
     range.setBackground(color);
     
     console.log(`✅ Randevularım color updated: ${color} for status: ${status}`);
+    console.log(`🔍 Debug - Range applied: ${range.getA1Notation()}`);
+    console.log(`🔍 Debug - Color applied: ${color}`);
     
   } catch (error) {
     console.error('❌ Error updating Randevularım row color:', error);
