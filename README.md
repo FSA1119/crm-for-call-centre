@@ -17,18 +17,27 @@ Google Sheets üzerinde çok kullanıcılı CRM sistemi ile temsilci-yönetici s
 
 ```
 Google-Sheets-CRM/
-├── backend.js                    # Ana CRM sistemi (Temsilci)
-├── manager-sync.js              # Yönetici senkronizasyon sistemi
-├── test.js                      # Test fonksiyonları
-├── appointmentDialog.html       # Randevu dialog template
-├── opportunityDialog.html       # Fırsat dialog template
-├── meetingDialog.html           # Toplantı dialog template
-├── README.md                    # Bu dosya
-└── docs/
-    ├── technical-specification.md  # Teknik özellikler
-    ├── sistem_semasi.md           # Sistem şeması
-    ├── sayfa_kolonlari.md         # Sayfa kolonları
-    └── RENK_KODLARI.md            # Merkezi renk kodları
+├── src/
+│   ├── agents/
+│   │   └── backend.js           # Ana CRM sistemi (Temsilci)
+│   ├── managers/
+│   │   └── manager-sync.js      # Yönetici senkronizasyon sistemi
+│   ├── shared/
+│   │   ├── fix-firsatlarim-validation.js
+│   │   └── smart-column-mapping.js
+│   ├── html-dialogs/
+│   │   ├── appointmentDialog.html
+│   │   ├── opportunityDialog.html
+│   │   ├── meetingDialog.html
+│   │   └── managerMeetingDialog.html
+│   └── utils/
+│       └── (yardımcı dosyalar)
+├── docs/
+│   ├── technical-specification.md
+│   ├── sistem_semasi.md
+│   ├── sayfa_kolonlari.md
+│   └── RENK_KODLARI.md
+└── README.md
 ```
 
 ## 🚀 Kurulum
@@ -94,17 +103,19 @@ hırdavat | izmit | MAZLUM TEKNİK HIRDAVAT | Department store | | 0532 748 04 2
 #### Temsilci Dosyası İçin:
 1. Google Sheets dosyanızı açın
 2. **Extensions** → **Apps Script** seçin
-3. `backend.js` dosyasının içeriğini kopyalayıp yapıştırın
+3. `src/agents/backend.js` dosyasının içeriğini kopyalayıp yapıştırın
 4. HTML dosyalarını da ekleyin:
-   - `appointmentDialog.html`
-   - `opportunityDialog.html`
+   - `src/html-dialogs/appointmentDialog.html`
+   - `src/html-dialogs/opportunityDialog.html`
+   - `src/html-dialogs/meetingDialog.html`
    - `meetingDialog.html`
 
 #### Yönetici Dosyası İçin:
 1. Google Sheets dosyanızı açın
 2. **Extensions** → **Apps Script** seçin
-3. `manager-sync.js` dosyasının içeriğini kopyalayıp yapıştırın
-4. HTML dosyalarını da ekleyin (aynı dosyalar)
+3. `src/managers/manager-sync.js` dosyasının içeriğini kopyalayıp yapıştırın
+4. HTML dosyalarını da ekleyin:
+   - `src/html-dialogs/managerMeetingDialog.html`
 
 ### 2. Test Fonksiyonları
 
