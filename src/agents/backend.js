@@ -5587,31 +5587,32 @@ function analyzeCMS(website) {
     
     const statusCode = response.getResponseCode();
     
-    // HTTP Status kontrolü - daha esnek yaklaşım
+    // HTTP Status kontrolü - Çok daha esnek yaklaşım
     if (statusCode >= 400) {
-      // 4xx ve 5xx hataları için CMS tespit yapma
+      // 4xx ve 5xx hataları için daha esnek kontrol
       if (statusCode === 404) {
-        return { cmsName: 'Sayfa Bulunamadı', cmsGroup: 'Erişilemiyor' };
+        // 404 için HTML içeriğini kontrol et - belki gerçekten erişilebilir
+        console.log('404 tespit edildi, HTML içeriği kontrol edilecek');
       } else if (statusCode === 403) {
-        return { cmsName: 'Erişim Engellendi', cmsGroup: 'Erişilemiyor' };
+        console.log('403 tespit edildi, devam ediliyor');
       } else if (statusCode === 500) {
-        return { cmsName: 'Sunucu Hatası', cmsGroup: 'Erişilemiyor' };
+        console.log('500 tespit edildi, devam ediliyor');
       } else if (statusCode === 429) {
         // Sosyal medya için özel kontrol
-        if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com')) {
+        if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com') || url.includes('youtube.com') || url.includes('linkedin.com')) {
           return { cmsName: 'Sosyal Medya', cmsGroup: 'Sosyal Medya' };
         } else {
-          return { cmsName: 'Rate Limit', cmsGroup: 'Erişilemiyor' };
+          console.log('Rate Limit tespit edildi, devam ediliyor');
         }
       } else {
-        // Diğer 4xx/5xx hatalar için site kalitesi kontrolü
-        return { cmsName: `HTTP ${statusCode}`, cmsGroup: 'Güvenli Değil' };
+        // Diğer 4xx/5xx hatalar için devam et
+        console.log(`HTTP ${statusCode} tespit edildi, devam ediliyor`);
       }
     } else if (statusCode >= 300 && statusCode < 400) {
-      // 3xx yönlendirmeler için devam et - Yönlendirme takip edildi
+      // 3xx yönlendirmeler için devam et
       console.log(`Yönlendirme tespit edildi: ${statusCode}`);
     } else if (statusCode !== 200) {
-      // 200 olmayan ama 300-399 arası olan durumlar için devam et
+      // 200 olmayan durumlar için devam et
       console.log(`HTTP ${statusCode} - Devam ediliyor`);
     }
     
@@ -5621,21 +5622,23 @@ function analyzeCMS(website) {
       return { cmsName: 'Boş Sayfa', cmsGroup: 'Erişilemiyor' };
     }
     
-    // HTML içeriğinde hata sayfası kontrolü - Daha akıllı yaklaşım
+    // HTML içeriğinde hata sayfası kontrolü - Çok daha esnek yaklaşım
     const lowerHtml = html.toLowerCase();
     
-    // Gerçek 404 sayfası kontrolü - Daha spesifik
+    // Gerçek 404 sayfası kontrolü - Çok daha esnek
     const isReal404 = (
       lowerHtml.includes('404') && 
       (lowerHtml.includes('sayfa bulunamadı') || 
        lowerHtml.includes('page not found') ||
        lowerHtml.includes('error 404') ||
        lowerHtml.includes('not found') ||
-       lowerHtml.includes('bulunamadı')) &&
-      html.length < 1500 // Daha kısa içerik
+       lowerHtml.includes('bulunamadı') ||
+       lowerHtml.includes('404 error')) &&
+      html.length < 1000 // Çok daha kısa içerik
     );
     
     if (isReal404) {
+      console.log('Gerçek 404 sayfası tespit edildi');
       return { cmsName: '404 Sayfa Bulunamadı', cmsGroup: 'Erişilemiyor' };
     }
     
@@ -5704,7 +5707,7 @@ function analyzeCMS(website) {
     const cmsPatterns = {
       // Türkiye E-ticaret Platformları
       'İdeasoft': {
-        patterns: ['ideasoft', 'ideacms', 'ideasoft.com.tr', 'ideasoft.com', 'ideasoft®', 'akıllı e-ticaret paketleri'],
+        patterns: ['ideasoft', 'ideacms', 'ideasoft.com.tr', 'ideasoft.com', 'ideasoft®', 'akıllı e-ticaret paketleri', 'ideasoft-'],
         group: 'Türkiye E-ticaret'
       },
       'Ticimax': {
@@ -5748,7 +5751,7 @@ function analyzeCMS(website) {
       
       // Blog CMS'leri
       'WordPress': {
-        patterns: ['wordpress', 'wp-content', 'wp-includes', 'wp-admin', 'wordpress.org', 'wp-json', 'wp-embed', 'wp-head', 'wp-footer'],
+        patterns: ['wordpress', 'wp-content', 'wp-includes', 'wp-admin', 'wordpress.org', 'wp-json', 'wp-embed', 'wp-head', 'wp-footer', 'wp-', 'wp_', 'wordpress-'],
         group: 'Blog CMS'
       },
       'Joomla': {
@@ -5788,25 +5791,25 @@ function analyzeCMS(website) {
         group: 'Pazar Yeri'
       },
       
-      // Sosyal Medya Platformları
+      // Sosyal Medya Platformları - Güçlendirilmiş
       'Instagram': {
-        patterns: ['instagram.com/', 'instagram.com/'],
+        patterns: ['instagram.com/', 'instagram.com/', 'instagram.com/p/', 'instagram.com/reel/', 'instagram.com/stories/'],
         group: 'Sosyal Medya'
       },
       'Facebook': {
-        patterns: ['facebook.com/', 'fb.com/'],
+        patterns: ['facebook.com/', 'fb.com/', 'facebook.com/pages/', 'facebook.com/groups/', 'facebook.com/profile.php'],
         group: 'Sosyal Medya'
       },
       'Twitter': {
-        patterns: ['twitter.com', 'x.com', 'twitter.com/'],
+        patterns: ['twitter.com', 'x.com', 'twitter.com/', 'x.com/'],
         group: 'Sosyal Medya'
       },
       'YouTube': {
-        patterns: ['youtube.com', 'youtu.be', 'youtube.com/'],
+        patterns: ['youtube.com', 'youtu.be', 'youtube.com/', 'youtube.com/channel/', 'youtube.com/c/'],
         group: 'Sosyal Medya'
       },
       'LinkedIn': {
-        patterns: ['linkedin.com', 'linkedin.com/'],
+        patterns: ['linkedin.com', 'linkedin.com/', 'linkedin.com/company/', 'linkedin.com/in/'],
         group: 'Sosyal Medya'
       }
     };
@@ -6065,23 +6068,24 @@ function analyzeEcommerce(website) {
     
     const statusCode = response.getResponseCode();
     
-    // HTTP Status kontrolü - daha esnek yaklaşım
+    // HTTP Status kontrolü - Çok daha esnek yaklaşım
     if (statusCode >= 400) {
       if (statusCode === 404) {
-        return 'Sayfa Bulunamadı';
+        // 404 için HTML içeriğini kontrol et
+        console.log('404 tespit edildi, HTML içeriği kontrol edilecek');
       } else if (statusCode === 403) {
-        return 'Erişim Engellendi';
+        console.log('403 tespit edildi, devam ediliyor');
       } else if (statusCode === 500) {
-        return 'Sunucu Hatası';
+        console.log('500 tespit edildi, devam ediliyor');
       } else if (statusCode === 429) {
         // Sosyal medya için özel kontrol
-        if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com')) {
+        if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com') || url.includes('youtube.com') || url.includes('linkedin.com')) {
           return 'Sosyal Medya';
         } else {
-          return 'Rate Limit';
+          console.log('Rate Limit tespit edildi, devam ediliyor');
         }
       } else {
-        return `HTTP ${statusCode}`;
+        console.log(`HTTP ${statusCode} tespit edildi, devam ediliyor`);
       }
     }
     
@@ -6091,12 +6095,21 @@ function analyzeEcommerce(website) {
       return 'Boş Sayfa';
     }
     
-    // HTML içeriğinde hata sayfası kontrolü
+    // HTML içeriğinde hata sayfası kontrolü - Çok daha esnek
     const lowerHtml = html.toLowerCase();
-    if (lowerHtml.includes('404') || 
-        lowerHtml.includes('sayfa bulunamadı') || 
-        lowerHtml.includes('page not found') ||
-        lowerHtml.includes('error 404')) {
+    const isReal404 = (
+      lowerHtml.includes('404') && 
+      (lowerHtml.includes('sayfa bulunamadı') || 
+       lowerHtml.includes('page not found') ||
+       lowerHtml.includes('error 404') ||
+       lowerHtml.includes('not found') ||
+       lowerHtml.includes('bulunamadı') ||
+       lowerHtml.includes('404 error')) &&
+      html.length < 1000 // Çok daha kısa içerik
+    );
+    
+    if (isReal404) {
+      console.log('Gerçek 404 sayfası tespit edildi');
       return '404 Sayfa Bulunamadı';
     }
     
@@ -6339,18 +6352,24 @@ function measureSiteSpeed(website) {
     // HTTP durum kodu
     const statusCode = response.getResponseCode();
     
-    // HTTP Status kontrolü - daha esnek yaklaşım
+    // HTTP Status kontrolü - Çok daha esnek yaklaşım
     if (statusCode >= 400) {
       if (statusCode === 404) {
-        return 'Sayfa Bulunamadı';
+        // 404 için devam et - belki gerçekten erişilebilir
+        console.log('404 tespit edildi, devam ediliyor');
       } else if (statusCode === 403) {
-        return 'Erişim Engellendi';
+        console.log('403 tespit edildi, devam ediliyor');
       } else if (statusCode === 500) {
-        return 'Sunucu Hatası';
+        console.log('500 tespit edildi, devam ediliyor');
       } else if (statusCode === 429) {
-        return 'Rate Limit';
+        // Sosyal medya için özel kontrol
+        if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com') || url.includes('youtube.com') || url.includes('linkedin.com')) {
+          return 'Sosyal Medya';
+        } else {
+          console.log('Rate Limit tespit edildi, devam ediliyor');
+        }
       } else {
-        return `HTTP ${statusCode}`;
+        console.log(`HTTP ${statusCode} tespit edildi, devam ediliyor`);
       }
     }
     
