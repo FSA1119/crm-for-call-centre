@@ -1735,7 +1735,7 @@ function processOpportunityForm(formData) {
     const result = createOpportunityInFirsatlarim(spreadsheet, selectedRowData, formData);
     
     // Update Format Tablo row with selected activity and form data
-    updateFormatTableRow(activeSheet, selectedRow, formData.aktivite || 'Fırsat İletildi', formData);
+    updateFormatTableRow(activeSheet, selectedRow, formData.firsatDurumu || 'Fırsat İletildi', formData);
     
     console.log('Processing complete:', result);
     logActivity('addOpportunity', { 
@@ -1820,6 +1820,8 @@ function createOpportunityInFirsatlarim(spreadsheet, rowData, opportunityData) {
   }
   
   // Apply color coding
+  console.log('🔍 Debug - Applying color coding to row:', nextRow);
+  console.log('🔍 Debug - Opportunity data:', opportunityData);
   applyOpportunityColorCoding(firsatlarimSheet, nextRow);
   
   // Activate Fırsatlarım sheet to show the new opportunity
@@ -1922,6 +1924,8 @@ function prepareOpportunityRow(rowData, opportunityData, columns, sheet) {
         break;
       case 'Fırsat Durumu':
         row[index] = opportunityData.firsatDurumu || 'Bilgi Verildi';
+        console.log('🔍 Debug - Fırsat Durumu set to:', row[index]);
+        console.log('🔍 Debug - opportunityData.firsatDurumu:', opportunityData.firsatDurumu);
         break;
       case 'Fırsat Tarihi':
         // Format date as DD.MM.YYYY
