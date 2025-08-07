@@ -5597,7 +5597,12 @@ function analyzeCMS(website) {
       } else if (statusCode === 500) {
         return { cmsName: 'Sunucu Hatası', cmsGroup: 'Erişilemiyor' };
       } else if (statusCode === 429) {
-        return { cmsName: 'Rate Limit', cmsGroup: 'Erişilemiyor' };
+        // Sosyal medya için özel kontrol
+        if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com')) {
+          return { cmsName: 'Sosyal Medya', cmsGroup: 'Sosyal Medya' };
+        } else {
+          return { cmsName: 'Rate Limit', cmsGroup: 'Erişilemiyor' };
+        }
       } else {
         // Diğer 4xx/5xx hatalar için site kalitesi kontrolü
         return { cmsName: `HTTP ${statusCode}`, cmsGroup: 'Güvenli Değil' };
@@ -5785,11 +5790,11 @@ function analyzeCMS(website) {
       
       // Sosyal Medya Platformları
       'Instagram': {
-        patterns: ['instagram.com', 'instagram.com/'],
+        patterns: ['instagram.com/', 'instagram.com/'],
         group: 'Sosyal Medya'
       },
       'Facebook': {
-        patterns: ['facebook.com', 'fb.com', 'facebook.com/'],
+        patterns: ['facebook.com/', 'fb.com/'],
         group: 'Sosyal Medya'
       },
       'Twitter': {
@@ -6069,7 +6074,12 @@ function analyzeEcommerce(website) {
       } else if (statusCode === 500) {
         return 'Sunucu Hatası';
       } else if (statusCode === 429) {
-        return 'Rate Limit';
+        // Sosyal medya için özel kontrol
+        if (url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com')) {
+          return 'Sosyal Medya';
+        } else {
+          return 'Rate Limit';
+        }
       } else {
         return `HTTP ${statusCode}`;
       }
