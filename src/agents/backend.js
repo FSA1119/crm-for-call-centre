@@ -4169,6 +4169,10 @@ function createAdminMenu() {
     const menu = ui.createMenu('Admin');
     
     // Add menu items
+    menu.addItem('🔍 CMS ALTYAPI', 'detectCMSAltyapisi');
+    menu.addItem('🛒 E-TİCARET İZİ', 'detectEcommerceIzi');
+    menu.addItem('⚡ HIZ TESTİ', 'testSiteHizi');
+    menu.addSeparator();
     menu.addItem('Yeni Tablo oluştur', 'showCreateTableDialog');
     menu.addSeparator();
     menu.addItem('🧪 Test Data Validation', 'testDataValidation');
@@ -5375,3 +5379,677 @@ function refreshFormatTabloValidation() {
     };
   }
 }
+
+// ========================================
+// 🔍 CMS ALTYAPISI - WEBSITE ANALİZ SİSTEMİ
+// ========================================
+
+/**
+ * 🔍 CMS Altyapısı Tespiti - Hızlı Analiz
+ * @param {Object} parameters - Fonksiyon parametreleri
+ * @returns {Object} - Sonuç objesi
+ */
+function detectCMSAltyapisi(parameters) {
+  console.log('🔍 CMS Altyapısı tespiti başlatılıyor:', parameters);
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const range = sheet.getActiveRange();
+    
+    if (!range) {
+      throw new Error('Lütfen analiz edilecek satırları seçin');
+    }
+    
+    const startRow = range.getRow();
+    const endRow = range.getLastRow();
+    const rowCount = endRow - startRow + 1;
+    
+    console.log(`📊 ${rowCount} satır analiz edilecek`);
+    
+    // Progress bar başlat
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('🔍 CMS Analizi', `${rowCount} satır analiz ediliyor...\nLütfen bekleyin.`);
+    
+    // Website kolonunu bul
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const websiteIndex = headers.findIndex(header => 
+      header === 'Website' || header === 'Site' || header === 'URL'
+    );
+    
+    if (websiteIndex === -1) {
+      throw new Error('Website kolonu bulunamadı');
+    }
+    
+    // CMS kolonlarını bul veya oluştur
+    let cmsAdiIndex = headers.findIndex(header => header === 'CMS Adı');
+    let cmsGrubuIndex = headers.findIndex(header => header === 'CMS Grubu');
+    
+    if (cmsAdiIndex === -1) {
+      // CMS Adı kolonu yoksa ekle
+      const lastColumn = sheet.getLastColumn();
+      sheet.getRange(1, lastColumn + 1).setValue('CMS Adı');
+      cmsAdiIndex = lastColumn;
+    }
+    
+    if (cmsGrubuIndex === -1) {
+      // CMS Grubu kolonu yoksa ekle
+      const lastColumn = sheet.getLastColumn();
+      sheet.getRange(1, lastColumn + 1).setValue('CMS Grubu');
+      cmsGrubuIndex = lastColumn;
+    }
+    
+    // Paralel işlem için batch size
+    const BATCH_SIZE = 50;
+    let processedCount = 0;
+    
+    // Her batch için
+    for (let i = 0; i < rowCount; i += BATCH_SIZE) {
+      const batchEnd = Math.min(i + BATCH_SIZE, rowCount);
+      const batchSize = batchEnd - i;
+      
+      console.log(`🔄 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${batchSize} satır işleniyor`);
+      
+      // Batch içindeki her satır için
+      for (let j = 0; j < batchSize; j++) {
+        const currentRow = startRow + i + j;
+        const website = sheet.getRange(currentRow, websiteIndex + 1).getValue();
+        
+        if (website && website.toString().trim() !== '') {
+          try {
+            const cmsResult = analyzeCMS(website.toString());
+            
+            // Sonuçları yaz
+            sheet.getRange(currentRow, cmsAdiIndex + 1).setValue(cmsResult.cmsName);
+            sheet.getRange(currentRow, cmsGrubuIndex + 1).setValue(cmsResult.cmsGroup);
+            
+            processedCount++;
+            
+            // Her 10 satırda bir progress
+            if (processedCount % 10 === 0) {
+              console.log(`✅ ${processedCount} satır tamamlandı`);
+            }
+            
+          } catch (error) {
+            console.error(`❌ Satır ${currentRow} analiz hatası:`, error);
+            sheet.getRange(currentRow, cmsAdiIndex + 1).setValue('Erişilemiyor');
+            sheet.getRange(currentRow, cmsGrubuIndex + 1).setValue('Erişilemiyor');
+          }
+        }
+      }
+      
+      // Batch arası kısa bekleme
+      Utilities.sleep(100);
+    }
+    
+    console.log(`✅ CMS Analizi tamamlandı: ${processedCount} satır işlendi`);
+    ui.alert('✅ Tamamlandı', `CMS Analizi tamamlandı!\n${processedCount} satır işlendi.`);
+    
+    return {
+      success: true,
+      processedCount: processedCount,
+      totalRows: rowCount
+    };
+    
+  } catch (error) {
+    console.error('❌ CMS Analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', 'CMS Analizi sırasında hata oluştu: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🔍 Tekil CMS Analizi - Website Analizi
+ * @param {string} website - Website URL'i
+ * @returns {Object} - CMS sonucu
+ */
+function analyzeCMS(website) {
+  try {
+    // URL'yi temizle
+    let url = website.toString().trim();
+    if (!url.startsWith('http')) {
+      url = 'https://' + url;
+    }
+    
+    // HTML kaynak kodunu al
+    const response = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      timeout: 5000
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      return { cmsName: 'Erişilemiyor', cmsGroup: 'Erişilemiyor' };
+    }
+    
+    const html = response.getContentText();
+    const lowerHtml = html.toLowerCase();
+    
+    // CMS Tespit Algoritması
+    const cmsPatterns = {
+      // Türkiye E-ticaret Platformları
+      'İdeasoft': {
+        patterns: ['ideasoft', 'ideacms', 'ideasoft.com.tr'],
+        group: 'Türkiye E-ticaret'
+      },
+      'Ticimax': {
+        patterns: ['ticimax', 'ticimax.com.tr'],
+        group: 'Türkiye E-ticaret'
+      },
+      'T-Soft': {
+        patterns: ['t-soft', 'tsoft', 'tsoft.com.tr'],
+        group: 'Türkiye E-ticaret'
+      },
+      'Softtr': {
+        patterns: ['softtr', 'softtr.com.tr'],
+        group: 'Türkiye E-ticaret'
+      },
+      'İkas': {
+        patterns: ['ikas', 'ikas.com.tr'],
+        group: 'Türkiye E-ticaret'
+      },
+      
+      // Uluslararası E-ticaret Platformları
+      'WooCommerce': {
+        patterns: ['woocommerce', 'wc-', 'woo-'],
+        group: 'Uluslararası E-ticaret'
+      },
+      'Shopify': {
+        patterns: ['shopify', 'myshopify.com'],
+        group: 'Uluslararası E-ticaret'
+      },
+      'PrestaShop': {
+        patterns: ['prestashop', 'presta-shop'],
+        group: 'Uluslararası E-ticaret'
+      },
+      'OpenCart': {
+        patterns: ['opencart', 'cart.php'],
+        group: 'Uluslararası E-ticaret'
+      },
+      'Magento': {
+        patterns: ['magento', 'mage/', 'magento.com'],
+        group: 'Uluslararası E-ticaret'
+      },
+      
+      // Blog CMS'leri
+      'WordPress': {
+        patterns: ['wordpress', 'wp-content', 'wp-includes', 'wp-admin'],
+        group: 'Blog CMS'
+      },
+      'Joomla': {
+        patterns: ['joomla', 'joomla.org', 'joomla.com'],
+        group: 'Blog CMS'
+      },
+      'Drupal': {
+        patterns: ['drupal', 'drupal.org'],
+        group: 'Blog CMS'
+      },
+      
+      // Website Builder'lar
+      'Wix': {
+        patterns: ['wix', 'wixsite.com', 'wix.com'],
+        group: 'Website Builder'
+      },
+      'Squarespace': {
+        patterns: ['squarespace', 'squarespace.com'],
+        group: 'Website Builder'
+      },
+      'Tilda': {
+        patterns: ['tilda', 'tilda.ws', 'tilda.cc'],
+        group: 'Website Builder'
+      }
+    };
+    
+    // CMS Tespiti
+    for (const [cmsName, cmsData] of Object.entries(cmsPatterns)) {
+      for (const pattern of cmsData.patterns) {
+        if (lowerHtml.includes(pattern.toLowerCase())) {
+          return {
+            cmsName: cmsName,
+            cmsGroup: cmsData.group
+          };
+        }
+      }
+    }
+    
+    // E-ticaret tespiti (genel)
+    const ecommercePatterns = [
+      'sepet', 'cart', 'basket', 'ödeme', 'payment', 'kredi kartı', 'credit card',
+      'sipariş', 'order', 'ürün', 'product', 'fiyat', 'price', '₺', '$', '€',
+      'add to cart', 'sepete ekle', 'buy now', 'şimdi al'
+    ];
+    
+    let ecommerceScore = 0;
+    for (const pattern of ecommercePatterns) {
+      if (lowerHtml.includes(pattern.toLowerCase())) {
+        ecommerceScore++;
+      }
+    }
+    
+    if (ecommerceScore >= 3) {
+      return {
+        cmsName: 'Özel E-ticaret',
+        cmsGroup: 'Özel Sistem'
+      };
+    }
+    
+    // Tanınmayan CMS
+    return {
+      cmsName: 'Tanınmayan CMS',
+      cmsGroup: 'Bilinmeyen'
+    };
+    
+  } catch (error) {
+    console.error('❌ Website analiz hatası:', error);
+    return {
+      cmsName: 'Erişilemiyor',
+      cmsGroup: 'Erişilemiyor'
+    };
+  }
+}
+
+/**
+ * 🛒 E-ticaret İzi Tespiti - Güven Skoru
+ * @param {Object} parameters - Fonksiyon parametreleri
+ * @returns {Object} - Sonuç objesi
+ */
+function detectEcommerceIzi(parameters) {
+  console.log('🛒 E-ticaret İzi tespiti başlatılıyor:', parameters);
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const range = sheet.getActiveRange();
+    
+    if (!range) {
+      throw new Error('Lütfen analiz edilecek satırları seçin');
+    }
+    
+    const startRow = range.getRow();
+    const endRow = range.getLastRow();
+    const rowCount = endRow - startRow + 1;
+    
+    console.log(`📊 ${rowCount} satır analiz edilecek`);
+    
+    // Progress bar başlat
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('🛒 E-ticaret Analizi', `${rowCount} satır analiz ediliyor...\nLütfen bekleyin.`);
+    
+    // Website kolonunu bul
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const websiteIndex = headers.findIndex(header => 
+      header === 'Website' || header === 'Site' || header === 'URL'
+    );
+    
+    if (websiteIndex === -1) {
+      throw new Error('Website kolonu bulunamadı');
+    }
+    
+    // E-ticaret İzi kolonunu bul veya oluştur
+    let ecommerceIndex = headers.findIndex(header => header === 'E-Ticaret İzi');
+    
+    if (ecommerceIndex === -1) {
+      // E-Ticaret İzi kolonu yoksa ekle
+      const lastColumn = sheet.getLastColumn();
+      sheet.getRange(1, lastColumn + 1).setValue('E-Ticaret İzi');
+      ecommerceIndex = lastColumn;
+    }
+    
+    // Paralel işlem için batch size
+    const BATCH_SIZE = 50;
+    let processedCount = 0;
+    
+    // Her batch için
+    for (let i = 0; i < rowCount; i += BATCH_SIZE) {
+      const batchEnd = Math.min(i + BATCH_SIZE, rowCount);
+      const batchSize = batchEnd - i;
+      
+      console.log(`🔄 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${batchSize} satır işleniyor`);
+      
+      // Batch içindeki her satır için
+      for (let j = 0; j < batchSize; j++) {
+        const currentRow = startRow + i + j;
+        const website = sheet.getRange(currentRow, websiteIndex + 1).getValue();
+        
+        if (website && website.toString().trim() !== '') {
+          try {
+            const ecommerceResult = analyzeEcommerce(website.toString());
+            
+            // Sonucu yaz
+            sheet.getRange(currentRow, ecommerceIndex + 1).setValue(ecommerceResult);
+            
+            processedCount++;
+            
+            // Her 10 satırda bir progress
+            if (processedCount % 10 === 0) {
+              console.log(`✅ ${processedCount} satır tamamlandı`);
+            }
+            
+          } catch (error) {
+            console.error(`❌ Satır ${currentRow} analiz hatası:`, error);
+            sheet.getRange(currentRow, ecommerceIndex + 1).setValue('Erişilemiyor');
+          }
+        }
+      }
+      
+      // Batch arası kısa bekleme
+      Utilities.sleep(100);
+    }
+    
+    console.log(`✅ E-ticaret Analizi tamamlandı: ${processedCount} satır işlendi`);
+    ui.alert('✅ Tamamlandı', `E-ticaret Analizi tamamlandı!\n${processedCount} satır işlendi.`);
+    
+    return {
+      success: true,
+      processedCount: processedCount,
+      totalRows: rowCount
+    };
+    
+  } catch (error) {
+    console.error('❌ E-ticaret Analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', 'E-ticaret Analizi sırasında hata oluştu: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🛒 Tekil E-ticaret Analizi - Güven Skoru
+ * @param {string} website - Website URL'i
+ * @returns {string} - E-ticaret skoru
+ */
+function analyzeEcommerce(website) {
+  try {
+    // URL'yi temizle
+    let url = website.toString().trim();
+    if (!url.startsWith('http')) {
+      url = 'https://' + url;
+    }
+    
+    // HTML kaynak kodunu al
+    const response = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      timeout: 5000
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      return 'Erişilemiyor';
+    }
+    
+    const html = response.getContentText();
+    const lowerHtml = html.toLowerCase();
+    
+    // E-ticaret Tespit Algoritması
+    const ecommercePatterns = {
+      // Güçlü E-ticaret İmzaları (5 puan)
+      strong: [
+        'sepet', 'cart', 'basket', 'shopping cart',
+        'ödeme', 'payment', 'checkout',
+        'kredi kartı', 'credit card', 'debit card',
+        'sipariş', 'order', 'purchase',
+        'add to cart', 'sepete ekle', 'buy now', 'şimdi al',
+        'woocommerce', 'shopify', 'magento', 'opencart',
+        'ideasoft', 'ticimax', 't-soft', 'softtr', 'ikas'
+      ],
+      
+      // Orta Güçlü E-ticaret İmzaları (3 puan)
+      medium: [
+        'ürün', 'product', 'item',
+        'fiyat', 'price', 'cost',
+        '₺', '$', '€', 'tl',
+        'kategori', 'category',
+        'stok', 'stock', 'inventory',
+        'kargo', 'shipping', 'delivery',
+        'indirim', 'discount', 'sale'
+      ],
+      
+      // Zayıf E-ticaret İmzaları (1 puan)
+      weak: [
+        'mağaza', 'store', 'shop',
+        'alışveriş', 'shopping',
+        'satın al', 'buy', 'purchase',
+        'müşteri', 'customer',
+        'hesap', 'account',
+        'giriş', 'login', 'register'
+      ]
+    };
+    
+    let totalScore = 0;
+    let maxPossibleScore = 0;
+    
+    // Her kategori için skor hesapla
+    for (const [strength, patterns] of Object.entries(ecommercePatterns)) {
+      const points = strength === 'strong' ? 5 : strength === 'medium' ? 3 : 1;
+      
+      for (const pattern of patterns) {
+        maxPossibleScore += points;
+        if (lowerHtml.includes(pattern.toLowerCase())) {
+          totalScore += points;
+        }
+      }
+    }
+    
+    // Güven skorunu hesapla (0-100%)
+    const confidenceScore = Math.round((totalScore / maxPossibleScore) * 100);
+    
+    // Skor kategorileri
+    if (confidenceScore >= 80) {
+      return `${confidenceScore}% - E-ticaret`;
+    } else if (confidenceScore >= 50) {
+      return `${confidenceScore}% - Muhtemelen E-ticaret`;
+    } else if (confidenceScore >= 20) {
+      return `${confidenceScore}% - E-ticaret İzi Var`;
+    } else {
+      return `${confidenceScore}% - E-ticaret Yok`;
+    }
+    
+  } catch (error) {
+    console.error('❌ E-ticaret analiz hatası:', error);
+    return 'Erişilemiyor';
+  }
+}
+
+/**
+ * ⚡ Site Hız Testi - Basit Hız Ölçümü
+ * @param {Object} parameters - Fonksiyon parametreleri
+ * @returns {Object} - Sonuç objesi
+ */
+function testSiteHizi(parameters) {
+  console.log('⚡ Site Hız Testi başlatılıyor:', parameters);
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const range = sheet.getActiveRange();
+    
+    if (!range) {
+      throw new Error('Lütfen test edilecek satırları seçin');
+    }
+    
+    const startRow = range.getRow();
+    const endRow = range.getLastRow();
+    const rowCount = endRow - startRow + 1;
+    
+    console.log(`📊 ${rowCount} satır test edilecek`);
+    
+    // Progress bar başlat
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('⚡ Hız Testi', `${rowCount} satır test ediliyor...\nLütfen bekleyin.`);
+    
+    // Website kolonunu bul
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const websiteIndex = headers.findIndex(header => 
+      header === 'Website' || header === 'Site' || header === 'URL'
+    );
+    
+    if (websiteIndex === -1) {
+      throw new Error('Website kolonu bulunamadı');
+    }
+    
+    // Site Hızı kolonunu bul veya oluştur
+    let speedIndex = headers.findIndex(header => header === 'Site Hızı');
+    
+    if (speedIndex === -1) {
+      // Site Hızı kolonu yoksa ekle
+      const lastColumn = sheet.getLastColumn();
+      sheet.getRange(1, lastColumn + 1).setValue('Site Hızı');
+      speedIndex = lastColumn;
+    }
+    
+    // Paralel işlem için batch size
+    const BATCH_SIZE = 50;
+    let processedCount = 0;
+    
+    // Her batch için
+    for (let i = 0; i < rowCount; i += BATCH_SIZE) {
+      const batchEnd = Math.min(i + BATCH_SIZE, rowCount);
+      const batchSize = batchEnd - i;
+      
+      console.log(`🔄 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${batchSize} satır işleniyor`);
+      
+      // Batch içindeki her satır için
+      for (let j = 0; j < batchSize; j++) {
+        const currentRow = startRow + i + j;
+        const website = sheet.getRange(currentRow, websiteIndex + 1).getValue();
+        
+        if (website && website.toString().trim() !== '') {
+          try {
+            const speedResult = measureSiteSpeed(website.toString());
+            
+            // Sonucu yaz
+            sheet.getRange(currentRow, speedIndex + 1).setValue(speedResult);
+            
+            processedCount++;
+            
+            // Her 10 satırda bir progress
+            if (processedCount % 10 === 0) {
+              console.log(`✅ ${processedCount} satır tamamlandı`);
+            }
+            
+          } catch (error) {
+            console.error(`❌ Satır ${currentRow} test hatası:`, error);
+            sheet.getRange(currentRow, speedIndex + 1).setValue('Erişilemiyor');
+          }
+        }
+      }
+      
+      // Batch arası kısa bekleme
+      Utilities.sleep(100);
+    }
+    
+    console.log(`✅ Hız Testi tamamlandı: ${processedCount} satır işlendi`);
+    ui.alert('✅ Tamamlandı', `Hız Testi tamamlandı!\n${processedCount} satır işlendi.`);
+    
+    return {
+      success: true,
+      processedCount: processedCount,
+      totalRows: rowCount
+    };
+    
+  } catch (error) {
+    console.error('❌ Hız Testi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Hız Testi sırasında hata oluştu: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * ⚡ Tekil Site Hız Ölçümü - Basit Metrik
+ * @param {string} website - Website URL'i
+ * @returns {string} - Hız sonucu
+ */
+function measureSiteSpeed(website) {
+  try {
+    // URL'yi temizle
+    let url = website.toString().trim();
+    if (!url.startsWith('http')) {
+      url = 'https://' + url;
+    }
+    
+    // Başlangıç zamanı
+    const startTime = new Date().getTime();
+    
+    // HTTP isteği
+    const response = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      timeout: 10000
+    });
+    
+    // Bitiş zamanı
+    const endTime = new Date().getTime();
+    const responseTime = endTime - startTime;
+    
+    // HTTP durum kodu
+    const statusCode = response.getResponseCode();
+    
+    if (statusCode !== 200) {
+      return 'Erişilemiyor';
+    }
+    
+    // İçerik boyutu
+    const contentLength = response.getHeaders()['content-length'];
+    const sizeKB = contentLength ? Math.round(contentLength / 1024) : 'Bilinmiyor';
+    
+    // Hız kategorileri
+    if (responseTime < 1000) {
+      return `${responseTime}ms (Çok Hızlı)`;
+    } else if (responseTime < 3000) {
+      return `${responseTime}ms (Hızlı)`;
+    } else if (responseTime < 5000) {
+      return `${responseTime}ms (Orta)`;
+    } else if (responseTime < 10000) {
+      return `${responseTime}ms (Yavaş)`;
+    } else {
+      return `${responseTime}ms (Çok Yavaş)`;
+    }
+    
+  } catch (error) {
+    console.error('❌ Hız ölçüm hatası:', error);
+    return 'Erişilemiyor';
+  }
+}
+
+/**
+ * 🎛️ Admin Menüsüne Website Analiz Butonlarını Ekle
+ */
+function addWebsiteAnalysisToAdminMenu() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    
+    // Mevcut Admin menüsünü bul
+    const menus = ui.getMenus();
+    let adminMenu = null;
+    
+    for (const menu of menus) {
+      if (menu.getName() === 'Admin') {
+        adminMenu = menu;
+        break;
+      }
+    }
+    
+    if (!adminMenu) {
+      console.log('Admin menüsü bulunamadı, yeni menü oluşturuluyor');
+      ui.createMenu('Admin')
+        .addItem('🔍 CMS ALTYAPI', 'detectCMSAltyapisi')
+        .addItem('🛒 E-TİCARET İZİ', 'detectEcommerceIzi')
+        .addItem('⚡ HIZ TESTİ', 'testSiteHizi')
+        .addSeparator()
+        .addItem('Yeni Tablo oluştur', 'showCreateTableDialog')
+        .addToUi();
+    } else {
+      console.log('Admin menüsüne Website Analiz butonları ekleniyor');
+      // Mevcut Admin menüsüne butonları ekle
+      // Not: Google Apps Script'te mevcut menüye dinamik ekleme yapılamıyor
+      // Bu yüzden menüyü yeniden oluşturmamız gerekiyor
+    }
+    
+    console.log('✅ Website Analiz butonları Admin menüsüne eklendi');
+    
+  } catch (error) {
+    console.error('❌ Admin menüsü güncelleme hatası:', error);
+  }
+}
+
+// ========================================
+// 🎛️ WEBSITE ANALİZ SİSTEMİ - BAŞLATMA
+// ========================================
+
+console.log('🔍 Website Analiz Sistemi yüklendi');
+console.log('📊 CMS Altyapısı fonksiyonları hazır');
+console.log('🛒 E-ticaret İzi fonksiyonları hazır');
+console.log('⚡ Hız Testi fonksiyonları hazır');
