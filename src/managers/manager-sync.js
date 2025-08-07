@@ -444,6 +444,8 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
         } else {
           // Debug: Log unknown status
           console.log('Unknown status in manager:', status);
+          console.log('Sheet name:', sheetName);
+          console.log('Available colors:', Object.keys(CRM_CONFIG.COLOR_CODES));
         }
         
         applyRowColor(sheet, rowNumber, color);
@@ -803,7 +805,7 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
         if (randevuDurumuIndex !== -1) {
           const validation = SpreadsheetApp.newDataValidation()
             .requireValueInList(['Randevu Alındı', 'İleri Tarih Randevu', 'Randevu Teyitlendi', 'Randevu Ertelendi', 'Randevu İptal oldu'], true)
-            .setAllowInvalid(false)
+            .setAllowInvalid(true)
             .build();
           sheet.getRange(2, randevuDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
         }
@@ -813,7 +815,7 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
         if (toplantiSonucuIndex !== -1) {
           const validation = SpreadsheetApp.newDataValidation()
             .requireValueInList(CRM_CONFIG.MEETING_RESULT_OPTIONS, true)
-            .setAllowInvalid(false)
+            .setAllowInvalid(true)
             .build();
           sheet.getRange(2, toplantiSonucuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
         }
@@ -824,8 +826,8 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
         const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
         if (firsatDurumuIndex !== -1) {
           const validation = SpreadsheetApp.newDataValidation()
-            .requireValueInList(['Fırsat İletildi', 'Bilgi Verildi', 'Yeniden Aranacak', 'İlgilenmiyor', 'Ulaşılamadı'], true)
-            .setAllowInvalid(false)
+            .requireValueInList(['Fırsat İletildi', 'Bilgi Verildi', 'Yeniden Aranacak'], true)
+            .setAllowInvalid(true)
             .build();
           sheet.getRange(2, firsatDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
         }
@@ -837,7 +839,7 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
         if (toplantiDurumuIndex !== -1) {
           const validation = SpreadsheetApp.newDataValidation()
             .requireValueInList(['Toplantı Tamamlandı'], true)
-            .setAllowInvalid(false)
+            .setAllowInvalid(true)
             .build();
           sheet.getRange(2, toplantiDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
         }
@@ -847,7 +849,7 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
         if (toplantiFormatiIndex !== -1) {
           const validation = SpreadsheetApp.newDataValidation()
             .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
-            .setAllowInvalid(false)
+            .setAllowInvalid(true)
             .build();
           sheet.getRange(2, toplantiFormatiIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
         }
