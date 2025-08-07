@@ -1195,15 +1195,20 @@ function applyFormatTableColorCoding(sheet, rowNumber, activity) {
   console.log('🎨 Applying Format Tablo color coding to row:', rowNumber, 'activity:', activity);
   
   try {
-    if (!sheet || !rowNumber || !activity) {
+    if (!sheet || !rowNumber) {
       console.error('❌ Invalid parameters for color coding');
       return;
     }
     
     let color = 'rgb(255, 255, 255)'; // Default white
     
+    // Check if activity is empty, null, or undefined
+    if (!activity || activity === '' || activity === null || activity === undefined) {
+      console.log('⚠️ Empty activity - applying white color');
+      color = 'rgb(255, 255, 255)'; // White
+    }
     // Map activity to color using centralized system
-    if (activity === 'Randevu Alındı') {
+    else if (activity === 'Randevu Alındı') {
       color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
     } else if (activity === 'İleri Tarih Randevu') {
       color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
@@ -2179,6 +2184,8 @@ function applyOpportunityColorCoding(sheet, rowNumber) {
       } else {
         console.log('⚠️ Unknown status:', normalizedStatus, '- using default white');
         console.log('Available statuses for opportunities:', ['Yeniden Aranacak', 'Bilgi Verildi', 'Fırsat İletildi']);
+        console.log('🔍 Debug - CRM_CONFIG.COLOR_CODES keys:', Object.keys(CRM_CONFIG.COLOR_CODES));
+        console.log('🔍 Debug - Looking for:', normalizedStatus);
       }
     } else {
       console.log('⚠️ Empty status - using default white');
@@ -4098,17 +4105,38 @@ function onEdit(e) {
         };
         
         handleRandevularimStatusChange(testEvent, sheet);
-        console.log('Manual test completed');
-        
-        SpreadsheetApp.getUi().alert('Test Completed', 'Check execution logs for details', SpreadsheetApp.getUi().ButtonSet.OK);
-      } else {
-        console.log('Not Randevularım sheet, current sheet:', sheetName);
-        SpreadsheetApp.getUi().alert('Wrong Sheet', `Current sheet: ${sheetName}\nPlease go to Randevularım sheet`, SpreadsheetApp.getUi().ButtonSet.OK);
       }
+      
+      if (sheetName === 'Fırsatlarım') {
+        console.log('Fırsatlarım sheet found, testing status change...');
+        
+        // Test with row 2, Fırsat Durumu column
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+        
+        if (firsatDurumuIndex !== -1) {
+          const testRange = sheet.getRange(2, firsatDurumuIndex + 1);
+          const currentValue = testRange.getValue();
+          console.log('Current Fırsat Durumu value:', currentValue);
+          
+          // Show alert with current info
+          SpreadsheetApp.getUi().alert('Test Info', 
+            `Sheet: ${sheetName}\nFırsat Durumu value: ${currentValue}`, 
+            SpreadsheetApp.getUi().ButtonSet.OK);
+          
+          // Apply color coding
+          applyOpportunityColorCoding(sheet, 2);
+        }
+      }
+      
+      console.log('Manual test completed');
+      
+      SpreadsheetApp.getUi().alert('Test Completed', 'Check execution logs for details', SpreadsheetApp.getUi().ButtonSet.OK);
+      
     } catch (error) {
       console.error('Manual test error:', error);
       SpreadsheetApp.getUi().alert('Test Error', 'Error: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
-      }
+    }
 }
 
 function testMonthlyReport() {
@@ -4305,40 +4333,42 @@ function updateRandevularimRowColor(randevularimSheet, rowNumber, status) {
       return;
     }
     
-    if (!status) {
-      console.error('❌ status is undefined');
-      return;
-    }
-    
     console.log('🎨 Status to color mapping for:', status);
     
     let color = 'rgb(255, 255, 255)'; // Default white
     
+    // Check if status is empty, null, or undefined
+    if (!status || status === '' || status === null || status === undefined) {
+      console.log('⚠️ Empty status - applying white color');
+      color = 'rgb(255, 255, 255)'; // White
+    }
     // Map status to color using centralized system
-    switch (status) {
-      case 'Randevu Alındı':
-        color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
-        console.log('🎨 Mapped Randevu Alındı to color:', color);
-        break;
-      case 'İleri Tarih Randevu':
-        color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
-        console.log('🎨 Mapped İleri Tarih Randevu to color:', color);
-        break;
-      case 'Randevu Teyitlendi':
-        color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
-        console.log('🎨 Mapped Randevu Teyitlendi to color:', color);
-        break;
-      case 'Randevu Ertelendi':
-        color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
-        console.log('🎨 Mapped Randevu Ertelendi to color:', color);
-        break;
-      case 'Randevu İptal oldu':
-        color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
-        console.log('🎨 Mapped Randevu İptal oldu to color:', color);
-        break;
-      default:
-        color = 'rgb(255, 255, 255)'; // White (default)
-        console.log('⚠️ Unknown status, using default white');
+    else {
+      switch (status) {
+        case 'Randevu Alındı':
+          color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+          console.log('🎨 Mapped Randevu Alındı to color:', color);
+          break;
+        case 'İleri Tarih Randevu':
+          color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
+          console.log('🎨 Mapped İleri Tarih Randevu to color:', color);
+          break;
+        case 'Randevu Teyitlendi':
+          color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
+          console.log('🎨 Mapped Randevu Teyitlendi to color:', color);
+          break;
+        case 'Randevu Ertelendi':
+          color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
+          console.log('🎨 Mapped Randevu Ertelendi to color:', color);
+          break;
+        case 'Randevu İptal oldu':
+          color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
+          console.log('🎨 Mapped Randevu İptal oldu to color:', color);
+          break;
+        default:
+          color = 'rgb(255, 255, 255)'; // White (default)
+          console.log('⚠️ Unknown status, using default white');
+      }
     }
     
     const range = randevularimSheet.getRange(rowNumber, 1, 1, randevularimSheet.getLastColumn());
