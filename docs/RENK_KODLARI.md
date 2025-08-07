@@ -9,7 +9,7 @@
 | Randevu Alındı | rgb(232, 245, 232) | Format Tablo, Randevularım | Açık Yeşil (Светло-зеленый) |
 | İleri Tarih Randevu | rgb(245, 245, 245) | Format Tablo, Randevularım | Açık Gri (Светло-серый) |
 | Teyitlendi | rgb(232, 245, 232) | Randevularım | Açık Yeşil (Светло-зеленый) |
-| Ertelendi | rgb(255, 243, 224) | Randevularım | Açık Turuncu (Светло-оранжевый) |
+| Ertelendi | rgb(255, 248, 225) | Randevularım | Açık Sarı (Светло-желтый) |
 | İptal | rgb(255, 235, 238) | Randevularım | Açık Kırmızı (Светло-красный) |
 | Fırsat İletildi | rgb(255, 235, 238) | Format Tablo, Fırsatlarım | Açık Kırmızı (Светло-красный) |
 | Toplantı Tamamlandı | rgb(200, 230, 201) | Toplantılarım | Açık Yeşil (Светло-зеленый) |
@@ -48,7 +48,7 @@ CRM_CONFIG = {
     'Randevu Alındı': 'rgb(232, 245, 232)',      // #E8F5E8 - Açık Yeşil
     'İleri Tarih Randevu': 'rgb(245, 245, 245)', // #F5F5F5 - Açık Gri
     'Teyitlendi': 'rgb(232, 245, 232)',          // #E8F5E8 - Açık Yeşil
-    'Ertelendi': 'rgb(255, 243, 224)',           // #FFF3E0 - Açık Turuncu
+    'Ertelendi': 'rgb(255, 248, 225)',           // #FFF8E1 - Açık Sarı
     'İptal': 'rgb(255, 235, 238)',               // #FFEBEE - Açık Kırmızı
     'Fırsat İletildi': 'rgb(255, 235, 238)',     // #FFEBEE - Açık Kırmızı
     'Toplantı Tamamlandı': 'rgb(200, 230, 201)', // #C8E6C9 - Açık Yeşil

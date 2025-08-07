@@ -26,8 +26,8 @@ const CRM_CONFIG = {
     'Randevu Alındı': 'rgb(232, 245, 232)',      // #E8F5E8 - Light Green
     'İleri Tarih Randevu': 'rgb(245, 245, 245)', // #F5F5F5 - Light Gray
     'Randevu Teyitlendi': 'rgb(232, 245, 232)',  // #E8F5E8 - Light Green
-    'Randevu Ertelendi': 'rgb(255, 243, 224)',   // #FFF3E0 - Light Orange
-    'Randevu İptal oldu': 'rgb(255, 235, 238)',  // #FFEBEE - Light Red
+    'Randevu Ertelendi': 'rgb(255, 248, 225)',   // #FFF8E1 - Light Yellow (Açık Sarı)
+    'Randevu İptal oldu': 'rgb(255, 235, 238)',  // #FFEBEE - Light Red (Açık Kırmızı)
     
     // Opportunity Colors - Görseldeki Renkler
     'Fırsat İletildi': 'rgb(255, 235, 238)',     // #FFEBEE - Light Red
