@@ -5587,20 +5587,39 @@ function analyzeCMS(website) {
     
     const statusCode = response.getResponseCode();
     
-    if (statusCode !== 200) {
-      return { 
-        cmsName: `HTTP ${statusCode}`, 
-        cmsGroup: 'Erişilemiyor' 
-      };
+    // HTTP Status kontrolü - daha esnek yaklaşım
+    if (statusCode >= 400) {
+      // 4xx ve 5xx hataları için CMS tespit yapma
+      if (statusCode === 404) {
+        return { cmsName: 'Sayfa Bulunamadı', cmsGroup: 'Erişilemiyor' };
+      } else if (statusCode === 403) {
+        return { cmsName: 'Erişim Engellendi', cmsGroup: 'Erişilemiyor' };
+      } else if (statusCode === 500) {
+        return { cmsName: 'Sunucu Hatası', cmsGroup: 'Erişilemiyor' };
+      } else if (statusCode === 429) {
+        return { cmsName: 'Rate Limit', cmsGroup: 'Erişilemiyor' };
+      } else {
+        return { cmsName: `HTTP ${statusCode}`, cmsGroup: 'Erişilemiyor' };
+      }
+    } else if (statusCode >= 300 && statusCode < 400) {
+      // 3xx yönlendirmeler için devam et
+      console.log(`Yönlendirme tespit edildi: ${statusCode}`);
     }
     
     const html = response.getContentText();
     
-    if (!html || html.length < 100) {
+    if (!html || html.length < 50) {
       return { cmsName: 'Boş Sayfa', cmsGroup: 'Erişilemiyor' };
     }
     
+    // HTML içeriğinde hata sayfası kontrolü
     const lowerHtml = html.toLowerCase();
+    if (lowerHtml.includes('404') || 
+        lowerHtml.includes('sayfa bulunamadı') || 
+        lowerHtml.includes('page not found') ||
+        lowerHtml.includes('error 404')) {
+      return { cmsName: '404 Sayfa Bulunamadı', cmsGroup: 'Erişilemiyor' };
+    }
     
     // CMS Tespit Algoritması
     const cmsPatterns = {
@@ -5622,7 +5641,7 @@ function analyzeCMS(website) {
         group: 'Türkiye E-ticaret'
       },
       'İkas': {
-        patterns: ['ikas', 'ikas.com.tr', 'ikas.com'],
+        patterns: ['ikas', 'ikas.com.tr', 'ikas.com', 'ikas-cms', 'ikas-cart', 'ikas-shopping'],
         group: 'Türkiye E-ticaret'
       },
       
@@ -5891,17 +5910,35 @@ function analyzeEcommerce(website) {
     
     const statusCode = response.getResponseCode();
     
-    if (statusCode !== 200) {
-      return `HTTP ${statusCode}`;
+    // HTTP Status kontrolü - daha esnek yaklaşım
+    if (statusCode >= 400) {
+      if (statusCode === 404) {
+        return 'Sayfa Bulunamadı';
+      } else if (statusCode === 403) {
+        return 'Erişim Engellendi';
+      } else if (statusCode === 500) {
+        return 'Sunucu Hatası';
+      } else if (statusCode === 429) {
+        return 'Rate Limit';
+      } else {
+        return `HTTP ${statusCode}`;
+      }
     }
     
     const html = response.getContentText();
     
-    if (!html || html.length < 100) {
+    if (!html || html.length < 50) {
       return 'Boş Sayfa';
     }
     
+    // HTML içeriğinde hata sayfası kontrolü
     const lowerHtml = html.toLowerCase();
+    if (lowerHtml.includes('404') || 
+        lowerHtml.includes('sayfa bulunamadı') || 
+        lowerHtml.includes('page not found') ||
+        lowerHtml.includes('error 404')) {
+      return '404 Sayfa Bulunamadı';
+    }
     
     // E-ticaret Tespit Algoritması
     const ecommercePatterns = {
@@ -6142,8 +6179,19 @@ function measureSiteSpeed(website) {
     // HTTP durum kodu
     const statusCode = response.getResponseCode();
     
-    if (statusCode !== 200) {
-      return `HTTP ${statusCode}`;
+    // HTTP Status kontrolü - daha esnek yaklaşım
+    if (statusCode >= 400) {
+      if (statusCode === 404) {
+        return 'Sayfa Bulunamadı';
+      } else if (statusCode === 403) {
+        return 'Erişim Engellendi';
+      } else if (statusCode === 500) {
+        return 'Sunucu Hatası';
+      } else if (statusCode === 429) {
+        return 'Rate Limit';
+      } else {
+        return `HTTP ${statusCode}`;
+      }
     }
     
     // İçerik boyutu
