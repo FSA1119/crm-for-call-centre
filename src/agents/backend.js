@@ -564,10 +564,11 @@ function setDataValidation(sheet) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const aktiviteIndex = headers.indexOf('Aktivite') + 1;
   const toplantiFormatIndex = headers.indexOf('Toplantı formatı') + 1;
+  
   if (aktiviteIndex > 0) {
     const aktiviteRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
       .build();
     const minRows = 1000;
     const lastRow = Math.max(sheet.getLastRow(), 2);
@@ -576,10 +577,11 @@ function setDataValidation(sheet) {
     validationRange.clearDataValidations();
     validationRange.setDataValidation(aktiviteRule);
   }
+  
   if (toplantiFormatIndex > 0) {
     const toplantiRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
       .build();
     const minRows = 1000;
     const lastRow = Math.max(sheet.getLastRow(), 2);
@@ -1354,7 +1356,7 @@ function setRandevularimDataValidation(sheet) {
     const randevuDurumuOptions = ['Randevu Alındı', 'İleri Tarih Randevu', 'Randevu Teyitlendi', 'Randevu Ertelendi', 'Randevu İptal oldu'];
     const randevuRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(randevuDurumuOptions, true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
       .build();
     
     sheet.getRange(2, randevuDurumuIndex, validationRows, 1).setDataValidation(randevuRule);
@@ -1391,7 +1393,7 @@ function setRandevularimDataValidation(sheet) {
   if (toplantiFormatIndex > 0) {
     const toplantiRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
       .build();
     
     sheet.getRange(2, toplantiFormatIndex, validationRows, 1).setDataValidation(toplantiRule);
@@ -1406,7 +1408,7 @@ function setRandevularimDataValidation(sheet) {
   if (toplantiTarihiIndex > 0) {
     const toplantiTarihRule = SpreadsheetApp.newDataValidation()
       .requireDate()
-      .setAllowInvalid(false)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
       .build();
     
     sheet.getRange(2, toplantiTarihiIndex, validationRows, 1).setDataValidation(toplantiTarihRule);
@@ -2084,7 +2086,7 @@ function setFirsatlarimDataValidation(sheet) {
     
     const firsatRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(firsatDurumuOptions, true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
       .build();
     
     const validationRange = sheet.getRange(2, firsatDurumuIndex, validationRows, 1);
@@ -2102,7 +2104,7 @@ function setFirsatlarimDataValidation(sheet) {
   if (firsatTarihiIndex > 0) {
     const tarihRule = SpreadsheetApp.newDataValidation()
       .requireDate()
-      .setAllowInvalid(false)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
       .build();
     
     sheet.getRange(2, firsatTarihiIndex, validationRows, 1).setDataValidation(tarihRule);
@@ -2114,7 +2116,7 @@ function setFirsatlarimDataValidation(sheet) {
   if (toplantiFormatIndex > 0) {
     const toplantiRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
       .build();
     
     sheet.getRange(2, toplantiFormatIndex, validationRows, 1).setDataValidation(toplantiRule);
