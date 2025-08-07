@@ -446,6 +446,8 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           console.log('Unknown status in manager:', status);
           console.log('Sheet name:', sheetName);
           console.log('Available colors:', Object.keys(CRM_CONFIG.COLOR_CODES));
+          console.log('Status column index:', statusColumnIndex);
+          console.log('Headers:', headers);
         }
         
         applyRowColor(sheet, rowNumber, color);
@@ -474,6 +476,10 @@ function createManagerMenu() {
       submenu.addItem(`${employeeCode} - ${employeeName}`, `syncSingleEmployee_${employeeCode.replace(/\s+/g, '_')}`);
     }
     menu.addSubMenu(submenu)
+        .addSeparator();
+    menu.addItem('🎨 Renk Kodlaması Yenile', 'forceRefreshManagerColorCoding')
+        .addItem('🎨 Manuel Renk Uygula', 'applyManualManagerColorCoding')
+        .addItem('🔄 Dropdown Yenile', 'applyDataValidationToAllManagerSheets')
         .addSeparator();
     menu.addItem('Senkronizasyon Durumu', 'showSyncStatus')
         .addSeparator()
@@ -800,6 +806,16 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
     // Apply validation based on sheet type
     switch (sheetName) {
       case 'Randevular':
+        // Add validation for Aktivite
+        const aktiviteIndex = headers.indexOf('Aktivite');
+        if (aktiviteIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, aktiviteIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
         // Add validation for Randevu durumu
         const randevuDurumuIndex = headers.indexOf('Randevu durumu');
         if (randevuDurumuIndex !== -1) {
@@ -822,6 +838,16 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
         break;
         
       case 'Fırsatlar':
+        // Add validation for Aktivite
+        const firsatAktiviteIndex = headers.indexOf('Aktivite');
+        if (firsatAktiviteIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatAktiviteIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
         // Add validation for Fırsat Durumu
         const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
         if (firsatDurumuIndex !== -1) {
@@ -830,6 +856,26 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
             .setAllowInvalid(true)
             .build();
           sheet.getRange(2, firsatDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Fırsat Tarihi
+        const firsatTarihiIndex = headers.indexOf('Fırsat Tarihi');
+        if (firsatTarihiIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireDate()
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatTarihiIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Toplantı formatı
+        const firsatToplantiFormatIndex = headers.indexOf('Toplantı formatı');
+        if (firsatToplantiFormatIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatToplantiFormatIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
         }
         break;
         
@@ -877,6 +923,66 @@ function forceRefreshManagerColorCoding() {
   } catch (error) {
     console.error('❌ Error refreshing manager colors:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', 'Renk kodlaması yenilenirken bir hata oluştu');
+  }
+}
+
+/**
+ * 🎨 Manual Color Coding for Manager - Force Apply Colors
+ */
+function applyManualManagerColorCoding() {
+  console.log('🎨 Applying manual color coding to manager');
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const sheetName = sheet.getName();
+    
+    console.log('Current sheet:', sheetName);
+    
+    if (sheetName === 'Randevular') {
+      console.log('Applying color coding to Randevular');
+      
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const randevuDurumuIndex = headers.indexOf('Randevu durumu');
+      
+      if (randevuDurumuIndex !== -1) {
+        for (let i = 1; i < data.length; i++) {
+          const status = data[i][randevuDurumuIndex];
+          if (status && status !== '') {
+            console.log(`Row ${i + 1}: ${status}`);
+            applyColorCodingToManagerData(sheet, sheetName, i + 1, 1);
+          }
+        }
+        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Randevular renk kodlaması uygulandı');
+      } else {
+        SpreadsheetApp.getUi().alert('❌ Hata', 'Randevu durumu sütunu bulunamadı');
+      }
+    } else if (sheetName === 'Fırsatlar') {
+      console.log('Applying color coding to Fırsatlar');
+      
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+      
+      if (firsatDurumuIndex !== -1) {
+        for (let i = 1; i < data.length; i++) {
+          const status = data[i][firsatDurumuIndex];
+          if (status && status !== '') {
+            console.log(`Row ${i + 1}: ${status}`);
+            applyColorCodingToManagerData(sheet, sheetName, i + 1, 1);
+          }
+        }
+        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Fırsatlar renk kodlaması uygulandı');
+      } else {
+        SpreadsheetApp.getUi().alert('❌ Hata', 'Fırsat Durumu sütunu bulunamadı');
+      }
+    } else {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu fonksiyon sadece Randevular veya Fırsatlar sayfalarında çalışır');
+    }
+    
+  } catch (error) {
+    console.error('Error applying manual manager color coding:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', 'Renk kodlaması uygulanırken hata: ' + error.message);
   }
 }
 
