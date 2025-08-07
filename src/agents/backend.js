@@ -5025,6 +5025,36 @@ function generateMonthlyReport() {
       reportData.push(row);
     }
     
+    // Tüm satırların aynı uzunlukta olduğunu kontrol et
+    const expectedLength = headerRow.length;
+    for (let i = 0; i < reportData.length; i++) {
+      if (reportData[i].length !== expectedLength) {
+        console.error(`Satır ${i} uzunluk hatası: ${reportData[i].length} (beklenen: ${expectedLength})`);
+        // Eksik kolonları doldur
+        while (reportData[i].length < expectedLength) {
+          reportData[i].push(0);
+        }
+        // Fazla kolonları kes
+        if (reportData[i].length > expectedLength) {
+          reportData[i] = reportData[i].slice(0, expectedLength);
+        }
+      }
+    }
+    
+    for (const category of categories) {
+      const row = [category];
+      let total = 0;
+      
+      for (const date of weekDates) {
+        const count = getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheet, date, category);
+        row.push(count);
+        total += count;
+      }
+      
+      row.push(total);
+      reportData.push(row);
+    }
+    
     // Toplam satırı ekle (sadece konuşma olan kategoriler)
     const totalRow = ['Toplam'];
     let grandTotal = 0;
