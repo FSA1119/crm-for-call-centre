@@ -435,10 +435,6 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
         } else if (status === 'Yeniden Aranacak') {
           color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
-        } else {
-          // Debug: Log unknown status
-          console.log('Unknown status in manager:', status);
-        }
         } else if (status === 'İlgilenmiyor') {
           color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
         } else if (status === 'Ulaşılamadı') {
