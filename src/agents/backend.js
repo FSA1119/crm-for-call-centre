@@ -5426,10 +5426,8 @@ function detectCMSAltyapisi(parameters) {
     const sheet = SpreadsheetApp.getActiveSheet();
     const sheetName = sheet.getName();
     
-    // Sayfa kontrolü
-    if (!sheetName.includes('Format Tablo')) {
-      throw new Error('Bu işlem sadece Format Tablo sayfalarında yapılabilir');
-    }
+    // Sayfa kontrolü - Herhangi bir sayfada çalışabilir
+    console.log('📊 Analiz edilecek sayfa:', sheetName);
     
     // Range kontrolü - Seçim yoksa tüm sayfa
     let startRow = 2; // Başlık satırını atla
@@ -5743,10 +5741,8 @@ function detectEcommerceIzi(parameters) {
     const sheet = SpreadsheetApp.getActiveSheet();
     const sheetName = sheet.getName();
     
-    // Sayfa kontrolü
-    if (!sheetName.includes('Format Tablo')) {
-      throw new Error('Bu işlem sadece Format Tablo sayfalarında yapılabilir');
-    }
+    // Sayfa kontrolü - Herhangi bir sayfada çalışabilir
+    console.log('📊 Analiz edilecek sayfa:', sheetName);
     
     // Range kontrolü - Seçim yoksa tüm sayfa
     let startRow = 2;
@@ -5985,10 +5981,8 @@ function testSiteHizi(parameters) {
     const sheet = SpreadsheetApp.getActiveSheet();
     const sheetName = sheet.getName();
     
-    // Sayfa kontrolü
-    if (!sheetName.includes('Format Tablo')) {
-      throw new Error('Bu işlem sadece Format Tablo sayfalarında yapılabilir');
-    }
+    // Sayfa kontrolü - Herhangi bir sayfada çalışabilir
+    console.log('📊 Analiz edilecek sayfa:', sheetName);
     
     // Range kontrolü - Seçim yoksa tüm sayfa
     let startRow = 2;
