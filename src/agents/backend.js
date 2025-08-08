@@ -1225,6 +1225,7 @@ function applyFormatTableColorCoding(sheet, rowNumber, activity) {
       color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
     } else if (activity === 'Fırsat İletildi') {
       color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+      console.log('🔍 Debug - Fırsat İletildi color found:', color);
     } else if (activity === 'Bilgi Verildi') {
       color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
     } else if (activity === 'Yeniden Aranacak') {
@@ -1237,6 +1238,8 @@ function applyFormatTableColorCoding(sheet, rowNumber, activity) {
       color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
     } else {
       console.log('⚠️ Unknown activity:', activity, '- using default white');
+      console.log('🔍 Debug - Available colors:', Object.keys(CRM_CONFIG.COLOR_CODES));
+      console.log('🔍 Debug - CRM_CONFIG.COLOR_CODES:', CRM_CONFIG.COLOR_CODES);
     }
     
     // Apply color to entire row
@@ -4224,6 +4227,46 @@ function applyManualColorCoding() {
   }
 }
 
+/**
+ * 🧪 Test Fırsat İletildi Color Coding
+ */
+function testFirsatIletildi() {
+  console.log('🧪 Testing Fırsat İletildi color coding');
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const sheetName = sheet.getName();
+    
+    console.log('Current sheet:', sheetName);
+    
+    if (isFormatTable(sheet)) {
+      console.log('Format Tablo sheet detected');
+      
+      // Test with row 2
+      const testRow = 2;
+      const testActivity = 'Fırsat İletildi';
+      
+      console.log('Testing with row:', testRow, 'activity:', testActivity);
+      
+      // Test CRM_CONFIG
+      console.log('🔍 Debug - CRM_CONFIG.COLOR_CODES:', CRM_CONFIG.COLOR_CODES);
+      console.log('🔍 Debug - Fırsat İletildi color:', CRM_CONFIG.COLOR_CODES['Fırsat İletildi']);
+      
+      // Apply color coding
+      applyFormatTableColorCoding(sheet, testRow, testActivity);
+      
+      SpreadsheetApp.getUi().alert('✅ Test Tamamlandı', 'Fırsat İletildi renk testi yapıldı. Console logları kontrol edin.');
+      
+    } else {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu test sadece Format Tablo sayfalarında çalışır');
+    }
+    
+  } catch (error) {
+    console.error('Test error:', error);
+    SpreadsheetApp.getUi().alert('❌ Test Hatası', 'Hata: ' + error.message);
+  }
+}
+
 function testMonthlyReport() {
   console.log('Haftalık rapor test başlatılıyor...');
   
@@ -4299,6 +4342,7 @@ function createAdminMenu() {
     menu.addSeparator();
     menu.addItem('🧪 Test onEdit Trigger', 'testOnEditTrigger');
     menu.addItem('🎨 Manuel Renk Uygula', 'applyManualColorCoding');
+    menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
     menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
     
     // Add menu to UI
