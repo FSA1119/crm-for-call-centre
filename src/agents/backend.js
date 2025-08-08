@@ -1761,9 +1761,17 @@ function processOpportunityForm(formData) {
     console.log('🔍 Debug - Updating Format Tablo row with activity:', newActivity);
     updateFormatTableRow(activeSheet, selectedRow, newActivity, formData);
     
-    // Apply color coding to the updated row using centralized function
-    console.log('🎨 Applying color coding to Format Tablo row for activity:', newActivity);
-    applyFormatTableColorCoding(activeSheet, selectedRow, newActivity);
+    // Apply color coding to the updated row - SIMPLE AND DIRECT
+    console.log('🎨 Applying color directly to row:', selectedRow);
+    
+    try {
+      const range = activeSheet.getRange(selectedRow, 1, 1, activeSheet.getLastColumn());
+      const color = 'rgb(255, 235, 238)'; // Light Red for Fırsat İletildi
+      range.setBackground(color);
+      console.log('✅ Color applied successfully to row:', selectedRow);
+    } catch (colorError) {
+      console.error('❌ Error applying color:', colorError);
+    }
     
     console.log('Processing complete:', result);
     logActivity('Fırsat İletildi', { 
