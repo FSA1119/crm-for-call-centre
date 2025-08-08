@@ -477,6 +477,65 @@ Yarı otomatık yarı manuel gırılen
 
 **⚠️ Önemli:** Aynı veri birden fazla kaynaktan sayılmaz. Her kategori sadece kendi sayfasından alınır.
 
+## 📊 **Rapor Hesaplama Sistemi**
+
+### 🎯 **Günlük Rapor Hesaplama:**
+
+**Veri Kaynakları:**
+```
+Randevu Alındı → Randevularım
+İleri Tarih Randevu → Randevularım
+Yeniden Aranacak → Fırsatlarım
+Bilgi Verildi → Fırsatlarım
+Fırsat İletildi → Fırsatlarım
+İlgilenmiyor → Format Tablo
+Ulaşılamadı → Format Tablo
+```
+
+**Tarih Kontrolü:**
+- **Randevularım/Fırsatlarım:** Aktivite tarihi sütunu varsa onu kontrol eder, yoksa bugün yapılan tüm işlemleri sayar
+- **Format Tablo:** Aktivite Tarihi sütununu kontrol eder, yoksa bugün yapılan tüm işlemleri sayar
+
+**Hesaplama:**
+```
+TOPLAM KONTAK = Randevu Alındı + İleri Tarih Randevu + Yeniden Aranacak + Bilgi Verildi + Fırsat İletildi + İlgilenmiyor
+
+TOPLAM İŞLEM = TOPLAM KONTAK + Ulaşılamadı
+```
+
+### 📅 **Haftalık Rapor Hesaplama:**
+
+**Veri Kaynakları:**
+```
+Randevu Alındı → Randevularım (Randevu Tarihi)
+İleri Tarih Randevu → Randevularım (Randevu Tarihi)
+Yeniden Aranacak → Fırsatlarım (Fırsat Tarihi)
+Bilgi Verildi → Fırsatlarım (Fırsat Tarihi)
+Fırsat İletildi → Fırsatlarım (Fırsat Tarihi)
+İlgilenmiyor → Format Tablo (Aktivite Tarihi)
+Ulaşılamadı → Format Tablo (Aktivite Tarihi)
+```
+
+**Tarih Kontrolü:**
+- **Randevularım:** Randevu Tarihi sütununa göre
+- **Fırsatlarım:** Fırsat Tarihi sütununa göre
+- **Format Tablo:** Aktivite Tarihi sütununa göre
+
+**Hesaplama:**
+```
+TOPLAM KONTAK = Randevu Alındı + İleri Tarih Randevu + Yeniden Aranacak + Bilgi Verildi + Fırsat İletildi + İlgilenmiyor
+
+TOPLAM İŞLEM = TOPLAM KONTAK + Ulaşılamadı
+```
+
+### ⚠️ **ALT KATEGORİLER:**
+- **Randevu Teyitlendi, Randevu Ertelendi, Randevu İptal oldu** → Raporlarda görünür ama **TOPLAM KONTAK ve TOPLAM İŞLEM'e girmez**
+
+### 🔧 **Format Tablo Desteği:**
+- **Tüm Format Tablo'ları** bulur ve kontrol eder
+- **Farklı isimlerle** Format Tablo'ları destekler
+- **Aktivite Tarihi** sütununu kullanır
+
 ## 📊 **Günlük Rapor vs Haftalık Rapor Mantığı**
 
 ### 🎯 **Günlük Rapor:**
