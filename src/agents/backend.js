@@ -5282,8 +5282,7 @@ function generateMonthlyReport() {
       '3. Yeniden Aranacak',
       '4. Bilgi Verildi',
       '5. Fırsat İletildi',
-      '6. İlgilenmiyor',
-      '7. Ulaşılamadı'
+      '6. İlgilenmiyor'
     ];
     
     console.log('Haftalık rapor başlık:', headerRow);
@@ -5355,7 +5354,7 @@ function generateMonthlyReport() {
       let columnTotal = 0;
       
       // Sadece ana aktiviteleri topla (alt kategoriler dahil değil)
-      for (let rowIndex = 1; rowIndex <= 10; rowIndex++) {
+      for (let rowIndex = 1; rowIndex <= 9; rowIndex++) { // 9 kategori (7 ana + 2 alt)
         const category = reportData[rowIndex][0];
         // Ana aktiviteler: 1. Randevu Alındı, 2. İleri Tarih Randevu, 3. Yeniden Aranacak, 4. Bilgi Verildi, 5. Fırsat İletildi, 6. İlgilenmiyor
         // Alt kategoriler dahil değil: - Randevu Teyitlendi, - Randevu Ertelendi, - Randevu İptal oldu
@@ -5374,6 +5373,22 @@ function generateMonthlyReport() {
     reportData.push(totalContactRow);
     console.log('Kontak satırı eklendi:', totalContactRow);
     
+    // Ulaşılamadı satırını ekle
+    const ulasilamadiRow = ['7. Ulaşılamadı'];
+    let ulasilamadiGrandTotal = 0;
+    
+    for (let colIndex = 1; colIndex < reportData[0].length; colIndex++) {
+      const count = getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheet, weekDates[colIndex - 1], '7. Ulaşılamadı');
+      ulasilamadiRow.push(count);
+      if (colIndex < reportData[0].length - 1) { // Total sütunu hariç
+        ulasilamadiGrandTotal += count;
+      }
+    }
+    
+    ulasilamadiRow.push(ulasilamadiGrandTotal);
+    reportData.push(ulasilamadiRow);
+    console.log('Ulaşılamadı satırı eklendi:', ulasilamadiRow);
+    
     // TOPLAM İŞLEM satırı ekle (Toplam Kontak + Ulaşılamadı)
     const totalIslemRow = ['İŞLEM'];
     let totalIslemGrandTotal = 0;
@@ -5382,21 +5397,11 @@ function generateMonthlyReport() {
       let columnTotal = 0;
       
       // Toplam Kontak + Ulaşılamadı formülü
-      // Toplam Kontak: Ana aktiviteler (1-6. kategoriler)
-      // Ulaşılamadı: 7. kategori
+      // Kontak satırından al
+      const kontakCount = reportData[reportData.length - 2][colIndex] || 0; // Kontak satırı
+      const ulasilamadiCount = reportData[reportData.length - 1][colIndex] || 0; // Ulaşılamadı satırı
       
-      // Ana aktiviteleri topla (1-6. kategoriler)
-      for (let rowIndex = 1; rowIndex <= 6; rowIndex++) {
-        const category = reportData[rowIndex][0];
-        // Ana aktiviteler: 1. Randevu Alındı, 2. İleri Tarih Randevu, 3. Yeniden Aranacak, 4. Bilgi Verildi, 5. Fırsat İletildi, 6. İlgilenmiyor
-        if (category === '1. Randevu Alındı' || category === '2. İleri Tarih Randevu' || category === '3. Yeniden Aranacak' || category === '4. Bilgi Verildi' || category === '5. Fırsat İletildi' || category === '6. İlgilenmiyor') {
-          columnTotal += reportData[rowIndex][colIndex] || 0;
-        }
-      }
-      
-      // Ulaşılamadı'yı ekle (7. kategori)
-      const ulasilamadiCount = reportData[7][colIndex] || 0; // 7. satır (index 7)
-      columnTotal += ulasilamadiCount;
+      columnTotal = kontakCount + ulasilamadiCount;
       
       totalIslemRow.push(columnTotal);
       if (colIndex < reportData[0].length - 1) { // Total sütunu hariç
@@ -5460,12 +5465,14 @@ function generateMonthlyReport() {
     // Alt kategoriler (normal ve küçük)
     raporlarimSheet.getRange(3, 1, 3, 1).setFontSize(10).setFontColor('#5f6368'); // Alt kategoriler
     
-    // Toplam satırlarını vurgula (son 2 satır)
-    const totalContactRowIndex = reportData.length - 1; // Kontak
+    // Toplam satırlarını vurgula (son 3 satır)
+    const totalContactRowIndex = reportData.length - 2; // Kontak
+    const ulasilamadiRowIndex = reportData.length - 1; // Ulaşılamadı
     const totalIslemRowIndex = reportData.length; // İŞLEM
     
     // Toplam satırları (kursiv ve kalın)
     raporlarimSheet.getRange(totalContactRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setFontSize(12).setFontStyle('italic').setBackground('#e3f2fd').setFontColor('#1a73e8'); // Kontak
+    raporlarimSheet.getRange(ulasilamadiRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setFontSize(11).setBackground('#ffebee').setFontColor('#d32f2f'); // Ulaşılamadı
     raporlarimSheet.getRange(totalIslemRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setFontSize(12).setFontStyle('italic').setBackground('#fff3e0').setFontColor('#f4b400'); // İŞLEM
     
     // Tüm sayıları ortala
