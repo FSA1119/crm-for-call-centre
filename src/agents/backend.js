@@ -5358,6 +5358,7 @@ function generateMonthlyReport() {
       for (let rowIndex = 1; rowIndex <= 10; rowIndex++) {
         const category = reportData[rowIndex][0];
         // Ana aktiviteler: 1. Randevu Alındı, 2. İleri Tarih Randevu, 3. Yeniden Aranacak, 4. Bilgi Verildi, 5. Fırsat İletildi, 6. İlgilenmiyor
+        // Alt kategoriler dahil değil: - Randevu Teyitlendi, - Randevu Ertelendi, - Randevu İptal oldu
         if (category === '1. Randevu Alındı' || category === '2. İleri Tarih Randevu' || category === '3. Yeniden Aranacak' || category === '4. Bilgi Verildi' || category === '5. Fırsat İletildi' || category === '6. İlgilenmiyor') {
           columnTotal += reportData[rowIndex][colIndex] || 0;
         }
@@ -5373,17 +5374,29 @@ function generateMonthlyReport() {
     reportData.push(totalContactRow);
     console.log('TOPLAM KONTAK satırı eklendi:', totalContactRow);
     
-    // TOPLAM İŞLEM satırı ekle (tüm kategoriler dahil)
+    // TOPLAM İŞLEM satırı ekle (Toplam Kontak + Ulaşılamadı)
     const totalIslemRow = ['TOPLAM İŞLEM'];
     let totalIslemGrandTotal = 0;
     
     for (let colIndex = 1; colIndex < reportData[0].length; colIndex++) {
       let columnTotal = 0;
       
-      // Tüm kategorileri topla (Ulaşılamadı dahil) (kategori satırları: 1-10)
-      for (let rowIndex = 1; rowIndex <= 10; rowIndex++) {
-        columnTotal += reportData[rowIndex][colIndex] || 0;
+      // Toplam Kontak + Ulaşılamadı formülü
+      // Toplam Kontak: Ana aktiviteler (1-6. kategoriler)
+      // Ulaşılamadı: 7. kategori
+      
+      // Ana aktiviteleri topla (1-6. kategoriler)
+      for (let rowIndex = 1; rowIndex <= 6; rowIndex++) {
+        const category = reportData[rowIndex][0];
+        // Ana aktiviteler: 1. Randevu Alındı, 2. İleri Tarih Randevu, 3. Yeniden Aranacak, 4. Bilgi Verildi, 5. Fırsat İletildi, 6. İlgilenmiyor
+        if (category === '1. Randevu Alındı' || category === '2. İleri Tarih Randevu' || category === '3. Yeniden Aranacak' || category === '4. Bilgi Verildi' || category === '5. Fırsat İletildi' || category === '6. İlgilenmiyor') {
+          columnTotal += reportData[rowIndex][colIndex] || 0;
+        }
       }
+      
+      // Ulaşılamadı'yı ekle (7. kategori)
+      const ulasilamadiCount = reportData[7][colIndex] || 0; // 7. satır (index 7)
+      columnTotal += ulasilamadiCount;
       
       totalIslemRow.push(columnTotal);
       if (colIndex < reportData[0].length - 1) { // Total sütunu hariç
