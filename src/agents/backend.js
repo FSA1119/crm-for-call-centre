@@ -1176,6 +1176,11 @@ function updateFormatTableRow(sheet, rowNumber, activity, formData = {}) {
   }
   
   // Apply color coding to Format Tablo row
+  console.log('🔍 Debug - updateFormatTableRow calling applyFormatTableColorCoding with:', {
+    sheet: sheet.getName(),
+    rowNumber: rowNumber,
+    activity: activity
+  });
   applyFormatTableColorCoding(sheet, rowNumber, activity);
 }
 
@@ -1239,6 +1244,8 @@ function applyFormatTableColorCoding(sheet, rowNumber, activity) {
     range.setBackground(color);
     
     console.log(`✅ Applied color ${color} to row ${rowNumber} for activity: ${activity}`);
+    console.log(`🔍 Debug - Range applied: ${range.getA1Notation()}`);
+    console.log(`🔍 Debug - Color applied: ${color}`);
     
   } catch (error) {
     console.error('❌ Error applying Format Tablo color coding:', error);
@@ -1735,7 +1742,13 @@ function processOpportunityForm(formData) {
     const result = createOpportunityInFirsatlarim(spreadsheet, selectedRowData, formData);
     
     // Update Format Tablo row with selected activity and form data
-    updateFormatTableRow(activeSheet, selectedRow, formData.firsatDurumu || 'Fırsat İletildi', formData);
+    const newActivity = formData.firsatDurumu || 'Fırsat İletildi';
+    console.log('🔍 Debug - Updating Format Tablo row with activity:', newActivity);
+    updateFormatTableRow(activeSheet, selectedRow, newActivity, formData);
+    
+    // Apply color coding to the updated row
+    console.log('🔍 Debug - Applying color coding to Format Tablo row:', selectedRow);
+    applyFormatTableColorCoding(activeSheet, selectedRow, newActivity);
     
     console.log('Processing complete:', result);
     logActivity('addOpportunity', { 
