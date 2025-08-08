@@ -5219,8 +5219,8 @@ function generateMonthlyReport() {
     
 
     
-    // Başlık satırı - 7 gün + 1 boş + 1 Total = 9 sütun
-    const headerRow = ['', ...weekDates, 'Total'];
+    // Başlık satırı - kategori + 7 gün + 1 Total = 9 sütun
+    const headerRow = ['Kategori', ...weekDates, 'Total'];
     
     // Kategori satırları (gerçek verilerdeki isimlerle eşleşecek)
     const categories = [
