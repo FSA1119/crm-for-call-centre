@@ -5152,17 +5152,35 @@ function generateDailyReport() {
     // Bugünkü tarihi doğru sütuna yaz
     raporlarimSheet.getRange(2, todayColumn).setValue(todayStr);
     
-    // Formatlamayı uygula
-    raporlarimSheet.getRange(1, 1).setFontWeight('bold').setFontSize(14);
-    raporlarimSheet.getRange(1, todayColumn).setFontWeight('bold').setFontSize(12);
-    raporlarimSheet.getRange(3, todayColumn).setFontWeight('bold');
-    raporlarimSheet.getRange(8, todayColumn, 4, 1).setFontWeight('bold'); // 6 yerine 4 (7. Ulaşılamadı hariç)
-    raporlarimSheet.getRange(13, todayColumn).setFontWeight('bold').setFontSize(12); // TOPLAM KONTAK
-    raporlarimSheet.getRange(15, todayColumn).setFontWeight('bold'); // 7. Ulaşılamadı
-    raporlarimSheet.getRange(17, todayColumn).setFontWeight('bold').setFontSize(12); // TOPLAM İŞLEM
+    // Formatlamayı uygula - Profesyonel görünüm
+    raporlarimSheet.getRange(1, 1).setFontWeight('bold').setFontSize(16).setFontColor('#1a73e8');
+    raporlarimSheet.getRange(1, todayColumn).setFontWeight('bold').setFontSize(14).setFontColor('#1a73e8');
+    
+    // Tarih formatı
+    raporlarimSheet.getRange(2, todayColumn).setFontWeight('bold').setFontSize(12).setFontColor('#5f6368');
+    
+    // Ana kategoriler (kalın)
+    raporlarimSheet.getRange(3, todayColumn).setFontWeight('bold').setFontSize(11);
+    raporlarimSheet.getRange(8, todayColumn, 4, 1).setFontWeight('bold').setFontSize(11);
+    
+    // Alt kategoriler (normal)
+    raporlarimSheet.getRange(4, todayColumn, 3, 1).setFontSize(10).setFontColor('#5f6368');
+    
+    // Toplamlar (kursiv ve kalın)
+    raporlarimSheet.getRange(14, todayColumn).setFontWeight('bold').setFontSize(12).setFontStyle('italic').setFontColor('#0f9d58');
+    raporlarimSheet.getRange(16, todayColumn).setFontWeight('bold').setFontSize(11).setFontColor('#db4437');
+    raporlarimSheet.getRange(18, todayColumn).setFontWeight('bold').setFontSize(12).setFontStyle('italic').setFontColor('#1a73e8');
+    
+    // Hücre hizalaması - tüm sayıları ortala
+    raporlarimSheet.getRange(2, todayColumn, 17, 1).setHorizontalAlignment('center');
     
     // Sütun genişliğini ayarla
     raporlarimSheet.autoResizeColumn(todayColumn);
+    
+    // Toplam satırlarına arka plan rengi
+    raporlarimSheet.getRange(14, todayColumn).setBackground('#e8f5e8'); // TOPLAM KONTAK - açık yeşil
+    raporlarimSheet.getRange(16, todayColumn).setBackground('#ffebee'); // Ulaşılamadı - açık kırmızı
+    raporlarimSheet.getRange(18, todayColumn).setBackground('#e3f2fd'); // TOPLAM İŞLEM - açık mavi
     
     SpreadsheetApp.getUi().alert('✅ Günlük Rapor', 'Rapor başarıyla oluşturuldu!', SpreadsheetApp.getUi().ButtonSet.OK);
     
