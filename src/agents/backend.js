@@ -5071,20 +5071,23 @@ function generateDailyReport() {
            if (isToday && durum) {
              console.log(`${sheetName} - Bugünkü aktivite: ${durum}, tarih: ${tarih}`);
              
-             // Kategori sayma - Format Tablo için sadece İlgilenmiyor ve Ulaşılamadı
-             if (sheetName === 'Format Tablo') {
-               // Format Tablo'dan sadece İlgilenmiyor ve Ulaşılamadı say
-               if (durum === 'İlgilenmiyor' || durum === 'Ulaşılamadı') {
+             // Kategori sayma - Her sayfadan sadece kendi aktivitelerini say
+             if (sheetName === 'Randevularım') {
+               // Randevularım'dan sadece randevu aktiviteleri
+               if (durum === 'Randevu Alındı' || durum === 'İleri Tarih Randevu' || 
+                   durum === 'Randevu Teyitlendi' || durum === 'Randevu Ertelendi' || durum === 'Randevu İptal oldu') {
                  if (stats.hasOwnProperty(durum)) {
                    stats[durum]++;
                    console.log(`${durum} sayısı: ${stats[durum]}`);
                  }
                }
-             } else {
-               // Randevularım ve Fırsatlarım'dan tüm kategorileri say
-               if (stats.hasOwnProperty(durum)) {
-                 stats[durum]++;
-                 console.log(`${durum} sayısı: ${stats[durum]}`);
+             } else if (sheetName === 'Fırsatlarım') {
+               // Fırsatlarım'dan sadece fırsat aktiviteleri
+               if (durum === 'Yeniden Aranacak' || durum === 'Bilgi Verildi' || durum === 'Fırsat İletildi') {
+                 if (stats.hasOwnProperty(durum)) {
+                   stats[durum]++;
+                   console.log(`${durum} sayısı: ${stats[durum]}`);
+                 }
                }
              }
            } else {
@@ -5587,7 +5590,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
             
             // Haftalık raporda randevu tarihine göre sayıyoruz
             if (rowDate === date) {
-              // Ana kategori kontrolü - sadece gerçek "Randevu Alındı" durumları
+              // Randevularım'dan sadece randevu aktiviteleri
               if (category === '1. Randevu Alındı' && randevuDurumu === 'Randevu Alındı') {
                 count++;
               }
@@ -5625,7 +5628,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
           try {
             const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
             if (rowDate === date) {
-              // Fırsat kategorilerini kontrol et
+              // Fırsatlarım'dan sadece fırsat aktiviteleri
               if (firsatDurumu === category || 
                   (category === '3. Yeniden Aranacak' && firsatDurumu === 'Yeniden Aranacak') ||
                   (category === '4. Bilgi Verildi' && firsatDurumu === 'Bilgi Verildi') ||
