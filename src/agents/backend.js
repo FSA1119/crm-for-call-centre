@@ -1171,7 +1171,7 @@ function updateFormatTableRow(sheet, rowNumber, activity, formData = {}) {
   // Update log
   if (logIndex > 0) {
     const currentLog = sheet.getRange(rowNumber, logIndex).getValue();
-    const newLog = `Randevu alındı - ${new Date().toLocaleString('tr-TR')}`;
+    const newLog = `${activity} - ${new Date().toLocaleString('tr-TR')}`;
     sheet.getRange(rowNumber, logIndex).setValue(newLog);
   }
   
