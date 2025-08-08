@@ -4093,27 +4093,23 @@ function onEdit(e) {
         applyFormatTableColorCoding(sheet, row, newActivity);
         console.log('🔍 onEdit - Color coding applied for activity:', newActivity);
         
-        // Auto-update Aktivite Tarihi when activity is selected (but not for imported data)
+        // Auto-update Aktivite Tarihi and Log when activity is selected
         if (aktiviteTarihiIndex !== -1 && newActivity && newActivity.trim() !== '') {
-          // Check if this is imported data (has "Ham veri'den aktarıldı" log)
+          const today = new Date();
+          const todayFormatted = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
+          
+          // Update Aktivite Tarihi
+          const tarihRange = sheet.getRange(row, aktiviteTarihiIndex + 1);
+          tarihRange.setValue(todayFormatted);
+          console.log('🔍 onEdit - Aktivite Tarihi updated to:', todayFormatted);
+          
+          // Update Log with new activity
           const logIndex = headers.indexOf('Log');
-          let isImportedData = false;
-          
           if (logIndex !== -1) {
-            const logValue = sheet.getRange(row, logIndex + 1).getValue();
-            if (logValue && logValue.toString().includes('Ham veri\'den aktarıldı')) {
-              isImportedData = true;
-              console.log('🔍 onEdit - Imported data detected, skipping date update');
-            }
-          }
-          
-          // Only update date if it's not imported data
-          if (!isImportedData) {
-            const today = new Date();
-            const todayFormatted = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
-            const tarihRange = sheet.getRange(row, aktiviteTarihiIndex + 1);
-            tarihRange.setValue(todayFormatted);
-            console.log('🔍 onEdit - Aktivite Tarihi updated to:', todayFormatted);
+            const logRange = sheet.getRange(row, logIndex + 1);
+            const newLogValue = `${newActivity} - ${todayFormatted} ${today.toLocaleTimeString('tr-TR')}`;
+            logRange.setValue(newLogValue);
+            console.log('🔍 onEdit - Log updated to:', newLogValue);
           }
         }
         
@@ -5038,27 +5034,29 @@ function generateDailyReport() {
            // Günlük rapor için aktivite tarihi kontrolü
            let isToday = false;
            
-           // Randevularım ve Fırsatlarım için: Aktivite tarihi kontrolü
+           // Randevularım ve Fırsatlarım için: Doğru tarih sütunu kontrolü
            if (sheetName === 'Randevularım' || sheetName === 'Fırsatlarım') {
-             if (aktiviteTarihiColIndex !== -1) {
-               // Aktivite tarihi sütunu varsa onu kontrol et
-               const aktiviteTarihi = row[aktiviteTarihiColIndex];
-               if (aktiviteTarihi) {
+             // Randevularım için: Randevu Tarihi, Fırsatlarım için: Fırsat Tarihi
+             const tarihSutunu = sheetName === 'Randevularım' ? 'Randevu Tarihi' : 'Fırsat Tarihi';
+             const tarihColIndex = findColumnIndex(headers, [tarihSutunu, 'Tarih']);
+             
+             if (tarihColIndex !== -1) {
+               const tarih = row[tarihColIndex];
+               if (tarih) {
                  try {
-                   const aktiviteTarihStr = aktiviteTarihi.toString();
-                   isToday = aktiviteTarihStr.includes(todayStr);
+                   const tarihStr = tarih.toString();
+                   isToday = tarihStr.includes(todayStr);
                    
-                   // Debug için aktivite tarih bilgilerini logla
+                   // Debug için tarih bilgilerini logla
                    if (durum && (durum.includes('Randevu') || durum.includes('Fırsat'))) {
-                     console.log(`${sheetName} - Aktivite tarihi: ${aktiviteTarihStr} -> isToday: ${isToday}`);
+                     console.log(`${sheetName} - ${tarihSutunu}: ${tarihStr} -> isToday: ${isToday}`);
                    }
                  } catch (e) {
-                   if (typeof aktiviteTarihi === 'string') {
-                     isToday = aktiviteTarihi === todayStr;
+                   if (typeof tarih === 'string') {
+                     isToday = tarih === todayStr;
                    }
                  }
                }
-               // Aktivite tarihi yoksa bugün sayma (eski kayıtlar)
              }
            }
            
@@ -5130,20 +5128,8 @@ function generateDailyReport() {
           if (isToday && durum) {
             console.log(`Format Tablo ${formatTableSheet.getName()} - Bugünkü aktivite: ${durum}`);
             
-            // Check if this is imported data (has "Ham veri'den aktarıldı" log)
-            const logIndex = headers.indexOf('Log');
-            let isImportedData = false;
-            
-            if (logIndex !== -1) {
-              const logValue = row[logIndex];
-              if (logValue && logValue.toString().includes('Ham veri\'den aktarıldı')) {
-                isImportedData = true;
-                console.log(`Format Tablo ${formatTableSheet.getName()} - Imported data detected, skipping count`);
-              }
-            }
-            
-            // Format Tablo'dan sadece İlgilenmiyor ve Ulaşılamadı say (imported data hariç)
-            if (!isImportedData && (durum === 'İlgilenmiyor' || durum === 'Ulaşılamadı')) {
+            // Format Tablo'dan sadece İlgilenmiyor ve Ulaşılamadı say
+            if (durum === 'İlgilenmiyor' || durum === 'Ulaşılamadı') {
               if (stats.hasOwnProperty(durum)) {
                 stats[durum]++;
                 console.log(`${durum} sayısı: ${stats[durum]}`);
@@ -5671,22 +5657,10 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
               const rowDate = Utilities.formatDate(new Date(aktiviteTarihi), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
               
               if (rowDate === date) {
-                // Check if this is imported data (has "Ham veri'den aktarıldı" log)
-                const logIndex = formatTableHeaders.indexOf('Log');
-                let isImportedData = false;
-                
-                if (logIndex !== -1) {
-                  const logValue = row[logIndex];
-                  if (logValue && logValue.toString().includes('Ham veri\'den aktarıldı')) {
-                    isImportedData = true;
-                    console.log(`Format Tablo ${formatTableSheet.getName()} - Imported data detected, skipping count`);
-                  }
-                }
-                
-                // Format Tablo kategorilerini kontrol et (sadece İlgilenmiyor ve Ulaşılamadı, imported data hariç)
-                if (!isImportedData && (aktivite === category || 
+                // Format Tablo kategorilerini kontrol et (sadece İlgilenmiyor ve Ulaşılamadı)
+                if (aktivite === category || 
                     (category === '6. İlgilenmiyor' && aktivite === 'İlgilenmiyor') ||
-                    (category === '7. Ulaşılamadı' && aktivite === 'Ulaşılamadı'))) {
+                    (category === '7. Ulaşılamadı' && aktivite === 'Ulaşılamadı')) {
                   count++;
                   console.log(`Format Tablo ${formatTableSheet.getName()} eşleşme: ${aktivite} === ${category}, count: ${count}`);
                 }
