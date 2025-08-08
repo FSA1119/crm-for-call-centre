@@ -5401,7 +5401,7 @@ function generateMonthlyReport() {
       let columnTotal = 0;
       
       // Sadece ana aktiviteleri topla (alt kategoriler dahil değil)
-      for (let rowIndex = 1; rowIndex <= 10; rowIndex++) {
+      for (let rowIndex = 1; rowIndex <= categories.length; rowIndex++) {
         const category = reportData[rowIndex][0];
         // Ana aktiviteler: 1. Randevu Alındı, 2. İleri Tarih Randevu, 3. Yeniden Aranacak, 4. Bilgi Verildi, 5. Fırsat İletildi, 6. İlgilenmiyor
         if (category === '1. Randevu Alındı' || category === '2. İleri Tarih Randevu' || category === '3. Yeniden Aranacak' || category === '4. Bilgi Verildi' || category === '5. Fırsat İletildi' || category === '6. İlgilenmiyor') {
@@ -5426,7 +5426,7 @@ function generateMonthlyReport() {
       let columnTotal = 0;
       
       // Sadece ana aktiviteleri topla (alt kategoriler dahil değil)
-      for (let rowIndex = 1; rowIndex <= 9; rowIndex++) { // 9 kategori (7 ana + 2 alt)
+      for (let rowIndex = 1; rowIndex <= categories.length; rowIndex++) {
         const category = reportData[rowIndex][0];
         // Ana aktiviteler: 1. Randevu Alındı, 2. İleri Tarih Randevu, 3. Yeniden Aranacak, 4. Bilgi Verildi, 5. Fırsat İletildi, 6. İlgilenmiyor
         // Alt kategoriler dahil değil: - Randevu Teyitlendi, - Randevu Ertelendi, - Randevu İptal oldu
@@ -5450,7 +5450,7 @@ function generateMonthlyReport() {
     let ulasilamadiGrandTotal = 0;
     
     for (let colIndex = 1; colIndex < reportData[0].length; colIndex++) {
-      const count = getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheet, weekDates[colIndex - 1], '7. Ulaşılamadı');
+      const count = getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheets, weekDates[colIndex - 1], '7. Ulaşılamadı');
       ulasilamadiRow.push(count);
       if (colIndex < reportData[0].length - 1) { // Total sütunu hariç
         ulasilamadiGrandTotal += count;
