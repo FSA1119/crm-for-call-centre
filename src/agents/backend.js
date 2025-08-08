@@ -5003,7 +5003,7 @@ function generateDailyReport() {
                if (aktiviteTarihi) {
                  try {
                    const aktiviteTarihStr = aktiviteTarihi.toString();
-                   isToday = aktiviteTarihStr.includes('Aug 03');
+                   isToday = aktiviteTarihStr.includes(todayStr);
                    
                    // Debug için aktivite tarih bilgilerini logla
                    if (sheetName === 'Randevularım' && durum && durum.includes('Randevu')) {
@@ -5022,7 +5022,7 @@ function generateDailyReport() {
              if (aktiviteTarihi) {
                try {
                  const aktiviteTarihStr = aktiviteTarihi.toString();
-                 isToday = aktiviteTarihStr.includes('Aug 03');
+                 isToday = aktiviteTarihStr.includes(todayStr);
                } catch (e) {
                  if (typeof aktiviteTarihi === 'string') {
                    isToday = aktiviteTarihi === todayStr;
