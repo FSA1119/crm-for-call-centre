@@ -4093,13 +4093,28 @@ function onEdit(e) {
         applyFormatTableColorCoding(sheet, row, newActivity);
         console.log('🔍 onEdit - Color coding applied for activity:', newActivity);
         
-        // Auto-update Aktivite Tarihi when activity is selected
+        // Auto-update Aktivite Tarihi when activity is selected (but not for imported data)
         if (aktiviteTarihiIndex !== -1 && newActivity && newActivity.trim() !== '') {
-          const today = new Date();
-          const todayFormatted = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
-          const tarihRange = sheet.getRange(row, aktiviteTarihiIndex + 1);
-          tarihRange.setValue(todayFormatted);
-          console.log('🔍 onEdit - Aktivite Tarihi updated to:', todayFormatted);
+          // Check if this is imported data (has "Ham veri'den aktarıldı" log)
+          const logIndex = headers.indexOf('Log');
+          let isImportedData = false;
+          
+          if (logIndex !== -1) {
+            const logValue = sheet.getRange(row, logIndex + 1).getValue();
+            if (logValue && logValue.toString().includes('Ham veri\'den aktarıldı')) {
+              isImportedData = true;
+              console.log('🔍 onEdit - Imported data detected, skipping date update');
+            }
+          }
+          
+          // Only update date if it's not imported data
+          if (!isImportedData) {
+            const today = new Date();
+            const todayFormatted = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
+            const tarihRange = sheet.getRange(row, aktiviteTarihiIndex + 1);
+            tarihRange.setValue(todayFormatted);
+            console.log('🔍 onEdit - Aktivite Tarihi updated to:', todayFormatted);
+          }
         }
         
         // Log the activity change
@@ -5115,8 +5130,20 @@ function generateDailyReport() {
           if (isToday && durum) {
             console.log(`Format Tablo ${formatTableSheet.getName()} - Bugünkü aktivite: ${durum}`);
             
-            // Format Tablo'dan sadece İlgilenmiyor ve Ulaşılamadı say
-            if (durum === 'İlgilenmiyor' || durum === 'Ulaşılamadı') {
+            // Check if this is imported data (has "Ham veri'den aktarıldı" log)
+            const logIndex = headers.indexOf('Log');
+            let isImportedData = false;
+            
+            if (logIndex !== -1) {
+              const logValue = row[logIndex];
+              if (logValue && logValue.toString().includes('Ham veri\'den aktarıldı')) {
+                isImportedData = true;
+                console.log(`Format Tablo ${formatTableSheet.getName()} - Imported data detected, skipping count`);
+              }
+            }
+            
+            // Format Tablo'dan sadece İlgilenmiyor ve Ulaşılamadı say (imported data hariç)
+            if (!isImportedData && (durum === 'İlgilenmiyor' || durum === 'Ulaşılamadı')) {
               if (stats.hasOwnProperty(durum)) {
                 stats[durum]++;
                 console.log(`${durum} sayısı: ${stats[durum]}`);
@@ -5644,10 +5671,22 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
               const rowDate = Utilities.formatDate(new Date(aktiviteTarihi), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
               
               if (rowDate === date) {
-                // Format Tablo kategorilerini kontrol et (sadece İlgilenmiyor ve Ulaşılamadı)
-                if (aktivite === category || 
+                // Check if this is imported data (has "Ham veri'den aktarıldı" log)
+                const logIndex = formatTableHeaders.indexOf('Log');
+                let isImportedData = false;
+                
+                if (logIndex !== -1) {
+                  const logValue = row[logIndex];
+                  if (logValue && logValue.toString().includes('Ham veri\'den aktarıldı')) {
+                    isImportedData = true;
+                    console.log(`Format Tablo ${formatTableSheet.getName()} - Imported data detected, skipping count`);
+                  }
+                }
+                
+                // Format Tablo kategorilerini kontrol et (sadece İlgilenmiyor ve Ulaşılamadı, imported data hariç)
+                if (!isImportedData && (aktivite === category || 
                     (category === '6. İlgilenmiyor' && aktivite === 'İlgilenmiyor') ||
-                    (category === '7. Ulaşılamadı' && aktivite === 'Ulaşılamadı')) {
+                    (category === '7. Ulaşılamadı' && aktivite === 'Ulaşılamadı'))) {
                   count++;
                   console.log(`Format Tablo ${formatTableSheet.getName()} eşleşme: ${aktivite} === ${category}, count: ${count}`);
                 }
