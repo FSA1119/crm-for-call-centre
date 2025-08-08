@@ -812,11 +812,16 @@ function processAppointmentForm(formData) {
     // Create appointment in Randevularım
     const result = createAppointmentInRandevularim(spreadsheet, selectedRowData, formData);
     
-    // Update Format Tablo row with selected activity and form data (only for Format Tablo sheets)
-    if (isFormatTable(activeSheet)) {
-      console.log('📋 Updating Format Tablo row with activity:', formData.aktivite);
-      updateFormatTableRow(activeSheet, activeRange.getRow(), formData.aktivite || 'Randevu Alındı', formData);
-    }
+      // Update Format Tablo row with selected activity and form data (only for Format Tablo sheets)
+  if (isFormatTable(activeSheet)) {
+    console.log('📋 Updating Format Tablo row with activity:', formData.aktivite);
+    const activity = formData.aktivite || 'Randevu Alındı';
+    updateFormatTableRow(activeSheet, activeRange.getRow(), activity, formData);
+    
+    // Apply color coding to Format Tablo row
+    console.log('🎨 Applying color coding to Format Tablo row for activity:', activity);
+    applyFormatTableColorCoding(activeSheet, activeRange.getRow(), activity);
+  }
     
     // Apply appointment color coding to Fırsatlarım row (if from Fırsatlarım)
     if (activeSheet.getName() === 'Fırsatlarım') {
@@ -1175,7 +1180,10 @@ function updateFormatTableRow(sheet, rowNumber, activity, formData = {}) {
     sheet.getRange(rowNumber, logIndex).setValue(newLog);
   }
   
-  // Note: Color coding is applied by the calling function (processOpportunityForm, etc.)
+  // Apply color coding to the row
+  console.log('🎨 Applying color coding to row for activity:', activity);
+  applyFormatTableColorCoding(sheet, rowNumber, activity);
+  
   console.log('🔍 Debug - updateFormatTableRow completed for activity:', activity);
 }
 
