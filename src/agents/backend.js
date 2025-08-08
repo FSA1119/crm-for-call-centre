@@ -4975,7 +4975,7 @@ function generateDailyReport() {
     
     const today = new Date();
     const todayStr = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
-    console.log('🔍 DEBUG - Bugünkü tarih:', todayStr);
+    console.log('🔍 DEBUG - Bugünkü tarih:', todayStr); // dd.MM.yyyy
     
     // Günlük istatistikler
     const stats = {
@@ -5045,17 +5045,13 @@ function generateDailyReport() {
                 const tarih = row[tarihColIndex];
                 if (tarih) {
                   try {
-                    const tarihStr = tarih.toString();
-                    isToday = tarihStr.includes(todayStr);
-                    
-                    // Debug için tarih bilgilerini logla
-                    if (durum && (durum.includes('Randevu') || durum.includes('Fırsat'))) {
-                      console.log(`${sheetName} - ${tarihSutunu}: ${tarihStr} -> isToday: ${isToday}`);
+                    isToday = isDateMatch(tarih, todayStr);
+                    // İsteğe bağlı: detay log azaltıldı, yalnızca eşleşenleri göster
+                    if (isToday && durum) {
+                      console.log(`${sheetName} - ${tarihSutunu} bugün: ${todayStr} (durum: ${durum})`);
                     }
                   } catch (e) {
-                    if (typeof tarih === 'string') {
-                      isToday = tarih === todayStr;
-                    }
+                    isToday = false;
                   }
                 } else {
                   console.log(`${sheetName} - ${tarihSutunu} boş, tarih: ${tarih}`);
@@ -5087,9 +5083,9 @@ function generateDailyReport() {
                  }
                }
              }
-           } else {
-             console.log(`${sheetName} - Tarih uyuşmuyor: ${tarih} !== ${todayStr}`);
-           }
+                       } else {
+              // Tarih uyuşmuyor; detay logu azaltıldı
+            }
          }
        }
     }
@@ -5119,16 +5115,15 @@ function generateDailyReport() {
           
           if (aktiviteTarihi) {
             try {
-              const aktiviteTarihStr = aktiviteTarihi.toString();
-              isToday = aktiviteTarihStr.includes(todayStr);
-              console.log(`Format Tablo ${formatTableSheet.getName()} - Aktivite tarihi: ${aktiviteTarihStr} -> isToday: ${isToday}`);
-            } catch (e) {
-              if (typeof aktiviteTarihi === 'string') {
-                isToday = aktiviteTarihi === todayStr;
+              isToday = isDateMatch(aktiviteTarihi, todayStr);
+              if (isToday && durum) {
+                console.log(`Format Tablo ${formatTableSheet.getName()} - Bugün (${todayStr}) aktivite: ${durum}`);
               }
+            } catch (e) {
+              isToday = false;
             }
           } else {
-            console.log(`Format Tablo ${formatTableSheet.getName()} - Aktivite tarihi boş`);
+            // Aktivite tarihi boş; log azaltıldı
           }
           // Aktivite tarihi yoksa bugün sayma (eski kayıtlar)
           
@@ -5314,13 +5309,16 @@ function generateMonthlyReport() {
     }
     
     const today = new Date();
+    console.log('🔍 HAFTALIK RAPOR DEBUG - Bugünkü tarih:', today);
     
     // Son 7 günün tarihlerini hesapla (bugünden geriye doğru)
     const weekDates = [];
     for (let day = 6; day >= 0; day--) {
       const date = new Date(today);
       date.setDate(today.getDate() - day);
-      weekDates.push(Utilities.formatDate(date, 'Europe/Istanbul', 'd.MM.yyyy')); // Başında 0 olmadan
+      const formattedDate = Utilities.formatDate(date, 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
+      weekDates.push(formattedDate);
+      console.log(`🔍 HAFTALIK RAPOR DEBUG - Hafta tarihi ${day}: ${formattedDate}`);
     }
     
 
@@ -5556,6 +5554,8 @@ function generateMonthlyReport() {
 function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheet, date, category) {
   let count = 0;
   
+  console.log(`🔍 getCountForDateAndCategory DEBUG - Tarih: ${date}, Kategori: ${category}`);
+  
   try {
     // Randevularım verilerini kontrol et
     const randevularimData = randevularimSheet.getDataRange().getValues();
@@ -5582,6 +5582,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
         if (tarih && isValidDate(tarih)) {
           try {
             const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
+            console.log(`🔍 Randevularım DEBUG - Randevu tarihi: ${tarih} -> ${rowDate}, aranan: ${date}`);
 
             
             // Haftalık raporda randevu tarihine göre sayıyoruz
@@ -5708,18 +5709,32 @@ function isValidDate(date) {
 
 function isDateMatch(date, targetDate) {
   if (!isValidDate(date)) return false;
-  
+
   try {
-    // Tarih string formatında ise (örn: "3.08.2025")
-    if (typeof date === 'string') {
-      return date === targetDate;
+    const normalizeTarget = (target) => {
+      if (typeof target !== 'string') return String(target || '');
+      if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(target)) return target;
+      return String(target);
+    };
+
+    const normalizedTarget = normalizeTarget(targetDate);
+
+    let inputDate;
+    if (date instanceof Date) {
+      inputDate = date;
+    } else if (typeof date === 'string' && /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(date)) {
+      const [d, m, y] = date.split('.').map(Number);
+      inputDate = new Date(y, m - 1, d);
+    } else {
+      inputDate = new Date(date);
     }
-    
-    // Tarih Date objesi ise
-    const inputDate = new Date(date);
-    const inputDateStr = Utilities.formatDate(inputDate, 'Europe/Istanbul', 'd.MM.yyyy');
-    
-    return inputDateStr === targetDate;
+
+    if (!(inputDate instanceof Date) || isNaN(inputDate.getTime())) return false;
+
+    const ddmm = Utilities.formatDate(inputDate, 'Europe/Istanbul', 'dd.MM.yyyy');
+    const dmm = Utilities.formatDate(inputDate, 'Europe/Istanbul', 'd.MM.yyyy');
+
+    return normalizedTarget === ddmm || normalizedTarget === dmm;
   } catch (error) {
     console.log('isDateMatch hatası:', date, targetDate, error);
     return false;
@@ -5728,7 +5743,7 @@ function isDateMatch(date, targetDate) {
 
 function isToday(date) {
   const today = new Date();
-  const todayStr = Utilities.formatDate(today, 'Europe/Istanbul', 'd.MM.yyyy');
+  const todayStr = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
   return isDateMatch(date, todayStr);
 }
 
