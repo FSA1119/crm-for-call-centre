@@ -6783,20 +6783,25 @@ function sortRandevularimByDate(sheet) {
         dateValue: dateValue,
         originalRow: row
       };
-    }).filter(item => item.dateValue && item.dateValue !== ''); // Boş tarihleri filtrele
+    });
     
     // Tarihleri kronolojik sıraya göre sırala (en eski önce)
+    // Boş tarihleri en sona koy
     dateData.sort((a, b) => {
+      // Eğer a'nın tarihi boşsa, b'den sonra koy
+      if (!a.dateValue || a.dateValue === '') return 1;
+      // Eğer b'nin tarihi boşsa, a'dan sonra koy
+      if (!b.dateValue || b.dateValue === '') return -1;
+      
+      // Her ikisi de doluysa tarihe göre sırala
       const dateA = new Date(a.dateValue.split('.').reverse().join('-'));
       const dateB = new Date(b.dateValue.split('.').reverse().join('-'));
       return dateA - dateB; // En eski önce
     });
     
     // Sıralanmış verileri sayfaya yaz
-    if (dateData.length > 0) {
-      const sortedData = dateData.map(item => item.originalRow);
-      sheet.getRange(2, 1, sortedData.length, sheet.getLastColumn()).setValues(sortedData);
-    }
+    const sortedData = dateData.map(item => item.originalRow);
+    sheet.getRange(2, 1, sortedData.length, sheet.getLastColumn()).setValues(sortedData);
     
     console.log(`✅ Randevularım ${dateColumnName} kolonuna göre sıralandı (en eski önce - kronolojik)`);
     
@@ -6847,20 +6852,25 @@ function sortFirsatlarimByDate(sheet) {
         dateValue: dateValue,
         originalRow: row
       };
-    }).filter(item => item.dateValue && item.dateValue !== ''); // Boş tarihleri filtrele
+    });
     
     // Tarihleri kronolojik sıraya göre sırala (en eski önce)
+    // Boş tarihleri en sona koy
     dateData.sort((a, b) => {
+      // Eğer a'nın tarihi boşsa, b'den sonra koy
+      if (!a.dateValue || a.dateValue === '') return 1;
+      // Eğer b'nin tarihi boşsa, a'dan sonra koy
+      if (!b.dateValue || b.dateValue === '') return -1;
+      
+      // Her ikisi de doluysa tarihe göre sırala
       const dateA = new Date(a.dateValue.split('.').reverse().join('-'));
       const dateB = new Date(b.dateValue.split('.').reverse().join('-'));
       return dateA - dateB; // En eski önce
     });
     
     // Sıralanmış verileri sayfaya yaz
-    if (dateData.length > 0) {
-      const sortedData = dateData.map(item => item.originalRow);
-      sheet.getRange(2, 1, sortedData.length, sheet.getLastColumn()).setValues(sortedData);
-    }
+    const sortedData = dateData.map(item => item.originalRow);
+    sheet.getRange(2, 1, sortedData.length, sheet.getLastColumn()).setValues(sortedData);
     
     console.log(`✅ Fırsatlarım ${dateColumnName} kolonuna göre sıralandı (en eski önce - kronolojik)`);
     
