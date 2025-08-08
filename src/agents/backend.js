@@ -6748,6 +6748,13 @@ function testDateSorting() {
     
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     
+    // First, let's see what sheets exist
+    const allSheets = spreadsheet.getSheets();
+    console.log('📋 Available sheets:');
+    allSheets.forEach((sheet, index) => {
+      console.log(`${index + 1}. ${sheet.getName()}`);
+    });
+    
     // Test Randevularım sorting
     const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
     if (randevularimSheet) {
