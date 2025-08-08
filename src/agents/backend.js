@@ -5316,7 +5316,7 @@ function generateMonthlyReport() {
     for (let day = 6; day >= 0; day--) {
       const date = new Date(today);
       date.setDate(today.getDate() - day);
-      const formattedDate = Utilities.formatDate(date, 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
+      const formattedDate = Utilities.formatDate(date, 'Europe/Istanbul', 'dd.MM.yyyy'); // Standart: DD.MM.YYYY
       weekDates.push(formattedDate);
       console.log(`🔍 HAFTALIK RAPOR DEBUG - Hafta tarihi ${day}: ${formattedDate}`);
     }
@@ -5352,7 +5352,7 @@ function generateMonthlyReport() {
       let total = 0;
       
       for (const date of weekDates) {
-        const count = getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheet, date, category);
+        const count = getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheets, date, category);
         row.push(count);
         total += count;
       }
@@ -5551,7 +5551,7 @@ function generateMonthlyReport() {
   }
 }
 
-function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheet, date, category) {
+function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheets, date, category) {
   let count = 0;
   
   console.log(`🔍 getCountForDateAndCategory DEBUG - Tarih: ${date}, Kategori: ${category}`);
@@ -5581,12 +5581,9 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
         
         if (tarih && isValidDate(tarih)) {
           try {
-            const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
-            console.log(`🔍 Randevularım DEBUG - Randevu tarihi: ${tarih} -> ${rowDate}, aranan: ${date}`);
-
-            
+            const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'dd.MM.yyyy');
             // Haftalık raporda randevu tarihine göre sayıyoruz
-            if (rowDate === date) {
+            if (isDateMatch(rowDate, date)) {
               // Randevularım'dan sadece randevu aktiviteleri
               if (category === '1. Randevu Alındı' && randevuDurumu === 'Randevu Alındı') {
                 count++;
@@ -5623,8 +5620,8 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
         
         if (tarih && isValidDate(tarih)) {
           try {
-            const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
-            if (rowDate === date) {
+            const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'dd.MM.yyyy');
+            if (isDateMatch(rowDate, date)) {
               // Fırsatlarım'dan sadece fırsat aktiviteleri
               if (firsatDurumu === category || 
                   (category === '3. Yeniden Aranacak' && firsatDurumu === 'Yeniden Aranacak') ||
@@ -5662,9 +5659,8 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
           
           if (aktiviteTarihi && isValidDate(aktiviteTarihi)) {
             try {
-              const rowDate = Utilities.formatDate(new Date(aktiviteTarihi), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
-              
-              if (rowDate === date) {
+              const rowDate = Utilities.formatDate(new Date(aktiviteTarihi), 'Europe/Istanbul', 'dd.MM.yyyy');
+              if (isDateMatch(rowDate, date)) {
                 // Format Tablo kategorilerini kontrol et (sadece İlgilenmiyor ve Ulaşılamadı)
                 if (aktivite === category || 
                     (category === '6. İlgilenmiyor' && aktivite === 'İlgilenmiyor') ||
