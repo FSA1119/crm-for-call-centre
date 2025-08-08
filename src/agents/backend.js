@@ -5023,13 +5023,9 @@ function generateDailyReport() {
            // Günlük rapor için aktivite tarihi kontrolü
            let isToday = false;
            
-           // Randevularım ve Fırsatlarım için: Aktivite tarihi sütunu yoksa bugün yapılan tüm işlemleri say
+           // Randevularım ve Fırsatlarım için: Aktivite tarihi kontrolü
            if (sheetName === 'Randevularım' || sheetName === 'Fırsatlarım') {
-             if (aktiviteTarihiColIndex === -1) {
-               // Aktivite tarihi sütunu yoksa, bugün yapılan tüm işlemleri say
-               isToday = true;
-               console.log(`${sheetName} - Aktivite tarihi sütunu yok, bugün yapılan tüm işlemler sayılıyor`);
-             } else {
+             if (aktiviteTarihiColIndex !== -1) {
                // Aktivite tarihi sütunu varsa onu kontrol et
                const aktiviteTarihi = row[aktiviteTarihiColIndex];
                if (aktiviteTarihi) {
@@ -5038,7 +5034,7 @@ function generateDailyReport() {
                    isToday = aktiviteTarihStr.includes(todayStr);
                    
                    // Debug için aktivite tarih bilgilerini logla
-                   if (sheetName === 'Randevularım' && durum && durum.includes('Randevu')) {
+                   if (durum && (durum.includes('Randevu') || durum.includes('Fırsat'))) {
                      console.log(`${sheetName} - Aktivite tarihi: ${aktiviteTarihStr} -> isToday: ${isToday}`);
                    }
                  } catch (e) {
@@ -5047,24 +5043,7 @@ function generateDailyReport() {
                    }
                  }
                }
-             }
-           } else {
-             // Format Tablo için: Aktivite tarihi kontrolü
-             const aktiviteTarihi = row[aktiviteTarihiColIndex];
-             if (aktiviteTarihi) {
-               try {
-                 const aktiviteTarihStr = aktiviteTarihi.toString();
-                 isToday = aktiviteTarihStr.includes(todayStr);
-                 console.log(`Format Tablo - Aktivite tarihi: ${aktiviteTarihStr} -> isToday: ${isToday}`);
-               } catch (e) {
-                 if (typeof aktiviteTarihi === 'string') {
-                   isToday = aktiviteTarihi === todayStr;
-                 }
-               }
-             } else {
-               // Aktivite tarihi yoksa bugün yapılan tüm işlemleri say
-               isToday = true;
-               console.log('Format Tablo - Aktivite tarihi yok, bugün yapılan tüm işlemler sayılıyor');
+               // Aktivite tarihi yoksa bugün sayma (eski kayıtlar)
              }
            }
            
@@ -5130,11 +5109,8 @@ function generateDailyReport() {
                 isToday = aktiviteTarihi === todayStr;
               }
             }
-          } else {
-            // Aktivite tarihi yoksa bugün yapılan tüm işlemleri say
-            isToday = true;
-            console.log(`Format Tablo ${formatTableSheet.getName()} - Aktivite tarihi yok, bugün yapılan tüm işlemler sayılıyor`);
           }
+          // Aktivite tarihi yoksa bugün sayma (eski kayıtlar)
           
           if (isToday && durum) {
             console.log(`Format Tablo ${formatTableSheet.getName()} - Bugünkü aktivite: ${durum}`);
