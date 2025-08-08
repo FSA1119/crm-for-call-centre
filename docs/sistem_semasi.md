@@ -174,6 +174,24 @@ Raporlarım (Pivot Table)
 - Randevu teyitlendiğinde Toplantılarım'a geçer
 - Format Tablo'dan direkt Toplantılarım'a geçiş YOK!
 
+### 📅 **Format Tablo Tarih Mantığı:**
+
+**🎯 Otomatik Tarih Güncelleme Sistemi:**
+- **Format Tablo oluşturulurken:** Aktivite Tarihi kolonu **boş** kalır
+- **Aktivite seçildiğinde:** Aktivite Tarihi otomatik olarak **bugünün tarihi** ile güncellenir
+- **Manuel hata önlenir:** Kullanıcı tarih girmeyi unutamaz
+
+**📋 Örnek Senaryo:**
+1. **Format Tablo oluşturulur** → Aktivite Tarihi boş
+2. **Kullanıcı "Ulaşılamadı" seçer** → Aktivite Tarihi otomatik "08.08.2025" olur
+3. **Kullanıcı "İlgilenmiyor" seçer** → Aktivite Tarihi otomatik "08.08.2025" olur
+
+**✅ Avantajlar:**
+- **Manuel hata önlenir** - Tarih otomatik doğru
+- **Tutarlılık** - Her aktivite bugünün tarihini alır
+- **Kullanıcı dostu** - Manuel tarih girmeye gerek yok
+- **Rapor doğruluğu** - Tarihler doğru sayılır
+
 ### 💼 **Fırsat Süreci:**
 
 **Fırsatlarım → Randevularım:**
