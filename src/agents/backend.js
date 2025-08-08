@@ -5393,31 +5393,6 @@ function generateMonthlyReport() {
       }
     }
     
-    // Toplam satırı ekle (sadece ana aktiviteler, alt kategoriler dahil değil)
-    const totalRow = ['Toplam'];
-    let grandTotal = 0;
-    
-    for (let colIndex = 1; colIndex < reportData[0].length; colIndex++) {
-      let columnTotal = 0;
-      
-      // Sadece ana aktiviteleri topla (alt kategoriler dahil değil)
-      for (let rowIndex = 1; rowIndex <= categories.length; rowIndex++) {
-        const category = reportData[rowIndex][0];
-        // Ana aktiviteler: 1. Randevu Alındı, 2. İleri Tarih Randevu, 3. Yeniden Aranacak, 4. Bilgi Verildi, 5. Fırsat İletildi, 6. İlgilenmiyor
-        if (category === '1. Randevu Alındı' || category === '2. İleri Tarih Randevu' || category === '3. Yeniden Aranacak' || category === '4. Bilgi Verildi' || category === '5. Fırsat İletildi' || category === '6. İlgilenmiyor') {
-          columnTotal += reportData[rowIndex][colIndex] || 0;
-        }
-      }
-      
-      totalRow.push(columnTotal);
-      if (colIndex < reportData[0].length - 1) { // Total sütunu hariç
-        grandTotal += columnTotal;
-      }
-    }
-    
-    totalRow.push(grandTotal);
-    reportData.push(totalRow);
-    
     // TOPLAM KONTAK satırı ekle (sadece ana aktiviteler, alt kategoriler dahil değil)
     const totalContactRow = ['Kontak'];
     let totalContactGrandTotal = 0;
