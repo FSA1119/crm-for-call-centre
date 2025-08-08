@@ -1239,11 +1239,17 @@ function applyFormatTableColorCoding(sheet, rowNumber, activity) {
     
     // Apply color to entire row
     const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
-    range.setBackground(color);
+    console.log(`🔍 Debug - About to apply color ${color} to range ${range.getA1Notation()}`);
     
-    console.log(`✅ Applied color ${color} to row ${rowNumber} for activity: ${activity}`);
-    console.log(`🔍 Debug - Range applied: ${range.getA1Notation()}`);
-    console.log(`🔍 Debug - Color applied: ${color}`);
+    try {
+      range.setBackground(color);
+      console.log(`✅ Successfully applied color ${color} to row ${rowNumber} for activity: ${activity}`);
+      console.log(`🔍 Debug - Range applied: ${range.getA1Notation()}`);
+      console.log(`🔍 Debug - Color applied: ${color}`);
+    } catch (setBackgroundError) {
+      console.error(`❌ Error setting background color:`, setBackgroundError);
+      throw setBackgroundError;
+    }
     
   } catch (error) {
     console.error('❌ Error applying Format Tablo color coding:', error);
@@ -4261,7 +4267,17 @@ function testFirsatIletildi() {
       console.log('🔍 Debug - CRM_CONFIG.COLOR_CODES:', CRM_CONFIG.COLOR_CODES);
       console.log('🔍 Debug - Fırsat İletildi color:', CRM_CONFIG.COLOR_CODES['Fırsat İletildi']);
       
-      // Apply color coding
+      // Test direct color application
+      console.log('🔍 Debug - Testing direct color application');
+      const range = sheet.getRange(testRow, 1, 1, sheet.getLastColumn());
+      const testColor = 'rgb(255, 0, 0)'; // Red for testing
+      range.setBackground(testColor);
+      console.log('🔍 Debug - Applied red color to test');
+      
+      // Wait a moment
+      Utilities.sleep(1000);
+      
+      // Now apply the real color
       applyFormatTableColorCoding(sheet, testRow, testActivity);
       
       SpreadsheetApp.getUi().alert('✅ Test Tamamlandı', 'Fırsat İletildi renk testi yapıldı. Console logları kontrol edin.');
