@@ -5586,7 +5586,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
     
     if (randevuDurumuColIndex !== -1 && tarihColIndex !== -1) {
       // Performans için sadece ilk 50 satırı kontrol et
-      const maxRows = Math.min(randevularimData.length, 50);
+      const maxRows = randevularimData.length;
       
       for (let i = 1; i < maxRows; i++) {
         const row = randevularimData[i];
@@ -5627,7 +5627,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
     const firsatTarihColIndex = findColumnIndex(firsatlarimHeaders, ['Tarih', 'Fırsat Tarihi']);
     
     if (firsatDurumuColIndex !== -1 && firsatTarihColIndex !== -1) {
-      const maxFirsatRows = Math.min(firsatlarimData.length, 50);
+      const maxFirsatRows = firsatlarimData.length;
       
       for (let i = 1; i < maxFirsatRows; i++) {
         const row = firsatlarimData[i];
@@ -5664,7 +5664,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
       const formatAktiviteTarihiColIndex = formatTableHeaders.indexOf('Aktivite Tarihi');
       
       if (formatAktiviteColIndex !== -1 && formatAktiviteTarihiColIndex !== -1) {
-        const maxFormatRows = Math.min(formatTableData.length, 100); // Daha fazla satır kontrol et
+        const maxFormatRows = formatTableData.length;
         
         console.log('Format Tablo işleniyor:', formatTableSheet.getName(), 'kategori:', category, 'tarih:', date);
         
