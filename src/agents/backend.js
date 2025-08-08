@@ -5572,9 +5572,8 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
         
         if (tarih && isValidDate(tarih)) {
           try {
-            const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'dd.MM.yyyy');
-            // Haftalık raporda randevu tarihine göre sayıyoruz
-            if (isDateMatch(rowDate, date)) {
+            // Haftalık raporda randevu tarihine göre sayıyoruz (ham değeri karşılaştır)
+            if (isDateMatch(tarih, date)) {
               // Randevularım'dan sadece randevu aktiviteleri
               if (category === '1. Randevu Alındı' && randevuDurumu === 'Randevu Alındı') {
                 count++;
@@ -5611,8 +5610,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
         
         if (tarih && isValidDate(tarih)) {
           try {
-            const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'dd.MM.yyyy');
-            if (isDateMatch(rowDate, date)) {
+            if (isDateMatch(tarih, date)) {
               // Fırsatlarım'dan sadece fırsat aktiviteleri
               if (firsatDurumu === category || 
                   (category === '3. Yeniden Aranacak' && firsatDurumu === 'Yeniden Aranacak') ||
@@ -5650,8 +5648,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
           
           if (aktiviteTarihi && isValidDate(aktiviteTarihi)) {
             try {
-              const rowDate = Utilities.formatDate(new Date(aktiviteTarihi), 'Europe/Istanbul', 'dd.MM.yyyy');
-              if (isDateMatch(rowDate, date)) {
+              if (isDateMatch(aktiviteTarihi, date)) {
                 // Format Tablo kategorilerini kontrol et (sadece İlgilenmiyor ve Ulaşılamadı)
                 if (aktivite === category || 
                     (category === '6. İlgilenmiyor' && aktivite === 'İlgilenmiyor') ||
