@@ -940,6 +940,10 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
     }
   }
   
+  // Sort by date after adding new appointment
+  console.log('📅 Sorting Randevularım by date after adding new appointment');
+  sortRandevularimByDate(randevularimSheet);
+  
   // Activate Randevularım sheet to show the new appointment
   randevularimSheet.activate();
   
@@ -1859,6 +1863,10 @@ function createOpportunityInFirsatlarim(spreadsheet, rowData, opportunityData) {
   console.log('🔍 Debug - Applying color coding to row:', nextRow);
   console.log('🔍 Debug - Opportunity data:', opportunityData);
   applyOpportunityColorCoding(firsatlarimSheet, nextRow);
+  
+  // Sort by date after adding new opportunity
+  console.log('📅 Sorting Fırsatlarım by date after adding new opportunity');
+  sortFirsatlarimByDate(firsatlarimSheet);
   
   // Activate Fırsatlarım sheet to show the new opportunity
   firsatlarimSheet.activate();
