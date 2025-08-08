@@ -439,6 +439,26 @@ Yarı otomatık yarı manuel gırılen
 
 **Özel Kural:** Raporlar mevcut aktivitelerden dinamik olarak veri çekecek ve aktiviteler değiştikçe sayısal değerler otomatik olarak güncellenecektir.
 
+**📊 Rapor Veri Kaynakları:**
+
+**Randevularım Sayfasından:**
+- Randevu Alındı
+- İleri Tarih Randevu
+- Randevu Teyitlendi (alt kategori)
+- Randevu Ertelendi (alt kategori)
+- Randevu İptal oldu (alt kategori)
+
+**Fırsatlarım Sayfasından:**
+- Yeniden Aranacak
+- Bilgi Verildi
+- Fırsat İletildi
+
+**Format Tablo Sayfasından:**
+- İlgilenmiyor
+- Ulaşılamadı
+
+**⚠️ Önemli:** Aynı veri birden fazla kaynaktan sayılmaz. Her kategori sadece kendi sayfasından alınır.
+
 ## 📊 **Günlük Rapor vs Haftalık Rapor Mantığı**
 
 ### 🎯 **Günlük Rapor:**
