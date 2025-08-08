@@ -6840,8 +6840,25 @@ function sortRandevularimByDate(sheet) {
       if (!b.dateValue || b.dateValue === '') return -1;
       
       // Her ikisi de doluysa tarihe göre sırala
-      const dateA = new Date(a.dateValue.split('.').reverse().join('-'));
-      const dateB = new Date(b.dateValue.split('.').reverse().join('-'));
+      let dateA, dateB;
+      
+      // Tarih değerini kontrol et ve uygun şekilde dönüştür
+      if (a.dateValue instanceof Date) {
+        dateA = a.dateValue;
+      } else if (typeof a.dateValue === 'string') {
+        dateA = new Date(a.dateValue.split('.').reverse().join('-'));
+      } else {
+        dateA = new Date(a.dateValue);
+      }
+      
+      if (b.dateValue instanceof Date) {
+        dateB = b.dateValue;
+      } else if (typeof b.dateValue === 'string') {
+        dateB = new Date(b.dateValue.split('.').reverse().join('-'));
+      } else {
+        dateB = new Date(b.dateValue);
+      }
+      
       return dateA - dateB; // En eski önce
     });
     
@@ -6909,8 +6926,25 @@ function sortFirsatlarimByDate(sheet) {
       if (!b.dateValue || b.dateValue === '') return -1;
       
       // Her ikisi de doluysa tarihe göre sırala
-      const dateA = new Date(a.dateValue.split('.').reverse().join('-'));
-      const dateB = new Date(b.dateValue.split('.').reverse().join('-'));
+      let dateA, dateB;
+      
+      // Tarih değerini kontrol et ve uygun şekilde dönüştür
+      if (a.dateValue instanceof Date) {
+        dateA = a.dateValue;
+      } else if (typeof a.dateValue === 'string') {
+        dateA = new Date(a.dateValue.split('.').reverse().join('-'));
+      } else {
+        dateA = new Date(a.dateValue);
+      }
+      
+      if (b.dateValue instanceof Date) {
+        dateB = b.dateValue;
+      } else if (typeof b.dateValue === 'string') {
+        dateB = new Date(b.dateValue.split('.').reverse().join('-'));
+      } else {
+        dateB = new Date(b.dateValue);
+      }
+      
       return dateA - dateB; // En eski önce
     });
     
