@@ -439,6 +439,42 @@ Yarı otomatık yarı manuel gırılen
 
 **Özel Kural:** Raporlar mevcut aktivitelerden dinamik olarak veri çekecek ve aktiviteler değiştikçe sayısal değerler otomatik olarak güncellenecektir.
 
+## 📊 **Günlük Rapor vs Haftalık Rapor Mantığı**
+
+### 🎯 **Günlük Rapor:**
+- **Bugün ne yapıldıysa** sayar
+- Randevu 3 gün sonra için alınsa bile **bugün için sayar**
+- **Örnek:** Bugün 7 Ağustos, 10 Ağustos için randevu aldım → 7 Ağustos günlük raporunda sayılır
+
+### 📅 **Haftalık Rapor:**
+- **Randevu/fırsat hangi güne alındıysa** o gün için sayar
+- **Örnek:** 7 Ağustos'ta 10 Ağustos için randevu aldım → 10 Ağustos haftalık raporunda sayılır
+
+### 🔍 **Ana Fark:**
+- **Günlük Rapor:** Aktivite yapıldığı gün (bugün)
+- **Haftalık Rapor:** Aktivite tarihi (gelecek/geçmiş tarih)
+
+---
+
+## 📈 **Toplam Kontak ve Toplam İşlem Hesaplama**
+
+### ✅ **Toplam Kontak:** Sadece ana aktiviteler sayılır:
+- **Randevu Alındı**
+- **İleri Tarih Randevu**  
+- **Yeniden Aranacak**
+- **Bilgi Verildi**
+- **Fırsat İletildi**
+- **İlgilenmiyor**
+
+### 🎯 **Toplam İşlem:** *Toplam Kontak + Ulaşılamadı*
+
+### ❌ **Sayılmayan Aktiviteler:**
+- **Randevu Teyitlendi** (Randevu Alındı'nın alt kategorisi)
+- **Randevu Ertelendi** (Randevu Alındı'nın alt kategorisi)  
+- **Randevu İptal oldu** (Randevu Alındı'nın alt kategorisi)
+
+> **Not:** Bu aktiviteler ana aktivite değil, alt kategorilerdir ve toplam hesaplamalara dahil edilmez.
+
 ---
 
 ### 📄 **Funktion 6: CMS analizi yapıyor (Performs CMS analysis)**

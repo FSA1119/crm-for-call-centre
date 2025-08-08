@@ -5124,8 +5124,8 @@ function generateDailyReport() {
       '' // TOPLAM İŞLEM (hesaplanacak)
     ];
     
-    // TOPLAM KONTAK hesaplaması (tüm kategoriler, Ulaşılamadı hariç)
-    const totalContact = (stats['Randevu Alındı'] || 0) + (stats['Randevu Teyitlendi'] || 0) + (stats['Randevu Ertelendi'] || 0) + (stats['Randevu İptal oldu'] || 0) + (stats['İleri Tarih Randevu'] || 0) + (stats['Yeniden Aranacak'] || 0) + (stats['Bilgi Verildi'] || 0) + (stats['Fırsat İletildi'] || 0) + (stats['İlgilenmiyor'] || 0);
+    // TOPLAM KONTAK hesaplaması (sadece ana aktiviteler, alt kategoriler dahil değil)
+    const totalContact = (stats['Randevu Alındı'] || 0) + (stats['İleri Tarih Randevu'] || 0) + (stats['Yeniden Aranacak'] || 0) + (stats['Bilgi Verildi'] || 0) + (stats['Fırsat İletildi'] || 0) + (stats['İlgilenmiyor'] || 0);
     todayNumbers[13] = totalContact; // TOPLAM KONTAK
     
     // TOPLAM İŞLEM hesaplaması (tüm kategoriler)
@@ -5310,17 +5310,18 @@ function generateMonthlyReport() {
     totalRow.push(grandTotal);
     reportData.push(totalRow);
     
-    // TOPLAM KONTAK satırı ekle (Ulaşılamadı hariç tüm kategoriler)
+    // TOPLAM KONTAK satırı ekle (sadece ana aktiviteler, alt kategoriler dahil değil)
     const totalContactRow = ['TOPLAM KONTAK'];
     let totalContactGrandTotal = 0;
     
     for (let colIndex = 1; colIndex < reportData[0].length; colIndex++) {
       let columnTotal = 0;
       
-      // Ulaşılamadı hariç tüm kategorileri topla (kategori satırları: 1-10)
+      // Sadece ana aktiviteleri topla (alt kategoriler dahil değil)
       for (let rowIndex = 1; rowIndex <= 10; rowIndex++) {
         const category = reportData[rowIndex][0];
-        if (category !== '7. Ulaşılamadı') {
+        // Ana aktiviteler: 1. Randevu Alındı, 2. İleri Tarih Randevu, 3. Yeniden Aranacak, 4. Bilgi Verildi, 5. Fırsat İletildi, 6. İlgilenmiyor
+        if (category === '1. Randevu Alındı' || category === '2. İleri Tarih Randevu' || category === '3. Yeniden Aranacak' || category === '4. Bilgi Verildi' || category === '5. Fırsat İletildi' || category === '6. İlgilenmiyor') {
           columnTotal += reportData[rowIndex][colIndex] || 0;
         }
       }
