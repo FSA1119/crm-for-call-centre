@@ -6757,10 +6757,10 @@ function sortRandevularimByDate(sheet) {
     
     const dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     
-    // Tarihe göre sırala (en yeni önce)
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).sort(dateColumnIndex, false);
+    // Tarihe göre sırala (en eski önce - kronolojik)
+    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).sort(dateColumnIndex, true);
     
-    console.log(`✅ Randevularım ${dateColumnName} kolonuna göre sıralandı (en yeni önce)`);
+    console.log(`✅ Randevularım ${dateColumnName} kolonuna göre sıralandı (en eski önce - kronolojik)`);
     
   } catch (error) {
     console.error('❌ Randevularım sıralama hatası:', error);
@@ -6799,10 +6799,10 @@ function sortFirsatlarimByDate(sheet) {
     
     const dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     
-    // Tarihe göre sırala (en yeni önce)
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).sort(dateColumnIndex, false);
+    // Tarihe göre sırala (en eski önce - kronolojik)
+    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).sort(dateColumnIndex, true);
     
-    console.log(`✅ Fırsatlarım ${dateColumnName} kolonuna göre sıralandı (en yeni önce)`);
+    console.log(`✅ Fırsatlarım ${dateColumnName} kolonuna göre sıralandı (en eski önce - kronolojik)`);
     
   } catch (error) {
     console.error('❌ Fırsatlarım sıralama hatası:', error);
