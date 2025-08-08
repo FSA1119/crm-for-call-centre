@@ -5207,19 +5207,11 @@ function generateMonthlyReport() {
     
     const today = new Date();
     
-    // Bu haftanın Pazartesi'sinden Pazar'ına kadar
+    // Son 7 günün tarihlerini hesapla (bugünden geriye doğru)
     const weekDates = [];
-    const currentDay = today.getDay(); // 0 = Pazar, 1 = Pazartesi, ..., 6 = Cumartesi
-    
-    // Bu haftanın Pazartesi'sini bul
-    const monday = new Date(today);
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1; // Pazar ise 6 gün geri, değilse currentDay-1
-    monday.setDate(today.getDate() - daysToMonday);
-    
-    // Pazartesi'den Pazar'a kadar 7 gün
-    for (let day = 0; day < 7; day++) {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + day);
+    for (let day = 6; day >= 0; day--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - day);
       weekDates.push(Utilities.formatDate(date, 'Europe/Istanbul', 'd.MM.yyyy')); // Başında 0 olmadan
     }
     
