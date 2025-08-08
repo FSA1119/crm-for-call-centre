@@ -1325,7 +1325,10 @@ function applyRandevularimStyling(sheet) {
   const dataRange = sheet.getDataRange();
   dataRange.setBorder(true, true, true, true, true, true);
   
-  console.log('Randevularım styling completed with optimized column widths');
+  // Auto-sort by date (newest first)
+  sortRandevularimByDate(sheet);
+  
+  console.log('Randevularım styling completed with optimized column widths and date sorting');
 }
 
 /**
@@ -2065,7 +2068,10 @@ function applyFirsatlarimStyling(sheet) {
   const dataRange = sheet.getDataRange();
   dataRange.setBorder(true, true, true, true, true, true);
   
-  console.log('Fırsatlarım styling completed with optimized column widths');
+  // Auto-sort by date (newest first)
+  sortFirsatlarimByDate(sheet);
+  
+  console.log('Fırsatlarım styling completed with optimized column widths and date sorting');
 }
 
 /**
@@ -6714,3 +6720,91 @@ console.log('🔍 Website Analiz Sistemi yüklendi');
 console.log('📊 CMS Altyapısı fonksiyonları hazır');
 console.log('🛒 E-ticaret İzi fonksiyonları hazır');
 console.log('⚡ Hız Testi fonksiyonları hazır');
+
+// ========================================
+// 📅 OTOMATİK TARİH SIRALAMA FONKSİYONLARI
+// ========================================
+
+/**
+ * 📅 Randevularım sayfasını tarihe göre sıralar (en yeni önce)
+ * @param {Sheet} sheet - Randevularım sayfası
+ */
+function sortRandevularimByDate(sheet) {
+  try {
+    console.log('📅 Randevularım tarihe göre sıralanıyor...');
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const randevuTarihiIndex = headers.indexOf('Randevu Tarihi');
+    const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi');
+    
+    if (randevuTarihiIndex === -1 && aktiviteTarihiIndex === -1) {
+      console.log('⚠️ Tarih kolonu bulunamadı, sıralama atlanıyor');
+      return;
+    }
+    
+    // Hangi tarih kolonunu kullanacağımızı belirle
+    const dateColumnIndex = randevuTarihiIndex !== -1 ? randevuTarihiIndex + 1 : aktiviteTarihiIndex + 1;
+    const dateColumnName = randevuTarihiIndex !== -1 ? 'Randevu Tarihi' : 'Aktivite Tarihi';
+    
+    console.log(`📅 Sıralama kolonu: ${dateColumnName} (${dateColumnIndex})`);
+    
+    // Veri aralığını al (header hariç)
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      console.log('📅 Sıralanacak veri yok');
+      return;
+    }
+    
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    
+    // Tarihe göre sırala (en yeni önce)
+    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).sort(dateColumnIndex, false);
+    
+    console.log(`✅ Randevularım ${dateColumnName} kolonuna göre sıralandı (en yeni önce)`);
+    
+  } catch (error) {
+    console.error('❌ Randevularım sıralama hatası:', error);
+  }
+}
+
+/**
+ * 📅 Fırsatlarım sayfasını tarihe göre sıralar (en yeni önce)
+ * @param {Sheet} sheet - Fırsatlarım sayfası
+ */
+function sortFirsatlarimByDate(sheet) {
+  try {
+    console.log('📅 Fırsatlarım tarihe göre sıralanıyor...');
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const firsatTarihiIndex = headers.indexOf('Fırsat Tarihi');
+    const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi');
+    
+    if (firsatTarihiIndex === -1 && aktiviteTarihiIndex === -1) {
+      console.log('⚠️ Tarih kolonu bulunamadı, sıralama atlanıyor');
+      return;
+    }
+    
+    // Hangi tarih kolonunu kullanacağımızı belirle
+    const dateColumnIndex = firsatTarihiIndex !== -1 ? firsatTarihiIndex + 1 : aktiviteTarihiIndex + 1;
+    const dateColumnName = firsatTarihiIndex !== -1 ? 'Fırsat Tarihi' : 'Aktivite Tarihi';
+    
+    console.log(`📅 Sıralama kolonu: ${dateColumnName} (${dateColumnIndex})`);
+    
+    // Veri aralığını al (header hariç)
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      console.log('📅 Sıralanacak veri yok');
+      return;
+    }
+    
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    
+    // Tarihe göre sırala (en yeni önce)
+    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).sort(dateColumnIndex, false);
+    
+    console.log(`✅ Fırsatlarım ${dateColumnName} kolonuna göre sıralandı (en yeni önce)`);
+    
+  } catch (error) {
+    console.error('❌ Fırsatlarım sıralama hatası:', error);
+  }
+}
