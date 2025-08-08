@@ -514,7 +514,7 @@ function mapHamVeriToFormatTable(hamVeriRows, hamVeriHeaders, formatTableColumns
             mappedRow[formatIndex] = '';
             break;
           case 'Aktivite Tarihi':
-            mappedRow[formatIndex] = new Date();
+            mappedRow[formatIndex] = ''; // Boş bırak, aktivite seçildiğinde otomatik doldurulacak
             break;
           case 'Log':
             mappedRow[formatIndex] = `Ham veri'den aktarıldı - ${new Date().toLocaleString('tr-TR')}`;
@@ -4060,6 +4060,7 @@ function onEdit(e) {
       // Check if the edited cell is in the Aktivite column
       const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       const aktiviteIndex = headers.indexOf('Aktivite');
+      const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi');
       
       if (aktiviteIndex !== -1 && col === aktiviteIndex + 1 && row > 1) {
         console.log('🔍 onEdit - Activity cell edited in row:', row);
@@ -4069,6 +4070,15 @@ function onEdit(e) {
         // Apply color coding based on new activity
         applyFormatTableColorCoding(sheet, row, newActivity);
         console.log('🔍 onEdit - Color coding applied for activity:', newActivity);
+        
+        // Auto-update Aktivite Tarihi when activity is selected
+        if (aktiviteTarihiIndex !== -1 && newActivity && newActivity.trim() !== '') {
+          const today = new Date();
+          const todayFormatted = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
+          const tarihRange = sheet.getRange(row, aktiviteTarihiIndex + 1);
+          tarihRange.setValue(todayFormatted);
+          console.log('🔍 onEdit - Aktivite Tarihi updated to:', todayFormatted);
+        }
         
         // Log the activity change
         logActivity(newActivity, { 
