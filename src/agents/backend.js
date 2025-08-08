@@ -4209,9 +4209,9 @@ function applyManualColorCoding() {
             updateRandevularimRowColor(sheet, i + 1, status);
           }
         }
-        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Randevularım renk kodlaması uygulandı');
+        SpreadsheetApp.getUi().alert('Randevularım renk kodlaması uygulandı');
       } else {
-        SpreadsheetApp.getUi().alert('❌ Hata', 'Randevu Durumu sütunu bulunamadı');
+        SpreadsheetApp.getUi().alert('Randevu Durumu sütunu bulunamadı');
       }
     } else if (sheetName === 'Fırsatlarım') {
       console.log('Applying color coding to Fırsatlarım');
@@ -4228,17 +4228,17 @@ function applyManualColorCoding() {
             applyOpportunityColorCoding(sheet, i + 1);
           }
         }
-        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Fırsatlarım renk kodlaması uygulandı');
+        SpreadsheetApp.getUi().alert('Fırsatlarım renk kodlaması uygulandı');
       } else {
-        SpreadsheetApp.getUi().alert('❌ Hata', 'Fırsat Durumu sütunu bulunamadı');
+        SpreadsheetApp.getUi().alert('Fırsat Durumu sütunu bulunamadı');
       }
     } else {
-      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu fonksiyon sadece Randevularım veya Fırsatlarım sayfalarında çalışır');
+      SpreadsheetApp.getUi().alert('Bu fonksiyon sadece Randevularım veya Fırsatlarım sayfalarında çalışır');
     }
     
   } catch (error) {
     console.error('Error applying manual color coding:', error);
-    SpreadsheetApp.getUi().alert('❌ Hata', 'Renk kodlaması uygulanırken hata: ' + error.message);
+    SpreadsheetApp.getUi().alert('Renk kodlaması uygulanırken hata: ' + error.message);
   }
 }
 
@@ -4280,15 +4280,15 @@ function testFirsatIletildi() {
       // Now apply the real color
       applyFormatTableColorCoding(sheet, testRow, testActivity);
       
-      SpreadsheetApp.getUi().alert('✅ Test Tamamlandı', 'Fırsat İletildi renk testi yapıldı. Console logları kontrol edin.');
+      SpreadsheetApp.getUi().alert('Fırsat İletildi renk testi yapıldı. Console logları kontrol edin.');
       
     } else {
-      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu test sadece Format Tablo sayfalarında çalışır');
+      SpreadsheetApp.getUi().alert('Bu test sadece Format Tablo sayfalarında çalışır');
     }
     
   } catch (error) {
     console.error('Test error:', error);
-    SpreadsheetApp.getUi().alert('❌ Test Hatası', 'Hata: ' + error.message);
+    SpreadsheetApp.getUi().alert('Test Hatası: ' + error.message);
   }
 }
 
@@ -4325,20 +4325,19 @@ function testOnEditTrigger() {
         // Wait a moment for the onEdit trigger
         Utilities.sleep(1000);
         
-        SpreadsheetApp.getUi().alert('✅ Test Tamamlandı', 
-          `onEdit trigger testi yapıldı.\nSatır: ${testRow}\nSütun: ${aktiviteIndex + 1}\nDeğer: Fırsat İletildi\nConsole logları kontrol edin.`);
+        SpreadsheetApp.getUi().alert(`onEdit trigger testi yapıldı.\nSatır: ${testRow}\nSütun: ${aktiviteIndex + 1}\nDeğer: Fırsat İletildi\nConsole logları kontrol edin.`);
         
       } else {
-        SpreadsheetApp.getUi().alert('❌ Hata', 'Aktivite sütunu bulunamadı');
+        SpreadsheetApp.getUi().alert('Aktivite sütunu bulunamadı');
       }
       
     } else {
-      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu test sadece Format Tablo sayfalarında çalışır');
+      SpreadsheetApp.getUi().alert('Bu test sadece Format Tablo sayfalarında çalışır');
     }
     
   } catch (error) {
     console.error('Test error:', error);
-    SpreadsheetApp.getUi().alert('❌ Test Hatası', 'Hata: ' + error.message);
+    SpreadsheetApp.getUi().alert('Test Hatası: ' + error.message);
   }
 }
 
