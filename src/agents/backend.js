@@ -5543,6 +5543,7 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
                               if (rowDate === date) {
                   // Format Tablo kategorilerini kontrol et
                   if (aktivite === category || 
+                      (category === '5. Fırsat İletildi' && aktivite === 'Fırsat İletildi') ||
                       (category === '6. İlgilenmiyor' && aktivite === 'İlgilenmiyor') ||
                       (category === '7. Ulaşılamadı' && aktivite === 'Ulaşılamadı')) {
                     count++;
