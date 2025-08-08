@@ -5395,6 +5395,22 @@ function generateMonthlyReport() {
     reportData.push(totalIslemRow);
     console.log('TOPLAM İŞLEM satırı eklendi:', totalIslemRow);
     
+    // Tüm satırların aynı uzunlukta olduğunu tekrar kontrol et (toplam satırları dahil)
+    const finalExpectedLength = headerRow.length;
+    for (let i = 0; i < reportData.length; i++) {
+      if (reportData[i].length !== finalExpectedLength) {
+        console.error(`Final satır ${i} uzunluk hatası: ${reportData[i].length} (beklenen: ${finalExpectedLength})`);
+        // Eksik kolonları doldur
+        while (reportData[i].length < finalExpectedLength) {
+          reportData[i].push(0);
+        }
+        // Fazla kolonları kes
+        if (reportData[i].length > finalExpectedLength) {
+          reportData[i] = reportData[i].slice(0, finalExpectedLength);
+        }
+      }
+    }
+    
     // Haftalık Rapor sayfasını temizle ve yeni raporu yaz
     raporlarimSheet.clear();
     raporlarimSheet.clearFormats();
