@@ -4940,16 +4940,16 @@ function generateDailyReport() {
     const firsatlarimSheet = sheet.getSheetByName('Fırsatlarım');
     let raporlarimSheet = sheet.getSheetByName('Günlük Rapor');
     
-    // Format Tablo sayfasını bul
+    // Tüm Format Tablo sayfalarını bul
     const sheets = sheet.getSheets();
-    let formatTableSheet = null;
+    const formatTableSheets = [];
     for (const sheetItem of sheets) {
       if (isFormatTable(sheetItem)) {
-        formatTableSheet = sheetItem;
+        formatTableSheets.push(sheetItem);
         console.log('Format Tablo bulundu:', sheetItem.getName());
-        break;
       }
     }
+    console.log('Toplam Format Tablo sayısı:', formatTableSheets.length);
     
     // Günlük Rapor sayfası yoksa oluştur
     if (!raporlarimSheet) {
@@ -4979,9 +4979,9 @@ function generateDailyReport() {
       'Ulaşılamadı': 0
     };
     
-    // Tüm sayfaları tara ve bugünkü aktiviteleri say
-    const allSheets = [randevularimSheet, firsatlarimSheet, formatTableSheet];
-    const sheetNames = ['Randevularım', 'Fırsatlarım', 'Format Tablo'];
+    // Randevularım ve Fırsatlarım sayfalarını tara
+    const allSheets = [randevularimSheet, firsatlarimSheet];
+    const sheetNames = ['Randevularım', 'Fırsatlarım'];
     
     for (let sheetIndex = 0; sheetIndex < allSheets.length; sheetIndex++) {
       const currentSheet = allSheets[sheetIndex];
@@ -5092,6 +5092,60 @@ function generateDailyReport() {
            }
          }
        }
+    }
+    
+    // Tüm Format Tablo sayfalarını tara
+    for (const formatTableSheet of formatTableSheets) {
+      if (!formatTableSheet) continue;
+      
+      console.log(`Format Tablo işleniyor: ${formatTableSheet.getName()}`);
+      const data = formatTableSheet.getDataRange().getValues();
+      const headers = data[0];
+      
+      // Format Tablo için sütun indekslerini bul
+      const durumColIndex = headers.indexOf('Aktivite');
+      const aktiviteTarihiColIndex = headers.indexOf('Aktivite Tarihi');
+      
+      console.log(`Format Tablo ${formatTableSheet.getName()} sütun indeksleri:`, { 'Aktivite': durumColIndex, 'Aktivite Tarihi': aktiviteTarihiColIndex });
+      
+      if (durumColIndex !== -1 && aktiviteTarihiColIndex !== -1) {
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          const durum = row[durumColIndex];
+          const aktiviteTarihi = row[aktiviteTarihiColIndex];
+          
+          // Format Tablo için aktivite tarihi kontrolü
+          let isToday = false;
+          
+          if (aktiviteTarihi) {
+            try {
+              const aktiviteTarihStr = aktiviteTarihi.toString();
+              isToday = aktiviteTarihStr.includes(todayStr);
+              console.log(`Format Tablo ${formatTableSheet.getName()} - Aktivite tarihi: ${aktiviteTarihStr} -> isToday: ${isToday}`);
+            } catch (e) {
+              if (typeof aktiviteTarihi === 'string') {
+                isToday = aktiviteTarihi === todayStr;
+              }
+            }
+          } else {
+            // Aktivite tarihi yoksa bugün yapılan tüm işlemleri say
+            isToday = true;
+            console.log(`Format Tablo ${formatTableSheet.getName()} - Aktivite tarihi yok, bugün yapılan tüm işlemler sayılıyor`);
+          }
+          
+          if (isToday && durum) {
+            console.log(`Format Tablo ${formatTableSheet.getName()} - Bugünkü aktivite: ${durum}`);
+            
+            // Format Tablo'dan sadece İlgilenmiyor ve Ulaşılamadı say
+            if (durum === 'İlgilenmiyor' || durum === 'Ulaşılamadı') {
+              if (stats.hasOwnProperty(durum)) {
+                stats[durum]++;
+                console.log(`${durum} sayısı: ${stats[durum]}`);
+              }
+            }
+          }
+        }
+      }
     }
     
     // Bugünkü raporu yan yana ekle
@@ -5236,16 +5290,16 @@ function generateMonthlyReport() {
     const firsatlarimSheet = sheet.getSheetByName('Fırsatlarım');
     let raporlarimSheet = sheet.getSheetByName('Haftalık Rapor');
     
-    // Format Tablo sayfasını bul
+    // Tüm Format Tablo sayfalarını bul
     const sheets = sheet.getSheets();
-    let formatTableSheet = null;
+    const formatTableSheets = [];
     for (const sheetItem of sheets) {
       if (isFormatTable(sheetItem)) {
-        formatTableSheet = sheetItem;
+        formatTableSheets.push(sheetItem);
         console.log('Format Tablo bulundu:', sheetItem.getName());
-        break;
       }
     }
+    console.log('Toplam Format Tablo sayısı:', formatTableSheets.length);
     
     // Haftalık Rapor sayfası yoksa oluştur
     if (!raporlarimSheet) {
@@ -5586,15 +5640,17 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
       }
     }
     
-    // Format Tablo verilerini kontrol et
-    if (formatTableSheet) {
+    // Tüm Format Tablo verilerini kontrol et
+    for (const formatTableSheet of formatTableSheets) {
+      if (!formatTableSheet) continue;
+      
       const formatTableData = formatTableSheet.getDataRange().getValues();
       const formatTableHeaders = formatTableData[0];
       
       const formatAktiviteColIndex = formatTableHeaders.indexOf('Aktivite');
-      const formatTarihColIndex = formatTableHeaders.indexOf('Tarih');
+      const formatAktiviteTarihiColIndex = formatTableHeaders.indexOf('Aktivite Tarihi');
       
-      if (formatAktiviteColIndex !== -1 && formatTarihColIndex !== -1) {
+      if (formatAktiviteColIndex !== -1 && formatAktiviteTarihiColIndex !== -1) {
         const maxFormatRows = Math.min(formatTableData.length, 100); // Daha fazla satır kontrol et
         
         console.log('Format Tablo işleniyor:', formatTableSheet.getName(), 'kategori:', category, 'tarih:', date);
@@ -5602,23 +5658,23 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
         for (let i = 1; i < maxFormatRows; i++) {
           const row = formatTableData[i];
           const aktivite = row[formatAktiviteColIndex];
-          const tarih = row[formatTarihColIndex];
+          const aktiviteTarihi = row[formatAktiviteTarihiColIndex];
           
-          if (tarih && isValidDate(tarih)) {
+          if (aktiviteTarihi && isValidDate(aktiviteTarihi)) {
             try {
-              const rowDate = Utilities.formatDate(new Date(tarih), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
+              const rowDate = Utilities.formatDate(new Date(aktiviteTarihi), 'Europe/Istanbul', 'd.MM.yyyy'); // Başında 0 olmadan
               
-                              if (rowDate === date) {
-                  // Format Tablo kategorilerini kontrol et (sadece İlgilenmiyor ve Ulaşılamadı)
-                  if (aktivite === category || 
-                      (category === '6. İlgilenmiyor' && aktivite === 'İlgilenmiyor') ||
-                      (category === '7. Ulaşılamadı' && aktivite === 'Ulaşılamadı')) {
-                    count++;
-                    console.log(`Format Tablo eşleşme: ${aktivite} === ${category}, count: ${count}`);
-                  }
+              if (rowDate === date) {
+                // Format Tablo kategorilerini kontrol et (sadece İlgilenmiyor ve Ulaşılamadı)
+                if (aktivite === category || 
+                    (category === '6. İlgilenmiyor' && aktivite === 'İlgilenmiyor') ||
+                    (category === '7. Ulaşılamadı' && aktivite === 'Ulaşılamadı')) {
+                  count++;
+                  console.log(`Format Tablo ${formatTableSheet.getName()} eşleşme: ${aktivite} === ${category}, count: ${count}`);
                 }
+              }
             } catch (dateError) {
-              console.log('Format Tablo tarih format hatası:', tarih, dateError);
+              console.log('Format Tablo tarih format hatası:', aktiviteTarihi, dateError);
             }
           }
         }
