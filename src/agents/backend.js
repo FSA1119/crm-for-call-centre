@@ -6712,6 +6712,8 @@ function addWebsiteAnalysisToAdminMenu() {
         .addItem('🛒 E-TİCARET İZİ', 'detectEcommerceIzi')
         .addItem('⚡ HIZ TESTİ', 'testSiteHizi')
         .addSeparator()
+        .addItem('🧪 Tarih Sıralama Test', 'testDateSorting')
+        .addSeparator()
         .addItem('Yeni Tablo oluştur', 'showCreateTableDialog')
         .addToUi();
     } else {
@@ -6736,6 +6738,43 @@ console.log('🔍 Website Analiz Sistemi yüklendi');
 console.log('📊 CMS Altyapısı fonksiyonları hazır');
 console.log('🛒 E-ticaret İzi fonksiyonları hazır');
 console.log('⚡ Hız Testi fonksiyonları hazır');
+
+/**
+ * 🧪 Test function to manually test date sorting
+ */
+function testDateSorting() {
+  try {
+    console.log('🧪 Testing date sorting functionality...');
+    
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Test Randevularım sorting
+    const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
+    if (randevularimSheet) {
+      console.log('📅 Testing Randevularım sorting...');
+      sortRandevularimByDate(randevularimSheet);
+      console.log('✅ Randevularım sorting test completed');
+    } else {
+      console.log('⚠️ Randevularım sheet not found');
+    }
+    
+    // Test Fırsatlarım sorting
+    const firsatlarimSheet = spreadsheet.getSheetByName('Fırsatlarım');
+    if (firsatlarimSheet) {
+      console.log('📅 Testing Fırsatlarım sorting...');
+      sortFirsatlarimByDate(firsatlarimSheet);
+      console.log('✅ Fırsatlarım sorting test completed');
+    } else {
+      console.log('⚠️ Fırsatlarım sheet not found');
+    }
+    
+    SpreadsheetApp.getUi().alert('🧪 Test tamamlandı! Console\'u kontrol edin.');
+    
+  } catch (error) {
+    console.error('❌ Test hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Test hatası: ' + error.message);
+  }
+}
 
 // ========================================
 // 📅 OTOMATİK TARİH SIRALAMA FONKSİYONLARI
