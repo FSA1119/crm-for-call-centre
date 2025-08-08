@@ -5009,6 +5009,7 @@ function generateDailyReport() {
       let durumColIndex = -1;
       let tarihColIndex = -1;
       let aktiviteTarihiColIndex = -1;
+      let logColIndex = headers.indexOf('Log');
       
       if (sheetName === 'Randevularım') {
         durumColIndex = findColumnIndex(headers, ['Randevu Durumu', 'Randevu durumu']);
@@ -5059,9 +5060,24 @@ function generateDailyReport() {
               } else {
                 console.log(`${sheetName} - ${tarihSutunu} sütunu bulunamadı`);
               }
-           }
-           
-           if (isToday && durum) {
+                       }
+
+            // Log tabanlı kontrol (bugün işlem yapıldı mı?)
+            if (!isToday && logColIndex !== -1) {
+              const logVal = row[logColIndex];
+              if (logVal) {
+                try {
+                  const m = logVal.toString().match(/(\d{1,2}\.\d{1,2}\.\d{4})/);
+                  if (m && m[1] && isDateMatch(m[1], todayStr)) {
+                    isToday = true;
+                  }
+                } catch (e) {
+                  // yoksay
+                }
+              }
+            }
+            
+            if (isToday && durum) {
              console.log(`${sheetName} - Bugünkü aktivite: ${durum}, tarih: ${tarih}`);
              
              // Kategori sayma - Her sayfadan sadece kendi aktivitelerini say
