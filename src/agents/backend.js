@@ -1175,13 +1175,8 @@ function updateFormatTableRow(sheet, rowNumber, activity, formData = {}) {
     sheet.getRange(rowNumber, logIndex).setValue(newLog);
   }
   
-  // Apply color coding to Format Tablo row
-  console.log('🔍 Debug - updateFormatTableRow calling applyFormatTableColorCoding with:', {
-    sheet: sheet.getName(),
-    rowNumber: rowNumber,
-    activity: activity
-  });
-  applyFormatTableColorCoding(sheet, rowNumber, activity);
+  // Note: Color coding is applied by the calling function (processOpportunityForm, etc.)
+  console.log('🔍 Debug - updateFormatTableRow completed for activity:', activity);
 }
 
 /**
@@ -1751,7 +1746,14 @@ function processOpportunityForm(formData) {
     
     // Apply color coding to the updated row
     console.log('🔍 Debug - Applying color coding to Format Tablo row:', selectedRow);
+    console.log('🔍 Debug - Sheet name:', activeSheet.getName());
+    console.log('🔍 Debug - Activity:', newActivity);
+    console.log('🔍 Debug - CRM_CONFIG.COLOR_CODES:', CRM_CONFIG.COLOR_CODES);
+    console.log('🔍 Debug - Fırsat İletildi color:', CRM_CONFIG.COLOR_CODES['Fırsat İletildi']);
+    
     applyFormatTableColorCoding(activeSheet, selectedRow, newActivity);
+    
+    console.log('🔍 Debug - Color coding completed');
     
     console.log('Processing complete:', result);
     logActivity('Fırsat İletildi', { 
