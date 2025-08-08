@@ -5296,9 +5296,6 @@ function generateMonthlyReport() {
       const row = [category];
       let total = 0;
       
-      // İlk sütun boş (başlık sütunu)
-      row.push('');
-      
       for (const date of weekDates) {
         const count = getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheet, date, category);
         row.push(count);
