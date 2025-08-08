@@ -6735,16 +6735,14 @@ function sortRandevularimByDate(sheet) {
     
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const randevuTarihiIndex = headers.indexOf('Randevu Tarihi');
-    const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi');
     
-    if (randevuTarihiIndex === -1 && aktiviteTarihiIndex === -1) {
-      console.log('⚠️ Tarih kolonu bulunamadı, sıralama atlanıyor');
+    if (randevuTarihiIndex === -1) {
+      console.log('⚠️ Randevu Tarihi kolonu bulunamadı, sıralama atlanıyor');
       return;
     }
     
-    // Hangi tarih kolonunu kullanacağımızı belirle
-    const dateColumnIndex = randevuTarihiIndex !== -1 ? randevuTarihiIndex + 1 : aktiviteTarihiIndex + 1;
-    const dateColumnName = randevuTarihiIndex !== -1 ? 'Randevu Tarihi' : 'Aktivite Tarihi';
+    const dateColumnIndex = randevuTarihiIndex + 1;
+    const dateColumnName = 'Randevu Tarihi';
     
     console.log(`📅 Sıralama kolonu: ${dateColumnName} (${dateColumnIndex})`);
     
@@ -6777,16 +6775,14 @@ function sortFirsatlarimByDate(sheet) {
     
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const firsatTarihiIndex = headers.indexOf('Fırsat Tarihi');
-    const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi');
     
-    if (firsatTarihiIndex === -1 && aktiviteTarihiIndex === -1) {
-      console.log('⚠️ Tarih kolonu bulunamadı, sıralama atlanıyor');
+    if (firsatTarihiIndex === -1) {
+      console.log('⚠️ Fırsat Tarihi kolonu bulunamadı, sıralama atlanıyor');
       return;
     }
     
-    // Hangi tarih kolonunu kullanacağımızı belirle
-    const dateColumnIndex = firsatTarihiIndex !== -1 ? firsatTarihiIndex + 1 : aktiviteTarihiIndex + 1;
-    const dateColumnName = firsatTarihiIndex !== -1 ? 'Fırsat Tarihi' : 'Aktivite Tarihi';
+    const dateColumnIndex = firsatTarihiIndex + 1;
+    const dateColumnName = 'Fırsat Tarihi';
     
     console.log(`📅 Sıralama kolonu: ${dateColumnName} (${dateColumnIndex})`);
     
