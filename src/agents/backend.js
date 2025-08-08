@@ -1754,7 +1754,7 @@ function processOpportunityForm(formData) {
     applyFormatTableColorCoding(activeSheet, selectedRow, newActivity);
     
     console.log('Processing complete:', result);
-    logActivity('addOpportunity', { 
+    logActivity('Fırsat İletildi', { 
       rowId: selectedRowData.Kod,
       opportunityData: formData 
     });
@@ -4053,13 +4053,20 @@ function onEdit(e) {
       const aktiviteIndex = headers.indexOf('Aktivite');
       
       if (aktiviteIndex !== -1 && col === aktiviteIndex + 1 && row > 1) {
-        console.log('Activity cell edited in row:', row);
+        console.log('🔍 onEdit - Activity cell edited in row:', row);
         const newActivity = range.getValue();
-        console.log('New activity value:', newActivity);
+        console.log('🔍 onEdit - New activity value:', newActivity);
         
         // Apply color coding based on new activity
         applyFormatTableColorCoding(sheet, row, newActivity);
-        console.log('Color coding applied for activity:', newActivity);
+        console.log('🔍 onEdit - Color coding applied for activity:', newActivity);
+        
+        // Log the activity change
+        logActivity(newActivity, { 
+          rowId: row,
+          sheetName: sheetName,
+          column: 'Aktivite'
+        });
       }
       
       return;
@@ -4256,6 +4263,56 @@ function testFirsatIletildi() {
       applyFormatTableColorCoding(sheet, testRow, testActivity);
       
       SpreadsheetApp.getUi().alert('✅ Test Tamamlandı', 'Fırsat İletildi renk testi yapıldı. Console logları kontrol edin.');
+      
+    } else {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu test sadece Format Tablo sayfalarında çalışır');
+    }
+    
+  } catch (error) {
+    console.error('Test error:', error);
+    SpreadsheetApp.getUi().alert('❌ Test Hatası', 'Hata: ' + error.message);
+  }
+}
+
+/**
+ * 🔍 Test onEdit Trigger - Simulate Manual Edit
+ */
+function testOnEditTrigger() {
+  console.log('🔍 Testing onEdit trigger simulation');
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const sheetName = sheet.getName();
+    
+    console.log('Current sheet:', sheetName);
+    
+    if (isFormatTable(sheet)) {
+      console.log('Format Tablo sheet detected');
+      
+      // Find Aktivite column
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const aktiviteIndex = headers.indexOf('Aktivite');
+      
+      if (aktiviteIndex !== -1) {
+        const testRow = 2;
+        const testRange = sheet.getRange(testRow, aktiviteIndex + 1);
+        const currentValue = testRange.getValue();
+        
+        console.log('🔍 Debug - Current value in Aktivite column:', currentValue);
+        console.log('🔍 Debug - Test range:', testRange.getA1Notation());
+        
+        // Simulate setting "Fırsat İletildi"
+        testRange.setValue('Fırsat İletildi');
+        
+        // Wait a moment for the onEdit trigger
+        Utilities.sleep(1000);
+        
+        SpreadsheetApp.getUi().alert('✅ Test Tamamlandı', 
+          `onEdit trigger testi yapıldı.\nSatır: ${testRow}\nSütun: ${aktiviteIndex + 1}\nDeğer: Fırsat İletildi\nConsole logları kontrol edin.`);
+        
+      } else {
+        SpreadsheetApp.getUi().alert('❌ Hata', 'Aktivite sütunu bulunamadı');
+      }
       
     } else {
       SpreadsheetApp.getUi().alert('❌ Hata', 'Bu test sadece Format Tablo sayfalarında çalışır');
