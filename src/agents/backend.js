@@ -4975,6 +4975,7 @@ function generateDailyReport() {
     
     const today = new Date();
     const todayStr = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
+    console.log('🔍 DEBUG - Bugünkü tarih:', todayStr);
     
     // Günlük istatistikler
     const stats = {
@@ -5040,24 +5041,28 @@ function generateDailyReport() {
              const tarihSutunu = sheetName === 'Randevularım' ? 'Randevu Tarihi' : 'Fırsat Tarihi';
              const tarihColIndex = findColumnIndex(headers, [tarihSutunu, 'Tarih']);
              
-             if (tarihColIndex !== -1) {
-               const tarih = row[tarihColIndex];
-               if (tarih) {
-                 try {
-                   const tarihStr = tarih.toString();
-                   isToday = tarihStr.includes(todayStr);
-                   
-                   // Debug için tarih bilgilerini logla
-                   if (durum && (durum.includes('Randevu') || durum.includes('Fırsat'))) {
-                     console.log(`${sheetName} - ${tarihSutunu}: ${tarihStr} -> isToday: ${isToday}`);
-                   }
-                 } catch (e) {
-                   if (typeof tarih === 'string') {
-                     isToday = tarih === todayStr;
-                   }
-                 }
-               }
-             }
+                           if (tarihColIndex !== -1) {
+                const tarih = row[tarihColIndex];
+                if (tarih) {
+                  try {
+                    const tarihStr = tarih.toString();
+                    isToday = tarihStr.includes(todayStr);
+                    
+                    // Debug için tarih bilgilerini logla
+                    if (durum && (durum.includes('Randevu') || durum.includes('Fırsat'))) {
+                      console.log(`${sheetName} - ${tarihSutunu}: ${tarihStr} -> isToday: ${isToday}`);
+                    }
+                  } catch (e) {
+                    if (typeof tarih === 'string') {
+                      isToday = tarih === todayStr;
+                    }
+                  }
+                } else {
+                  console.log(`${sheetName} - ${tarihSutunu} boş, tarih: ${tarih}`);
+                }
+              } else {
+                console.log(`${sheetName} - ${tarihSutunu} sütunu bulunamadı`);
+              }
            }
            
            if (isToday && durum) {
@@ -5122,6 +5127,8 @@ function generateDailyReport() {
                 isToday = aktiviteTarihi === todayStr;
               }
             }
+          } else {
+            console.log(`Format Tablo ${formatTableSheet.getName()} - Aktivite tarihi boş`);
           }
           // Aktivite tarihi yoksa bugün sayma (eski kayıtlar)
           
