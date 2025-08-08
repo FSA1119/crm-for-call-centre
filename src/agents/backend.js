@@ -5055,11 +5055,16 @@ function generateDailyReport() {
                try {
                  const aktiviteTarihStr = aktiviteTarihi.toString();
                  isToday = aktiviteTarihStr.includes(todayStr);
+                 console.log(`Format Tablo - Aktivite tarihi: ${aktiviteTarihStr} -> isToday: ${isToday}`);
                } catch (e) {
                  if (typeof aktiviteTarihi === 'string') {
                    isToday = aktiviteTarihi === todayStr;
                  }
                }
+             } else {
+               // Aktivite tarihi yoksa bugün yapılan tüm işlemleri say
+               isToday = true;
+               console.log('Format Tablo - Aktivite tarihi yok, bugün yapılan tüm işlemler sayılıyor');
              }
            }
            
