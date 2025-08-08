@@ -5385,24 +5385,43 @@ function generateMonthlyReport() {
       return;
     }
     
-    // Formatlamayı uygula
-    raporlarimSheet.getRange(1, 1, 1, reportData[0].length).setFontWeight('bold').setBackground('#E3F2FD');
-    raporlarimSheet.getRange(1, 1, reportData.length, 1).setFontWeight('bold');
-    raporlarimSheet.getRange(1, reportData[0].length, reportData.length, 1).setFontWeight('bold').setBackground('#FFF3E0');
+    // Formatlamayı uygula - Profesyonel görünüm
+    // Başlık satırı
+    raporlarimSheet.getRange(1, 1, 1, reportData[0].length).setFontWeight('bold').setFontSize(14).setBackground('#1a73e8').setFontColor('#ffffff');
+    
+    // Kategori sütunu (ilk sütun)
+    raporlarimSheet.getRange(1, 1, reportData.length, 1).setFontWeight('bold').setFontSize(11).setBackground('#f8f9fa');
+    
+    // Total sütunu (son sütun)
+    raporlarimSheet.getRange(1, reportData[0].length, reportData.length, 1).setFontWeight('bold').setBackground('#fff3e0');
+    
+    // Ana kategoriler (kalın)
+    raporlarimSheet.getRange(2, 1, 6, 1).setFontWeight('bold').setFontSize(11); // 1-6. kategoriler
+    raporlarimSheet.getRange(8, 1, 1, 1).setFontWeight('bold').setFontSize(11); // 7. Ulaşılamadı
+    
+    // Alt kategoriler (normal ve küçük)
+    raporlarimSheet.getRange(3, 1, 3, 1).setFontSize(10).setFontColor('#5f6368'); // Alt kategoriler
     
     // Toplam satırlarını vurgula (son 3 satır)
     const totalRowIndex = reportData.length - 2; // Toplam
     const totalContactRowIndex = reportData.length - 1; // TOPLAM KONTAK  
     const totalIslemRowIndex = reportData.length; // TOPLAM İŞLEM
     
-    raporlarimSheet.getRange(totalRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setBackground('#E8F5E8').setFontSize(12); // Toplam
-    raporlarimSheet.getRange(totalContactRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setBackground('#E3F2FD').setFontSize(12); // TOPLAM KONTAK
-    raporlarimSheet.getRange(totalIslemRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setBackground('#FFF3E0').setFontSize(12); // TOPLAM İŞLEM
+    // Toplam satırları (kursiv ve kalın)
+    raporlarimSheet.getRange(totalRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setFontSize(12).setFontStyle('italic').setBackground('#e8f5e8').setFontColor('#0f9d58'); // Toplam
+    raporlarimSheet.getRange(totalContactRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setFontSize(12).setFontStyle('italic').setBackground('#e3f2fd').setFontColor('#1a73e8'); // TOPLAM KONTAK
+    raporlarimSheet.getRange(totalIslemRowIndex, 1, 1, reportData[0].length).setFontWeight('bold').setFontSize(12).setFontStyle('italic').setBackground('#fff3e0').setFontColor('#f4b400'); // TOPLAM İŞLEM
+    
+    // Tüm sayıları ortala
+    raporlarimSheet.getRange(1, 2, reportData.length, reportData[0].length - 1).setHorizontalAlignment('center');
     
     // Sütun genişliklerini ayarla
     for (let i = 1; i <= reportData[0].length; i++) {
       raporlarimSheet.autoResizeColumn(i);
     }
+    
+    // Kenarlık ekle
+    raporlarimSheet.getRange(1, 1, reportData.length, reportData[0].length).setBorder(true, true, true, true, true, true);
     
 
     SpreadsheetApp.getUi().alert('✅ Haftalık Rapor', 'Bu haftanın (Pazartesi-Pazar) raporu oluşturuldu!', SpreadsheetApp.getUi().ButtonSet.OK);
