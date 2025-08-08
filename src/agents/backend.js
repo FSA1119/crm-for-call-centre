@@ -5272,20 +5272,6 @@ function generateMonthlyReport() {
       }
     }
     
-    for (const category of categories) {
-      const row = [category];
-      let total = 0;
-      
-      for (const date of weekDates) {
-        const count = getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatTableSheet, date, category);
-        row.push(count);
-        total += count;
-      }
-      
-      row.push(total);
-      reportData.push(row);
-    }
-    
     // Toplam satırı ekle (sadece konuşma olan kategoriler)
     const totalRow = ['Toplam'];
     let grandTotal = 0;
