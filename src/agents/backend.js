@@ -2247,10 +2247,7 @@ function applyOpportunityColorCoding(sheet, rowNumber) {
       else if (normalizedStatus.toLowerCase().includes('fırsat') && normalizedStatus.toLowerCase().includes('iletildi')) {
         color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
         console.log('✅ Applied Fırsat İletildi color (fuzzy match):', color);
-        
-        // Fix the status value in the cell to ensure exact match for future
-        sheet.getRange(rowNumber, firsatDurumuIndex + 1).setValue('Fırsat İletildi');
-        console.log('🔧 Fixed status value to exact match: "Fırsat İletildi"');
+        // Not: Hücre değerini zorla düzeltmiyoruz (validation çatışmasını önlemek için)
       } else {
         console.log('⚠️ Unknown status:', normalizedStatus, '- using default white');
         console.log('Available statuses for opportunities:', ['Yeniden Aranacak', 'Bilgi Verildi', 'Fırsat İletildi']);
