@@ -2187,11 +2187,7 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
       return s.replace(/\s+/g, ' ').trim();
     }
  
-    // Build existing index map (key -> rowIndex) for same employee only
-    const employeeCodeNorm = canonCode(employeeCode);
-    const existingRowsCount = sheet.getLastRow() > 1 ? sheet.getLastRow() - 1 : 0;
-    const existingValues = existingRowsCount > 0 ? sheet.getRange(2, 1, existingRowsCount, lastColT).getValues() : [];
-    function rowKeyFromArray(arr) {
+    function strictKeyFromArray(arr) {
       const parts = [
         iCode >= 0 ? canonCode(arr[iCode]) : '',
         iComp >= 0 ? canonCompany(arr[iComp]) : '',
@@ -2200,11 +2196,27 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
       ];
       return parts.join('||');
     }
-    const keyToRowIndex = new Map();
+    function softKeyFromArray(arr) {
+      const parts = [
+        iCode >= 0 ? canonCode(arr[iCode]) : '',
+        iComp >= 0 ? canonCompany(arr[iComp]) : ''
+      ];
+      return parts.join('||');
+    }
+ 
+    // Build existing index maps (key -> rowIndex) for same employee only
+    const employeeCodeNorm = canonCode(employeeCode);
+    const existingRowsCount = sheet.getLastRow() > 1 ? sheet.getLastRow() - 1 : 0;
+    const existingValues = existingRowsCount > 0 ? sheet.getRange(2, 1, existingRowsCount, lastColT).getValues() : [];
+    const strictMap = new Map();
+    const softMap = new Map(); // softKey -> rowIndex (or -1 if ambiguous)
     for (let r = 0; r < existingValues.length; r++) {
       const arr = existingValues[r];
       if (canonCode(arr[iCode]) !== employeeCodeNorm) continue; // only same employee
-      keyToRowIndex.set(rowKeyFromArray(arr), r + 2); // 2-based with header
+      const sKey = strictKeyFromArray(arr);
+      strictMap.set(sKey, r + 2);
+      const soKey = softKeyFromArray(arr);
+      if (!softMap.has(soKey)) softMap.set(soKey, r + 2); else softMap.set(soKey, -1);
     }
  
     let sameCount = 0, updateCount = 0, newCount = 0;
@@ -2212,7 +2224,8 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
     const updates = []; // {rowIndex, values}
  
     // Ensure uniqueness also within the incoming batch
-    const seenIncomingKeys = new Set();
+    const seenIncomingStrictKeys = new Set();
+    const seenIncomingSoftKeys = new Set();
  
     // Prepare each incoming row against existing
     for (let i = 0; i < data.length; i++) {
@@ -2227,23 +2240,36 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
       // Force canonical employee code in target row
       if (iCode >= 0) rowCopy[iCode] = employeeCodeNorm;
  
-      const key = rowKeyFromArray(rowCopy);
-      if (keyToRowIndex.has(key)) {
-        const targetRow = keyToRowIndex.get(key);
+      const sKey = strictKeyFromArray(rowCopy);
+      const soKey = softKeyFromArray(rowCopy);
+ 
+      if (strictMap.has(sKey)) {
+        const targetRow = strictMap.get(sKey);
         const current = sheet.getRange(targetRow, 1, 1, lastColT).getValues()[0];
         const changed = current.some((v, idx) => String(v) !== String(rowCopy[idx]));
-        if (changed) {
-          updates.push({ rowIndex: targetRow, values: rowCopy });
-          updateCount++;
-        } else {
-          sameCount++;
-        }
-      } else {
-        if (!seenIncomingKeys.has(key)) {
-          rowsToAppend.push(rowCopy);
-          seenIncomingKeys.add(key);
-          newCount++;
-        }
+        if (changed) { updates.push({ rowIndex: targetRow, values: rowCopy }); updateCount++; }
+        else { sameCount++; }
+        seenIncomingStrictKeys.add(sKey);
+        continue;
+      }
+ 
+      // Soft fallback: update single matched company for same employee
+      if (softMap.has(soKey) && softMap.get(soKey) > 0) {
+        const targetRow = softMap.get(soKey);
+        const current = sheet.getRange(targetRow, 1, 1, lastColT).getValues()[0];
+        const changed = current.some((v, idx) => String(v) !== String(rowCopy[idx]));
+        if (changed) { updates.push({ rowIndex: targetRow, values: rowCopy }); updateCount++; }
+        else { sameCount++; }
+        seenIncomingSoftKeys.add(soKey);
+        continue;
+      }
+ 
+      // Append if neither strict nor unique soft match exists (and not duplicated in the same batch)
+      if (!seenIncomingStrictKeys.has(sKey) && !seenIncomingSoftKeys.has(soKey)) {
+        rowsToAppend.push(rowCopy);
+        seenIncomingStrictKeys.add(sKey);
+        seenIncomingSoftKeys.add(soKey);
+        newCount++;
       }
     }
  
@@ -2259,7 +2285,6 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
     if (rowsToAppend.length > 0) {
       const startRow = sheet.getLastRow() + 1;
       sheet.getRange(startRow, 1, rowsToAppend.length, lastColT).setValues(rowsToAppend.map(r => {
-        // pad/truncate safety
         const rc = [...r];
         while (rc.length < lastColT) rc.push('');
         if (rc.length > lastColT) rc.length = lastColT;
