@@ -1,409 +1,60 @@
 # 🏢 Google Sheets CRM System
 
+Kısa, okunabilir özet. Detaylar ilgili dokümanlara linklenmiştir. Eski tam sürüm: `docs/archive/README-2025-08-09.md`.
+
 ## 📋 Proje Özeti
+- Google Sheets tabanlı CRM
+- 6 Temsilci dosyası + 1+ Yönetici (çoklu yönetici desteklenir)  
+- Otomatik senkronizasyon, raporlar, renk kodları, website analizleri
 
-Google Sheets üzerinde çok kullanıcılı CRM sistemi ile temsilci-yönetici senkronizasyonu ve değişiklik takibi.
-
-## 🎯 Ana Özellikler
-
-- **6 Temsilci Dosyası** + **1 Yönetici Dosyası**
-- **12 Ana Fonksiyon** ile tam CRM yönetimi
-- **Otomatik Senkronizasyon** sistemi
-- **Website Analiz** araçları (CMS, E-ticaret, Hız testi)
-- **Pivot Table** raporlama sistemi
-- **Renk Kodlu** durum takibi
-
-## 📁 Dosya Yapısı
-
+## 📁 Yapı
 ```
 Google-Sheets-CRM/
 ├── src/
-│   ├── agents/
-│   │   └── backend.js           # Ana CRM sistemi (Temsilci)
-│   ├── managers/
-│   │   └── manager-sync.js      # Yönetici senkronizasyon sistemi
-│   ├── shared/
-│   │   ├── fix-firsatlarim-validation.js
-│   │   └── smart-column-mapping.js
+│   ├── agents/backend.js
+│   ├── managers/manager-sync.js
 │   ├── html-dialogs/
-│   │   ├── appointmentDialog.html
-│   │   ├── opportunityDialog.html
-│   │   ├── meetingDialog.html
-│   │   └── managerMeetingDialog.html
-│   └── utils/
-│       └── (yardımcı dosyalar)
+│   └── shared/, utils/
 ├── docs/
-│   ├── technical-specification.md
-│   ├── sistem_semasi.md
-│   ├── sayfa_kolonlari.md
-│   └── RENK_KODLARI.md
+│   ├── sistem_semasi.md     # Mimari ve rapor mantığı
+│   ├── sayfa_kolonlari.md   # Tek kolon kaynağı
+│   ├── RENK_KODLARI.md      # Tek renk kaynağı
+│   └── technical-specification.md
 └── README.md
 ```
 
-## 🚀 Kurulum
-
-### Git'ten En Son Versiyonu Yükleme
-
-```bash
-# Mevcut projeyi klonlayın
-git clone [repository-url]
-cd Google-Sheets-CRM
-
-# Tüm versiyonları görün
-git tag -l
-
-# En son versiyona geçin (v3.7)
-git checkout v3.7-etap3.7
-```
-
-## 🔄 **Versiyon Yönetimi**
-
-### 📋 **Mevcut Versiyon:**
-- **`v3.7-etap3.7`** - Ana stabil versiyon (CRM menüsünden Yeni Tablo kaldırma)
-
-### 🔙 **v3.7'ye Dönme:**
-```bash
-# v3.7'ye dönmek için:
-git checkout v3.7-etap3.7
-```
-
-### 🔙 **v3.7'den Devam Etme:**
-```bash
-# v3.7'den devam etmek için:
-git checkout v3.7-etap3.7
-git checkout -b devam-branch
-```
-
-### 📊 **Mevcut Durumu Kontrol Etme:**
-```bash
-# Hangi versiyonda olduğunuzu görmek için:
-git describe --tags
-
-# Son commit bilgilerini görmek için:
-git log --oneline -10
-
-# Tüm versiyonları görmek için:
-git tag -l
-```
-
-### 0. Ham Veri Formatı
-
-**Desteklenen Ham Veri Formatı (v3):**
-```
-Keyword | Location | Company name | Category | Website | Phone | Email 1 | Email 2 | Email 3 | Address | City | State | Pincode | Rating count | Review | Cid
-```
-
-**Örnek Veri:**
-```
-hırdavat | izmit | MAZLUM TEKNİK HIRDAVAT | Department store | | 0532 748 04 20 | | | | İZMİT SANAYİ SİTESİ 401 BLOK NO, D:5, 41140 Kocaeli | İzmit/Kocaeli | | 41140 | 264 | 4.2 | https://maps.google.com/?cid=13065953095889504726
-```
-
-### 1. Google Sheets'e Kod Ekleme
-
-#### Temsilci Dosyası İçin:
-1. Google Sheets dosyanızı açın
-2. **Extensions** → **Apps Script** seçin
-3. `src/agents/backend.js` dosyasının içeriğini kopyalayıp yapıştırın
-4. HTML dosyalarını da ekleyin:
-   - `src/html-dialogs/appointmentDialog.html`
-   - `src/html-dialogs/opportunityDialog.html`
-   - `src/html-dialogs/meetingDialog.html`
-   - `meetingDialog.html`
-
-#### Yönetici Dosyası İçin:
-1. Google Sheets dosyanızı açın
-2. **Extensions** → **Apps Script** seçin
-3. `src/managers/manager-sync.js` dosyasının içeriğini kopyalayıp yapıştırın
-4. HTML dosyalarını da ekleyin:
-   - `src/html-dialogs/managerMeetingDialog.html`
-
-### 2. Test Fonksiyonları
-
-1. `test.js` dosyasının içeriğini de ekleyin
-2. `quickSystemCheck()` fonksiyonunu çalıştırın
-3. Tüm testlerin başarılı olduğunu kontrol edin
-
-## 📊 CRM Fonksiyonları
-
-### 🔧 Core CRM Fonksiyonları (1-5)
-
-#### 1. Yeni Tablo oluştur
-- **Buton:** "Yeni Tablo oluştur"
-- **İşlev:** Ham veri → Format Tablo
-- **Kullanım:** Ham veriyi standart formata çevirir
-
-#### 2. Randevu al
-- **Buton:** "Randevu al"
-- **İşlev:** Format Tablo → Randevularım
-- **Kullanım:** Seçilen satırdan randevu oluşturur
-
-#### 3. Fırsat ekle
-- **Buton:** "Fırsat ekle"
-- **İşlev:** Format Tablo → Fırsatlarım
-- **Kullanım:** Seçilen satırdan fırsat oluşturur
-
-#### 4. Toplantıya Geç
-- **Buton:** "Toplantıya Geç"
-- **İşlev:** Randevularım → Toplantılarım
-- **Kullanım:** Teyitlenmiş randevuyu toplantıya çevirir
-
-#### 5. Rapor oluştur
-- **Buton:** "📊 Rapor oluştur"
-- **İşlev:** Pivot Table raporları oluşturur
-- **Kullanım:** Tüm aktiviteleri analiz eder
-
-### 🌐 Website Analiz Fonksiyonları (6-8)
-
-#### 6. CMS ALTYAPI
-- **Buton:** "🔍 CMS ALTYAPI"
-- **İşlev:** Website CMS tespiti
-- **Çıktı:** CMS Adı, CMS Grubu kolonları
-
-#### 7. E-TİCARET İZİ
-- **Buton:** "🛒 E-TİCARET İZİ"
-- **İşlev:** E-ticaret tespiti
-- **Çıktı:** E-Ticaret İzi kolonu (0-100% güven)
-
-#### 8. HIZ TESTİ
-- **Buton:** "⚡ HIZ TESTİ"
-- **İşlev:** Website hız ölçümü
-- **Çıktı:** Site Hızı kolonu
-
-### 🛠️ Veri Yönetimi Fonksiyonları (9-10)
-
-#### 9. Telefon olmayanları sil
-- **Buton:** "Telefon olmayanları sil"
-- **İşlev:** Telefon numarası olmayan satırları siler
-
-#### 10. Cep sabit ayarla
-- **Buton:** "Cep sabit ayarla"
-- **İşlev:** Telefon numaralarını kategorize eder
-
-### 🔄 Senkronizasyon Sistemi (11-12)
-
-#### 11. Otomatik Senkronizasyon
-- **Trigger:** `onEdit` eventi
-- **İşlev:** Temsilci → Yönetici otomatik senkronizasyon
-
-#### 12. Manuel Senkronizasyon
-- **Buton:** "Senkronize Et"
-- **İşlev:** Manuel toplu senkronizasyon
-
-## 🎨 Renk Kodları
-
-Merkezi renk kodları `docs/RENK_KODLARI.md` dosyasında tanımlanmıştır.
-
-| Durum | Renk Kodu | Açıklama |
-|-------|-----------|----------|
-| Randevu Alındı | rgb(227, 242, 253) | Açık Mavi |
-| İleri Tarih Randevu | rgb(227, 242, 253) | Açık Mavi |
-| Teyitlendi | rgb(232, 245, 232) | Yeşil |
-| Ertelendi | rgb(255, 243, 224) | Turuncu |
-| İptal | rgb(255, 235, 238) | Kırmızı |
-| Yeniden Aranacak | rgb(255, 248, 225) | Sarı |
-| Bilgi Verildi | rgb(199, 171, 235) | Mor |
-| Fırsat İletildi | rgb(255, 248, 225) | Sarı |
-| İlgilenmiyor | rgb(255, 235, 238) | Kırmızı |
-| Ulaşılamadı | rgb(255, 235, 238) | Kırmızı |
-| Toplantı Tamamlandı | rgb(200, 230, 201) | Koyu Yeşil |
-
-## 📋 Kullanım Kılavuzu
-
-### 1. İlk Kurulum
-
-```javascript
-// Google Apps Script'te çalıştırın
-function setupCRM() {
-  quickSystemCheck();
-  console.log('CRM sistemi hazır!');
-}
-```
-
-### 2. Yeni Tablo Oluşturma
-
-1. **Ham veri** sayfasına verilerinizi yükleyin (v3 formatı)
-2. CRM menüsünden **"Yeni Tablo oluştur"** seçin
-3. Tablo ismini girin (örn: "Format Tablo 1")
-4. Sistem otomatik olarak:
-   - Tüm kolonları eşleştirir
-   - Cid'yi Maplink'e dönüştürür
-   - Gerekli sistem kolonlarını ekler
-   - Renk kodlaması uygular
-
-### 3. Randevu Alma
-
-1. **Format Tablo**'da bir satır seçin
-2. CRM menüsünden **"Randevu al"** seçin
-3. Formu doldurun ve **"Randevu Oluştur"** tıklayın
-4. Sistem otomatik olarak **Randevularım**'a ekler
-
-### 4. Fırsat Ekleme
-
-1. **Format Tablo**'da bir satır seçin
-2. CRM menüsünden **"Fırsat ekle"** seçin
-3. Formu doldurun ve **"Fırsat Oluştur"** tıklayın
-4. Sistem otomatik olarak **Fırsatlarım**'a ekler
-
-### 5. Toplantıya Geçme
-
-1. **Randevularım**'da teyitlenmiş bir randevu seçin
-2. CRM menüsünden **"Toplantıya Geç"** seçin
-3. Toplantı detaylarını girin
-4. Sistem otomatik olarak **Toplantılarım**'a ekler
-
-### 6. Rapor Oluşturma
-
-1. CRM menüsünden **"📊 Rapor oluştur"** seçin
-2. Sistem otomatik olarak **Raporlarım** sayfasında pivot table oluşturur
-3. Aktivite dağılımı ve özet bilgileri görüntülenir
-
-## 🔧 Test Sistemi
-
-### Hızlı Test
-
-```javascript
-// Temel sistem kontrolü
-quickSystemCheck();
-```
-
-### Tam Test
-
-```javascript
-// Tüm fonksiyonları test eder
-testCRMSystem();
-```
-
-### Belirli Fonksiyon Testi
-
-```javascript
-// Belirli bir fonksiyonu test eder
-testSpecificFunction('createNewTable');
-```
-
-## 📊 Raporlama
-
-### Temsilci Raporları
-
-- **Kaynak:** Kişisel aktivite verileri
-- **İçerik:** Aktivite türü, sayı, yüzde
-- **Alt Kırılımlar:** Randevu Alındı → Teyitlendi/Ertelendi/İptal
-
-### Yönetici Raporları
-
-- **Kaynak:** Tüm temsilcilerin verileri
-- **İçerik:** Temsilci bazında aktivite dağılımı
-- **Filtreleme:** Tarih, temsilci, aktivite türü
+## 🚀 Kurulum ve Hızlı Başlangıç
+1) Google Sheets → Extensions → Apps Script
+2) Temsilci: `src/agents/backend.js` + ilgili HTML dialogları
+3) Yönetici: `src/managers/manager-sync.js` + `managerMeetingDialog.html`
+4) Çalıştır: `quickSystemCheck()`
 
 ## 🔄 Senkronizasyon
+- Otomatik `onEdit`: Temsilci → Yönetici
+- Manuel: Menü CRM → Senkronize Et
+- İleri plan: Çift yönlü senkronizasyon (manuel onaylı geri-iterme) — bkz: `docs/sistem_semasi.md`
 
-### Otomatik Senkronizasyon
+## 📊 Raporlar
+- `Raporlarım` tek menü; alt-fonksiyonlar: Günlük, Haftalık, Aylık (tasarım)  
+- Mantık (kaynak sayfalar, tarihler, toplam formülleri): `docs/sistem_semasi.md`
 
-- **Trigger:** Her hücre değişikliğinde (`onEdit`)
-- **Kapsam:** Randevularım, Fırsatlarım, Toplantılarım
-- **Hız:** Anında (1-2 saniye)
-- **Renk Kodları:** Kaynak ve hedef dosyalarda aynı renkler
+## 🎨 Renkler
+- Merkez: `docs/RENK_KODLARI.md`
+- Not: Eski satır renklerini yeni koda uyarlamak için “Renkleri Yenile” komutu (plan)  
 
-### Manuel Senkronizasyon
+## 🌐 Website Analizi
+- CMS, E-Ticaret, Hız testleri  
+- CMS doğruluk iyileştirmesi ve test süreci (20-30 URL, hedef ≥%95) — plan  
 
-- **Buton:** CRM → "Senkronize Et"
-- **Kapsam:** Tüm veriler
-- **Kullanım:** İnternet sorunu, test, manuel kontrol
+## 🛠️ Yardımcı Araçlar
+- “Telefon olmayanları sil” + “Website olmayanları sil” (plan)  
+- Admin Panel temizlik (plan)
 
-### Günlük ve Haftalık Raporlar
+## 🧭 Referans Dokümanlar
+- Sistem Şeması: `docs/sistem_semasi.md`
+- Sayfa Kolonları: `docs/sayfa_kolonlari.md`
+- Renk Kodları: `docs/RENK_KODLARI.md`
+- Teknik Detaylar: `docs/technical-specification.md`
 
-- **Günlük Rapor:** Bugünkü aktiviteleri listeler
-- **Haftalık Rapor:** Pazartesi-Pazar arası aktiviteleri sayar
-- **TOPLAM KONTAK:** "Ulaşılamadı" hariç tüm aktiviteler
-- **TOPLAM İŞLEM:** Tüm aktiviteler (Ulaşılamadı dahil)
-
-## 🛠️ Sorun Giderme
-
-### Yaygın Sorunlar
-
-1. **Menü görünmüyor**
-   - Sayfayı yenileyin
-   - `onOpen()` fonksiyonunu manuel çalıştırın
-
-2. **Dialog açılmıyor**
-   - HTML dosyalarının doğru eklendiğini kontrol edin
-   - Console'da hata mesajlarını kontrol edin
-
-3. **Veri kaydedilmiyor**
-   - Seçili satırın doğru olduğunu kontrol edin
-   - Başlık satırını seçmediğinizden emin olun
-
-4. **Renk kodları çalışmıyor**
-   - Conditional formatting ayarlarını kontrol edin
-   - Durum değerlerinin doğru olduğunu kontrol edin
-
-### Debug Modu
-
-```javascript
-// Debug modunu aktifleştirin
-function enableDebugMode() {
-  console.log('Debug mode enabled');
-  // Tüm console.log çıktılarını görün
-}
-```
-
-## 📞 Destek
-
-### Sistem Gereksinimleri
-
-- Google Sheets hesabı
-- Apps Script erişimi
-- Modern web tarayıcısı
-
-### Performans
-
-- **Website Analizi:** 200-300 URL için ~2-3 dakika
-- **Batch İşlem:** 50 URL/grup
-- **Timeout:** 5 saniye/URL
-- **Senkronizasyon:** Anında
-
-## 🔄 Güncellemeler
-
-### v1.3 (2025-01-27)
-- ✅ Core CRM fonksiyonları (1-5)
-- ✅ HTML dialog template'leri
-- ✅ Test sistemi
-- ✅ Renk kodlama sistemi (merkezi yapılandırma)
-- ✅ Pivot table raporlama
-- ✅ Temsilci-Yönetici senkronizasyonu
-- ✅ Günlük ve haftalık raporlar
-- ✅ Gelişmiş hata yönetimi
-- ✅ Dinamik renk kodlama (tüm durumlar için)
-
-### v1.2 (2025-01-27)
-- ✅ Renk kodlama iyileştirmeleri
-- ✅ Veri doğrulama düzeltmeleri
-- ✅ Senkronizasyon hata düzeltmeleri
-
-### v1.1 (2025-01-27)
-- ✅ Temel CRM sistemi
-- ✅ Renk kodlama sistemi
-- ✅ Senkronizasyon altyapısı
-
-### v1.0 (2025-07-08)
-- ✅ Core CRM fonksiyonları (1-5)
-- ✅ HTML dialog template'leri
-- ✅ Test sistemi
-- ✅ Renk kodlama
-- ✅ Pivot table raporlama
-
-### Gelecek Sürümler
-- 🔄 Website analiz fonksiyonları (6-8)
-- 🔄 Veri yönetimi fonksiyonları (9-10)
-- 🔄 Gelişmiş senkronizasyon sistemi (11-12)
-- 🔄 API entegrasyonları
-- 🔄 Mobil uygulama desteği
-
-## 📄 Lisans
-
-Bu proje özel kullanım için geliştirilmiştir.
-
----
-
-**📧 İletişim:** CRM Development Team  
-**📅 Son Güncelleme:** 27.01.2025  
-**🔧 Versiyon:** 1.3 
+## 🔄 Versiyon
+- Mevcut: v1.3 — Ayrıntılar ve geçmiş: `docs/archive/README-2025-08-09.md` 
