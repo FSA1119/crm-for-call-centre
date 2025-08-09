@@ -2319,8 +2319,11 @@ function clearAllDataExceptHeadersForFocus(managerFile) {
       const lastRow = sheet.getLastRow();
       const lastCol = sheet.getLastColumn();
       if (lastRow > 1 && lastCol > 0) {
-        sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
-        console.log(`🧹 Focus mode: cleared data in ${name}`);
+        const dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+        dataRange.clearContent();
+        // Reset backgrounds so previous color coding does not linger
+        dataRange.setBackground('white');
+        console.log(`🧹 Focus mode: cleared data and backgrounds in ${name}`);
       }
     }
     console.log('Processing complete:', { cleared: true });
