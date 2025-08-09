@@ -4462,9 +4462,16 @@ function createAdminMenu() {
     menu.addItem('🎨 Manuel Renk Uygula', 'applyManualColorCoding');
     menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
     menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
-    menu.addSeparator();
-    menu.addItem('📵 Telefonu olmayanları sil', 'deleteRowsWithoutPhone');
-    menu.addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite');
+    
+    // Bakım alt menüsü
+    const bakım = SpreadsheetApp.getUi().createMenu('Bakım')
+      .addItem('🎨 Renkleri Yenile (Bu sayfa)', 'refreshColorsOnActiveSheet')
+      .addItem('🎨 Renkleri Yenile (Tüm sayfalar)', 'refreshAllColors')
+      .addSeparator()
+      .addItem('📵 Telefonu olmayanları sil', 'deleteRowsWithoutPhone')
+      .addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite');
+    
+    menu.addSubMenu(bakım);
     
     // Add menu to UI
     menu.addToUi();
