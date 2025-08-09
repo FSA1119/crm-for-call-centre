@@ -3749,16 +3749,17 @@ function onOpen() {
     }
     
     // Create CRM menu for all sheets
-                   ui.createMenu('CRM')
-                 .addItem('Randevu al', 'showTakeAppointmentDialog')
-                 .addItem('Fırsat ekle', 'showAddOpportunityDialog')
-                 .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
-                 .addSeparator()
-                 .addItem('📊 Günlük Rapor', 'generateDailyReport')
-                 .addItem('📅 Haftalık Rapor', 'generateMonthlyReport')
-                 .addSeparator()
-                 .addItem('📈 Detaylı Rapor', 'showGenerateReportDialog')
-                 .addToUi();
+    const crmMenu = ui.createMenu('CRM')
+      .addItem('Randevu al', 'showTakeAppointmentDialog')
+      .addItem('Fırsat ekle', 'showAddOpportunityDialog')
+      .addItem('Toplantıya Geç', 'showMoveToMeetingDialog');
+
+    const raporlarSubMenu = ui.createMenu('Raporlarım')
+      .addItem('📊 Günlük', 'generateDailyReport')
+      .addItem('📅 Haftalık', 'generateMonthlyReport')
+      .addItem('📈 Detaylı', 'showGenerateReportDialog');
+
+    crmMenu.addSubMenu(raporlarSubMenu).addToUi();
       
     console.log('CRM menu created for all sheets');
   }
