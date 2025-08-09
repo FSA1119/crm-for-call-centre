@@ -490,6 +490,13 @@ function createManagerMenu() {
     menu.addSubMenu(isolatedSubmenu)
         .addSeparator();
 
+    // Performance submenu
+    const perfSubmenu = ui.createMenu('⚡ Performans');
+    const onlyTouched = getOnlyColorTouchedRowsFlag();
+    perfSubmenu.addItem(`Renkleme: Yalnızca Yeni/Güncellenen (Şu an: ${onlyTouched ? 'Açık' : 'Kapalı'})`, 'toggleOnlyColorTouchedRows');
+    menu.addSubMenu(perfSubmenu)
+        .addSeparator();
+
     // Quick action to move selected appointment to meetings
     menu.addItem('📥 Seçili Randevuyu Toplantıya Taşı', 'moveSelectedRandevuToMeeting')
         .addSeparator();
@@ -666,8 +673,7 @@ function syncSingleEmployee(employeeCode, options) {
     totalStats.employeeStats[employeeCode] = employeeStats;
     totalStats.totalRecords += employeeStats.totalRecords;
     showSyncResults(totalStats);
-    applyColorCodingToAllManagerSheets();
-    applyDataValidationToAllManagerSheets();
+    // Removed global recoloring/validation to avoid O(N) cost across all sheets
     return totalStats;
   } catch (error) {
     console.error(`Error synchronizing employee ${employeeCode}:`, error);
@@ -941,6 +947,7 @@ function forceRefreshManagerColorCoding() {
   console.log('🎨 Force refreshing manager colors'); 
   
   try {
+    // Full recolor regardless of performance flag
     applyColorCodingToAllManagerSheets();
     SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Tüm sayfalar için renk kodlaması yenilendi', SpreadsheetApp.getUi().ButtonSet.OK);
     
@@ -1457,16 +1464,23 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       // Apply updates
       for (const u of updates) {
         sheet.getRange(u.rowIndex, 1, 1, lastCol).setValues([u.values]);
-        applyColorCodingToManagerData(sheet, sheet.getName(), u.rowIndex, 1);
+        if (getOnlyColorTouchedRowsFlag()) {
+          applyColorCodingToManagerData(sheet, sheet.getName(), u.rowIndex, 1);
+        }
       }
 
       // Apply appends
       if (rowsToAppend.length > 0 && rowsToAppend[0].length > 0) {
         const startRow = sheet.getLastRow() + 1;
         sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
-        applyColorCodingToManagerData(sheet, sheet.getName(), startRow, rowsToAppend.length);
-        optimizeColumnWidths(sheet, baseTypeForHeaders);
+        if (getOnlyColorTouchedRowsFlag()) {
+          applyColorCodingToManagerData(sheet, sheet.getName(), startRow, rowsToAppend.length);
+        }
       }
+
+      // Per-sheet formatting/validation only for touched sheet
+      optimizeColumnWidths(sheet, baseTypeForHeaders);
+      applyManagerSheetDataValidation(sheet, baseTypeForHeaders);
 
       // Optional: group by employee code after operation so visual order is clear
       if (effectiveMode === 'append' && idxCode >= 0) {
@@ -1792,6 +1806,18 @@ function showSyncResults(totalStats) {
         return null;
       }
     }
+    function extractDateFromLog(logValue) {
+      try {
+        const s = String(logValue || '');
+        const m = s.match(/(\d{2}\.\d{2}\.\d{4})/);
+        if (m && m[1]) {
+          return parseDdMmYyyy(m[1]);
+        }
+        return null;
+      } catch (err) {
+        return null;
+      }
+    }
 
     // Build base message
     let resultMessage = '📊 **SENKRONİZASYON SONUÇLARI**\n\n';
@@ -1837,15 +1863,26 @@ function showSyncResults(totalStats) {
               let codeIdx = headers.indexOf('Temsilci Kodu');
               if (codeIdx === -1) codeIdx = headers.indexOf('Kod');
 
-              if (codeIdx !== -1 && dateIdx !== -1) {
+              // Prefer activity date from Log
+              const logIdx = headers.indexOf('Log');
+
+              if (codeIdx !== -1) {
                 const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
                 for (let i = 0; i < values.length; i++) {
                   const row = values[i];
                   if (String(row[codeIdx]) !== String(employeeCode)) continue;
-                  const parsed = parseDdMmYyyy(row[dateIdx]);
-                  if (!parsed) continue;
-                  if (!minDate || parsed < minDate) minDate = parsed;
-                  if (!maxDate || parsed > maxDate) maxDate = parsed;
+
+                  let activityDate = null;
+                  if (logIdx !== -1) {
+                    activityDate = extractDateFromLog(row[logIdx]);
+                  }
+                  if (!activityDate && dateIdx !== -1) {
+                    activityDate = parseDdMmYyyy(row[dateIdx]);
+                  }
+                  if (!activityDate) continue;
+
+                  if (!minDate || activityDate < minDate) minDate = activityDate;
+                  if (!maxDate || activityDate > maxDate) maxDate = activityDate;
                 }
               }
             }
@@ -2213,7 +2250,9 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
     // Apply updates
     for (const u of updates) {
       sheet.getRange(u.rowIndex, 1, 1, lastColT).setValues([u.values]);
-      applyColorCodingToManagerData(sheet, baseSheetName, u.rowIndex, 1);
+      if (getOnlyColorTouchedRowsFlag()) {
+        applyColorCodingToManagerData(sheet, baseSheetName, u.rowIndex, 1);
+      }
     }
  
     // Apply appends
@@ -2226,7 +2265,9 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
         if (rc.length > lastColT) rc.length = lastColT;
         return rc;
       }));
-      applyColorCodingToManagerData(sheet, baseSheetName, startRow, rowsToAppend.length);
+      if (getOnlyColorTouchedRowsFlag()) {
+        applyColorCodingToManagerData(sheet, baseSheetName, startRow, rowsToAppend.length);
+      }
     }
  
     optimizeColumnWidths(sheet, baseSheetName);
@@ -2362,10 +2403,14 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex) {
     if (existingRow === -1) {
       const startRow = toplantilarSheet.getLastRow() + 1;
       toplantilarSheet.getRange(startRow, 1, 1, output.length).setValues([output]);
-      applyColorCodingToManagerData(toplantilarSheet, 'Toplantılar', startRow, 1);
+      if (getOnlyColorTouchedRowsFlag()) {
+        applyColorCodingToManagerData(toplantilarSheet, 'Toplantılar', startRow, 1);
+      }
     } else {
       toplantilarSheet.getRange(existingRow, 1, 1, output.length).setValues([output]);
-      applyColorCodingToManagerData(toplantilarSheet, 'Toplantılar', existingRow, 1);
+      if (getOnlyColorTouchedRowsFlag()) {
+        applyColorCodingToManagerData(toplantilarSheet, 'Toplantılar', existingRow, 1);
+      }
     }
 
     optimizeColumnWidths(toplantilarSheet, 'Toplantılar');
@@ -2437,5 +2482,41 @@ function clearAllDataExceptHeadersForFocus(managerFile) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
     throw error;
+  }
+}
+
+const PERFORMANCE_KEYS = {
+  ONLY_COLOR_TOUCHED_ROWS: 'ONLY_COLOR_TOUCHED_ROWS'
+};
+
+function getOnlyColorTouchedRowsFlag() {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    const val = props.getProperty(PERFORMANCE_KEYS.ONLY_COLOR_TOUCHED_ROWS);
+    return val === null ? true : String(val) === 'true';
+  } catch (error) {
+    console.error('❌ Error reading performance flag:', error);
+    return true;
+  }
+}
+
+function setOnlyColorTouchedRowsFlag(value) {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    props.setProperty(PERFORMANCE_KEYS.ONLY_COLOR_TOUCHED_ROWS, String(!!value));
+  } catch (error) {
+    console.error('❌ Error setting performance flag:', error);
+  }
+}
+
+function toggleOnlyColorTouchedRows() {
+  try {
+    const current = getOnlyColorTouchedRowsFlag();
+    const next = !current;
+    setOnlyColorTouchedRowsFlag(next);
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('Performans Modu', `Renkleme: Sadece Yeni/Güncellenen Satırlar = ${next ? 'Açık' : 'Kapalı'}`, ui.ButtonSet.OK);
+  } catch (error) {
+    console.error('❌ Error toggling performance flag:', error);
   }
 }
