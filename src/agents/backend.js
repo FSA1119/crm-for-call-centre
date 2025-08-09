@@ -1986,9 +1986,20 @@ function prepareOpportunityRow(rowData, opportunityData, columns, sheet) {
         row[index] = opportunityData.isimSoyisim || '';
         break;
       case 'Fırsat Durumu':
-        row[index] = opportunityData.firsatDurumu || 'Bilgi Verildi';
-        console.log('🔍 Debug - Fırsat Durumu set to:', row[index]);
-        console.log('🔍 Debug - opportunityData.firsatDurumu:', opportunityData.firsatDurumu);
+        {
+          let statusVal = (opportunityData.firsatDurumu || '').toString().trim();
+          const lower = statusVal.toLowerCase();
+          if (lower.includes('fırsat') && lower.includes('iletildi')) {
+            statusVal = 'Fırsat İletildi';
+          } else if (lower.includes('bilgi') && lower.includes('verildi')) {
+            statusVal = 'Bilgi Verildi';
+          } else if (lower.includes('yeniden') && lower.includes('aranacak')) {
+            statusVal = 'Yeniden Aranacak';
+          }
+          row[index] = statusVal || 'Bilgi Verildi';
+          console.log('🔍 Debug - Fırsat Durumu set to:', row[index]);
+          console.log('🔍 Debug - opportunityData.firsatDurumu:', opportunityData.firsatDurumu);
+        }
         break;
       case 'Fırsat Tarihi':
         // Format date as DD.MM.YYYY
@@ -7220,6 +7231,156 @@ function deleteRowsWithoutWebsite(parameters) {
     console.log('Processing complete:', { deleted });
     
     return { success: true, deleted };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+// ========================================
+// 🎨 RENK YENİLEME FONKSİYONЛARI (BAKIM)
+// ========================================
+
+/**
+ * 🎨 Renkleri Yenile (Bu sayfa) - Sadece aktif sayfadaki renkleri normalizer
+ */
+function refreshColorsOnActiveSheet(parameters) {
+  console.log('Function started: refreshColorsOnActiveSheet', parameters);
+  
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const name = sheet.getName();
+    let updated = 0;
+
+    if (isFormatTable(sheet)) {
+      const data = sheet.getDataRange().getValues();
+      if (data.length > 1) {
+        const headers = data[0];
+        const aktiviteIdx = headers.indexOf('Aktivite');
+        if (aktiviteIdx !== -1) {
+          for (let i = 1; i < data.length; i++) {
+            const activity = data[i][aktiviteIdx] || '';
+            applyFormatTableColorCoding(sheet, i + 1, activity);
+            updated++;
+          }
+        }
+      }
+    } else if (name === 'Randevularım') {
+      const data = sheet.getDataRange().getValues();
+      if (data.length > 1) {
+        const headers = data[0];
+        const durumIdx = findColumnIndex(headers, ['Randevu Durumu', 'Randevu durumu']);
+        if (durumIdx !== -1) {
+          for (let i = 1; i < data.length; i++) {
+            const status = data[i][durumIdx] || '';
+            updateRandevularimRowColor(sheet, i + 1, status);
+            updated++;
+          }
+        }
+      }
+    } else if (name === 'Fırsatlarım') {
+      const data = sheet.getDataRange().getValues();
+      if (data.length > 1) {
+        for (let i = 1; i < data.length; i++) {
+          applyOpportunityColorCoding(sheet, i + 1);
+          updated++;
+        }
+      }
+    } else {
+      console.log('Bu sayfa için renk yenileme kuralı yok:', name);
+    }
+
+    SpreadsheetApp.getUi().alert(`Bu sayfada renkler yenilendi. Güncellenen satır: ${updated}`);
+    console.log('Processing complete:', { sheet: name, updated });
+    return { success: true, updated };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🎨 Renkleri Yenile (Tüm sayfalar) - Tüm sayfalarda mevcut statülere göre arka planları normalize eder
+ */
+function refreshAllColors(parameters) {
+  console.log('Function started: refreshAllColors', parameters);
+
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = ss.getSheets();
+    const ui = SpreadsheetApp.getUi();
+
+    let updated = 0;
+    let processedSheets = { format: 0, randevu: 0, firsat: 0 };
+
+    for (const sheet of sheets) {
+      const name = sheet.getName();
+
+      // Format Tablo sayfaları
+      if (isFormatTable(sheet)) {
+        const data = sheet.getDataRange().getValues();
+        if (data.length > 1) {
+          const headers = data[0];
+          const aktiviteIdx = headers.indexOf('Aktivite');
+          if (aktiviteIdx !== -1) {
+            for (let i = 1; i < data.length; i++) {
+              const activity = data[i][aktiviteIdx] || '';
+              applyFormatTableColorCoding(sheet, i + 1, activity);
+              updated++;
+            }
+          }
+        }
+        processedSheets.format++;
+        continue;
+      }
+
+      // Randevularım
+      if (name === 'Randevularım') {
+        const data = sheet.getDataRange().getValues();
+        if (data.length > 1) {
+          const headers = data[0];
+          const durumIdx = findColumnIndex(headers, ['Randevu Durumu', 'Randevu durumu']);
+          if (durumIdx !== -1) {
+            for (let i = 1; i < data.length; i++) {
+              const status = data[i][durumIdx] || '';
+              updateRandevularimRowColor(sheet, i + 1, status);
+              updated++;
+            }
+          }
+        }
+        processedSheets.randevu++;
+        continue;
+      }
+
+      // Fırsatlarım
+      if (name === 'Fırsatlarım') {
+        const data = sheet.getDataRange().getValues();
+        if (data.length > 1) {
+          for (let i = 1; i < data.length; i++) {
+            applyOpportunityColorCoding(sheet, i + 1);
+            updated++;
+          }
+        }
+        processedSheets.firsat++;
+        continue;
+      }
+    }
+
+    const msg = `Renkler yenilendi.\nFormat Tablo: ${processedSheets.format} sayfa\nRandevularım: ${processedSheets.randevu}\nFırsatlarım: ${processedSheets.firsat}\nGüncellenen satır: ${updated}`;
+    ui.alert('🎨 Renkleri Yenile', msg, ui.ButtonSet.OK);
+    console.log('Processing complete:', { processedSheets, updated });
+
+    return { success: true, processedSheets, updated };
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata: ' + error.message);
