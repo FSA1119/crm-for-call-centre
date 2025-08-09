@@ -325,3 +325,74 @@ function adminMigrateFirsatlar() {
     throw error;
   }
 }
+
+function forceStandardizeFirsatlarNoBackup() {
+  console.log('Function started:', {});
+  try {
+    var ss = SpreadsheetApp.getActive();
+    var sheet = ss.getSheetByName('Fırsatlar');
+    if (!sheet) throw new Error('Fırsatlar sayfası bulunamadı');
+
+    var canonical = getCanonicalFirsatlarHeaders();
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    var existingHeaders = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+    var data = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, Math.max(1, lastCol)).getValues() : [];
+
+    var out = [];
+    for (var r = 0; r < data.length; r++) {
+      var dstRow = new Array(canonical.length).fill('');
+      for (var c = 0; c < canonical.length; c++) {
+        var targetHeader = canonical[c];
+        var srcIdx = findColumnIndexByAliases(existingHeaders, [targetHeader, String(targetHeader).toLowerCase(), String(targetHeader).toUpperCase()]);
+        if (srcIdx !== -1) dstRow[c] = data[r][srcIdx];
+      }
+      // enforce required
+      var dDurum = findColumnIndexByAliases(canonical, ['Fırsat Durumu']);
+      var dTarih = findColumnIndexByAliases(canonical, ['Fırsat Tarihi']);
+      if (dDurum !== -1) dstRow[dDurum] = normalizeFirsatDurumu(dstRow[dDurum]);
+      if (dTarih !== -1) dstRow[dTarih] = parseDate_ddMMyyyy(dstRow[dTarih]) || '';
+      out.push(dstRow);
+    }
+
+    // Ensure column count equals canonical length
+    var currentMaxCols = sheet.getMaxColumns();
+    if (currentMaxCols > canonical.length) {
+      sheet.deleteColumns(canonical.length + 1, currentMaxCols - canonical.length);
+    } else if (currentMaxCols < canonical.length) {
+      sheet.insertColumnsAfter(currentMaxCols, canonical.length - currentMaxCols);
+    }
+
+    // Clear and rewrite
+    sheet.clear();
+    sheet.getRange(1, 1, 1, canonical.length).setValues([canonical]);
+    if (out.length > 0) {
+      sheet.getRange(2, 1, out.length, canonical.length).setValues(out);
+    }
+
+    // Formats & validation
+    var tarihIdx = findColumnIndexByAliases(canonical, ['Fırsat Tarihi']);
+    var durumIdx = findColumnIndexByAliases(canonical, ['Fırsat Durumu']);
+    var lastRowNew = sheet.getLastRow();
+    if (tarihIdx !== -1 && lastRowNew > 1) {
+      sheet.getRange(2, tarihIdx + 1, lastRowNew - 1, 1).setNumberFormat('dd.MM.yyyy');
+    }
+    if (durumIdx !== -1) {
+      var rule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(['Yeniden Aranacak', 'Bilgi Verildi', 'Fırsat İletildi'], true)
+        .setAllowInvalid(true)
+        .build();
+      sheet.getRange(2, durumIdx + 1, Math.max(1, lastRowNew - 1), 1).setDataValidation(rule);
+    }
+
+    // Recolor
+    applyColorCodingToManagerOpportunities(sheet);
+
+    console.log('Processing complete:', { rows: out.length });
+    return { success: true, rewrittenRows: out.length };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Error: ' + error.message);
+    throw error;
+  }
+}
