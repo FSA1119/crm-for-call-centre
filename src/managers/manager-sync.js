@@ -1388,14 +1388,19 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       const idxCompany = findIdx(['Company name', 'Company']);
       const idxStatus = findIdx(['Fırsat Durumu', 'Randevu durumu', 'Toplantı durumu', 'Durum']);
       const idxDate = findIdx(['Fırsat Tarihi', 'Randevu Tarihi', 'Toplantı Tarihi', 'Tarih']);
-      const idxLog = findIdx(['Log']);
 
+      function canonicalCode(value) {
+        return String(value || '').trim();
+      }
+      function canonicalCompany(value) {
+        return String(value || '').replace(/\s+/g, ' ').trim();
+      }
       function canonicalStatus(value) {
         const v = String(value || '').toLowerCase();
         if (v.includes('ilet')) return 'Fırsat İletildi';
         if (v.includes('bilgi')) return 'Bilgi Verildi';
         if (v.includes('yeniden') || v.includes('ara')) return 'Yeniden Aranacak';
-        return String(value || '');
+        return String(value || '').trim();
       }
       function canonicalDate(value) {
         return formatDateValue(value);
@@ -1403,11 +1408,11 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
 
       function upsertKey(row) {
         const parts = [];
-        parts.push(String(idxCode >= 0 ? row[idxCode] : ''));
-        parts.push(String(idxCompany >= 0 ? row[idxCompany] : ''));
+        parts.push(canonicalCode(idxCode >= 0 ? row[idxCode] : ''));
+        parts.push(canonicalCompany(idxCompany >= 0 ? row[idxCompany] : ''));
         parts.push(canonicalStatus(idxStatus >= 0 ? row[idxStatus] : ''));
         parts.push(canonicalDate(idxDate >= 0 ? row[idxDate] : ''));
-        return parts.join('||').trim();
+        return parts.join('||');
       }
 
       // Build existing key -> rowIndex map
