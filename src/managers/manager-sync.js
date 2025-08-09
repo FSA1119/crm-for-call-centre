@@ -634,6 +634,7 @@ function syncSingleEmployee(employeeCode) {
     totalStats.totalRecords += employeeStats.totalRecords;
     showSyncResults(totalStats);
     applyColorCodingToAllManagerSheets();
+    applyDataValidationToAllManagerSheets();
     return totalStats;
   } catch (error) {
     console.error(`Error synchronizing employee ${employeeCode}:`, error);
