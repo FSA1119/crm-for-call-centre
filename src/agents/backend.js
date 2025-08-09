@@ -7048,3 +7048,154 @@ function sortFirsatlarimByDate(sheet) {
     console.error('❌ Fırsatlarım sıralama hatası:', error);
   }
 }
+
+// ========================================
+// 🧹 DATA CLEANUP FUNCTIONS
+// ========================================
+
+/**
+ * "Telefon olmayanları sil" - Aktif sayfada Phone kolonu boş/geçersiz olan satırları siler
+ * @param {Object} parameters - { scope?: 'all' | 'selection' }
+ * @returns {Object} - Sonuç bilgisi
+ */
+function deleteRowsWithoutPhone(parameters) {
+  console.log('Function started: deleteRowsWithoutPhone', parameters);
+  
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const sheetName = sheet.getName();
+    console.log('🧹 Target sheet:', sheetName);
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const phoneIdx = headers.indexOf('Phone');
+    if (phoneIdx === -1) {
+      throw new Error("'Phone' kolonu bulunamadı");
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      ui.alert('Silinecek satır bulunamadı');
+      return { success: true, deleted: 0 };
+    }
+    
+    // Kapsam: seçim varsa seçim, yoksa tüm veri
+    const range = sheet.getActiveRange();
+    let startRow = 2;
+    let endRow = lastRow;
+    if (range && range.getRow() > 1) {
+      startRow = range.getRow();
+      endRow = range.getLastRow();
+      if (startRow === 1) startRow = 2;
+    }
+    
+    console.log(`🔎 Scan rows: ${startRow}-${endRow}`);
+    const values = sheet.getRange(startRow, 1, endRow - startRow + 1, sheet.getLastColumn()).getValues();
+    
+    // Sıralı silme için alt->üst
+    const rowsToDelete = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const phoneRaw = row[phoneIdx];
+      const phoneStr = (phoneRaw || '').toString();
+      const digits = phoneStr.replace(/\D+/g, '');
+      const hasValidPhone = digits.length >= 7; // esnek eşik
+      if (!hasValidPhone) {
+        rowsToDelete.push(startRow + i);
+      }
+    }
+    
+    console.log('🗑️ Rows to delete (no phone):', rowsToDelete);
+    
+    // Sil
+    let deleted = 0;
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+      sheet.deleteRow(rowsToDelete[i]);
+      deleted++;
+    }
+    
+    ui.alert(`📵 Telefonu olmayan satırlar silindi: ${deleted}`);
+    console.log('Processing complete:', { deleted });
+    
+    return { success: true, deleted };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * "Website olmayanları sil" - Aktif sayfada Website kolonu boş/geçersiz olan satırları siler
+ * @param {Object} parameters - { scope?: 'all' | 'selection' }
+ * @returns {Object} - Sonuç bilgisi
+ */
+function deleteRowsWithoutWebsite(parameters) {
+  console.log('Function started: deleteRowsWithoutWebsite', parameters);
+  
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const sheetName = sheet.getName();
+    console.log('🧹 Target sheet:', sheetName);
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const websiteIdx = headers.indexOf('Website');
+    if (websiteIdx === -1) {
+      throw new Error("'Website' kolonu bulunamadı");
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      ui.alert('Silinecek satır bulunamadı');
+      return { success: true, deleted: 0 };
+    }
+    
+    const range = sheet.getActiveRange();
+    let startRow = 2;
+    let endRow = lastRow;
+    if (range && range.getRow() > 1) {
+      startRow = range.getRow();
+      endRow = range.getLastRow();
+      if (startRow === 1) startRow = 2;
+    }
+    
+    console.log(`🔎 Scan rows: ${startRow}-${endRow}`);
+    const values = sheet.getRange(startRow, 1, endRow - startRow + 1, sheet.getLastColumn()).getValues();
+    
+    const rowsToDelete = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const websiteRaw = (row[websiteIdx] || '').toString().trim();
+      const hasWebsite = websiteRaw.length > 0;
+      if (!hasWebsite) {
+        rowsToDelete.push(startRow + i);
+      }
+    }
+    
+    console.log('🗑️ Rows to delete (no website):', rowsToDelete);
+    
+    let deleted = 0;
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+      sheet.deleteRow(rowsToDelete[i]);
+      deleted++;
+    }
+    
+    ui.alert(`🌐 Websitesi olmayan satırlar silindi: ${deleted}`);
+    console.log('Processing complete:', { deleted });
+    
+    return { success: true, deleted };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
