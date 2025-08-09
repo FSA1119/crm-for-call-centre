@@ -2126,25 +2126,29 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
                     : baseSheetName === 'Fırsatlar' ? idxT('Fırsat Durumu')
                     : idxT('Toplantı durumu');
  
-    // Canonicalizers to avoid duplicate keys due to format differences
-    function canonStr(v) { return String(v == null ? '' : v).trim(); }
-    function canonDate(v) { return formatDateValue(v); }
+    // Canonicalizers to avoid duplicate keys due to format/case differences
+    function canonCode(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toUpperCase(); }
+    function canonCompany(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase(); }
+    function canonDate(v) { return formatDateValue(v) || ''; }
     function canonStatus(v) {
-      if (baseSheetName !== 'Fırsatlar') return canonStr(v);
       const s = String(v || '').toLowerCase();
-      if (s.indexOf('ilet') !== -1) return 'Fırsat İletildi';
-      if (s.indexOf('bilgi') !== -1) return 'Bilgi Verildi';
-      if (s.indexOf('yeniden') !== -1 || s.indexOf('ara') !== -1) return 'Yeniden Aranacak';
-      return canonStr(v);
+      if (baseSheetName === 'Fırsatlar') {
+        if (s.indexOf('ilet') !== -1) return 'fırsat iletildi';
+        if (s.indexOf('bilgi') !== -1) return 'bilgi verildi';
+        if (s.indexOf('yeniden') !== -1 || s.indexOf('ara') !== -1) return 'yeniden aranacak';
+      }
+      // For randevu/toplantı use lowercased trimmed status
+      return s.replace(/\s+/g, ' ').trim();
     }
  
-    // Build existing index map (key -> rowIndex)
+    // Build existing index map (key -> rowIndex) for same employee only
+    const employeeCodeNorm = canonCode(employeeCode);
     const existingRowsCount = sheet.getLastRow() > 1 ? sheet.getLastRow() - 1 : 0;
     const existingValues = existingRowsCount > 0 ? sheet.getRange(2, 1, existingRowsCount, lastColT).getValues() : [];
     function rowKeyFromArray(arr) {
       const parts = [
-        iCode >= 0 ? canonStr(arr[iCode]) : '',
-        iComp >= 0 ? canonStr(arr[iComp]) : '',
+        iCode >= 0 ? canonCode(arr[iCode]) : '',
+        iComp >= 0 ? canonCompany(arr[iComp]) : '',
         iDate >= 0 ? canonDate(arr[iDate]) : '',
         iStatus >= 0 ? canonStatus(arr[iStatus]) : ''
       ];
@@ -2152,12 +2156,17 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
     }
     const keyToRowIndex = new Map();
     for (let r = 0; r < existingValues.length; r++) {
-      keyToRowIndex.set(rowKeyFromArray(existingValues[r]), r + 2); // 2-based with header
+      const arr = existingValues[r];
+      if (canonCode(arr[iCode]) !== employeeCodeNorm) continue; // only same employee
+      keyToRowIndex.set(rowKeyFromArray(arr), r + 2); // 2-based with header
     }
  
     let sameCount = 0, updateCount = 0, newCount = 0;
     const rowsToAppend = [];
     const updates = []; // {rowIndex, values}
+ 
+    // Ensure uniqueness also within the incoming batch
+    const seenIncomingKeys = new Set();
  
     // Prepare each incoming row against existing
     for (let i = 0; i < data.length; i++) {
@@ -2168,6 +2177,9 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
       // Ensure target row length equals header length
       while (rowCopy.length < headersT.length) rowCopy.push('');
       if (rowCopy.length > headersT.length) rowCopy.length = headersT.length;
+ 
+      // Force canonical employee code in target row
+      if (iCode >= 0) rowCopy[iCode] = employeeCodeNorm;
  
       const key = rowKeyFromArray(rowCopy);
       if (keyToRowIndex.has(key)) {
@@ -2181,8 +2193,11 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
           sameCount++;
         }
       } else {
-        rowsToAppend.push(rowCopy);
-        newCount++;
+        if (!seenIncomingKeys.has(key)) {
+          rowsToAppend.push(rowCopy);
+          seenIncomingKeys.add(key);
+          newCount++;
+        }
       }
     }
  
@@ -2195,7 +2210,13 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
     // Apply appends
     if (rowsToAppend.length > 0) {
       const startRow = sheet.getLastRow() + 1;
-      sheet.getRange(startRow, 1, rowsToAppend.length, lastColT).setValues(rowsToAppend);
+      sheet.getRange(startRow, 1, rowsToAppend.length, lastColT).setValues(rowsToAppend.map(r => {
+        // pad/truncate safety
+        const rc = [...r];
+        while (rc.length < lastColT) rc.push('');
+        if (rc.length > lastColT) rc.length = lastColT;
+        return rc;
+      }));
       applyColorCodingToManagerData(sheet, baseSheetName, startRow, rowsToAppend.length);
     }
  
