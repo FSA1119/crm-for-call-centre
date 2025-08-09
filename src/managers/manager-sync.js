@@ -653,20 +653,14 @@ function syncSingleEmployee(employeeCode, options) {
     if (!managerFile) {
       throw new Error('Yönetici dosyası bulunamadı');
     }
-
-    // Focus mode: clear entire manager sheets to show only this employee's data
-    if (mode === 'replace') {
-      clearAllDataExceptHeadersForFocus(managerFile);
-    }
-
     const totalStats = { totalRecords: 0, employeeStats: {}, errors: [] };
     const employeeData = collectEmployeeData(managerFile, employeeCode);
     const employeeStats = { employeeCode, totalRecords: 0, sheetStats: {} };
     for (const [sheetName, data] of Object.entries(employeeData)) {
       if (data && data.length > 0) {
-        updateManagerSheet(managerFile, sheetName, data, employeeCode, mode);
-        employeeStats.sheetStats[sheetName] = data.length;
-        employeeStats.totalRecords += data.length;
+        const op = updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) || { totalIncoming: data.length };
+        employeeStats.sheetStats[sheetName] = op;
+        employeeStats.totalRecords += op.totalIncoming;
       }
     }
     totalStats.employeeStats[employeeCode] = employeeStats;
@@ -1358,6 +1352,8 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       clearEmployeeData(sheet, employeeCode);
     }
 
+    const opStats = { totalIncoming: data.length, sameCount: 0, updateCount: 0, newCount: 0 };
+
     if (data.length > 0) {
       const allData = [];
       for (let i = 0; i < data.length; i++) {
@@ -1441,7 +1437,8 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
           const rowIndex = strictMap.get(sKey);
           const current = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
           const changed = current.some((v, idx) => String(v) !== String(r[idx]));
-          if (changed) updates.push({ rowIndex, values: r });
+          if (changed) { updates.push({ rowIndex, values: r }); opStats.updateCount++; }
+          else { opStats.sameCount++; }
           continue;
         }
         const soKey = softKey(r);
@@ -1449,10 +1446,12 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
           const rowIndex = softMap.get(soKey);
           const current = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
           const changed = current.some((v, idx) => String(v) !== String(r[idx]));
-          if (changed) updates.push({ rowIndex, values: r });
+          if (changed) { updates.push({ rowIndex, values: r }); opStats.updateCount++; }
+          else { opStats.sameCount++; }
           continue;
         }
         rowsToAppend.push(r);
+        opStats.newCount++;
       }
 
       // Apply updates
@@ -1477,8 +1476,11 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         }
       }
     }
+
+    return opStats;
   } catch (error) {
     console.error(`❌ Error updating manager sheet ${sheetName}:`, error);
+    return { totalIncoming: data ? data.length : 0, sameCount: 0, updateCount: 0, newCount: 0 };
   }
 }
 
@@ -1811,7 +1813,9 @@ function showSyncResults(totalStats) {
       // Compose per-sheet breakdown lines with date ranges
       const breakdownLines = [];
       if (stats.sheetStats && Object.keys(stats.sheetStats).length > 0) {
-        for (const [sheetName, recordCount] of Object.entries(stats.sheetStats)) {
+        for (const [sheetName, recordInfo] of Object.entries(stats.sheetStats)) {
+          const recordCount = typeof recordInfo === 'number' ? recordInfo : (recordInfo.totalIncoming || 0);
+
           let minDate = null;
           let maxDate = null;
           try {
@@ -1820,17 +1824,18 @@ function showSyncResults(totalStats) {
               const lastCol = sheet.getLastColumn();
               const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 
+              // Date column per sheet (tolerant of prefixes like 'T ')
+              const lowerName = String(sheetName || '').toLowerCase();
+              let dateHeader = '';
+              if (lowerName.includes('randevu')) dateHeader = 'Randevu Tarihi';
+              else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) dateHeader = 'Fırsat Tarihi';
+              else if (lowerName.includes('toplant')) dateHeader = 'Toplantı Tarihi';
+              else dateHeader = 'Tarih';
+              const dateIdx = headers.indexOf(dateHeader);
+
               // Employee code column can be 'Temsilci Kodu' or 'Kod'
               let codeIdx = headers.indexOf('Temsilci Kodu');
               if (codeIdx === -1) codeIdx = headers.indexOf('Kod');
-
-              // Date column per sheet
-              let dateHeader = '';
-              if (sheetName === 'Randevular') dateHeader = 'Randevu Tarihi';
-              else if (sheetName === 'Fırsatlar') dateHeader = 'Fırsat Tarihi';
-              else if (sheetName === 'Toplantılar') dateHeader = 'Toplantı Tarihi';
-              else dateHeader = 'Tarih';
-              const dateIdx = headers.indexOf(dateHeader);
 
               if (codeIdx !== -1 && dateIdx !== -1) {
                 const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
@@ -1852,10 +1857,14 @@ function showSyncResults(totalStats) {
           if (minDate && (!overallMin || minDate < overallMin)) overallMin = minDate;
           if (maxDate && (!overallMax || maxDate > overallMax)) overallMax = maxDate;
 
+          const breakdownCounts = (typeof recordInfo === 'object')
+            ? ` (Yeni: ${recordInfo.newCount || 0}, Güncellendi: ${recordInfo.updateCount || 0}, Aynı: ${recordInfo.sameCount || 0})`
+            : '';
+
           if (minDate && maxDate) {
-            breakdownLines.push(`  - ${sheetName}: ${recordCount} kayıt (Tarih: ${formatDdMmYyyy(minDate)} – ${formatDdMmYyyy(maxDate)})`);
+            breakdownLines.push(`  - ${sheetName}: ${recordCount} kayıt${breakdownCounts} (Tarih: ${formatDdMmYyyy(minDate)} – ${formatDdMmYyyy(maxDate)})`);
           } else {
-            breakdownLines.push(`  - ${sheetName}: ${recordCount} kayıt`);
+            breakdownLines.push(`  - ${sheetName}: ${recordCount} kayıt${breakdownCounts}`);
           }
         }
       }
