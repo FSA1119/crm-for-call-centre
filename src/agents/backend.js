@@ -1776,13 +1776,20 @@ function processOpportunityForm(formData) {
       selectedRowData.Kaynak = activeSheet.getName();
     }
     
-    // Create opportunity in Fırsatlarım
-    const result = createOpportunityInFirsatlarim(spreadsheet, selectedRowData, formData);
-    
-    // Update Format Tablo row with selected activity and form data
-    const newActivity = formData.firsatDurumu || 'Fırsat İletildi';
-    console.log('🔍 Debug - Updating Format Tablo row with activity:', newActivity);
-    updateFormatTableRow(activeSheet, selectedRow, newActivity, formData);
+      // Create opportunity in Fırsatlarım
+  const result = createOpportunityInFirsatlarim(spreadsheet, selectedRowData, formData);
+  
+  // Normalize activity label for Format Tablo
+  let newActivity = (formData.firsatDurumu || '').toString().trim();
+  const newActLower = newActivity.toLowerCase();
+  if (newActLower.includes('fırsat') && newActLower.includes('iletildi')) newActivity = 'Fırsat İletildi';
+  else if (newActLower.includes('bilgi') && newActLower.includes('verildi')) newActivity = 'Bilgi Verildi';
+  else if (newActLower.includes('yeniden') && newActLower.includes('aranacak')) newActivity = 'Yeniden Aranacak';
+  if (!newActivity) newActivity = 'Fırsat İletildi';
+
+  // Update Format Tablo row with selected activity and form data
+  console.log('🔍 Debug - Updating Format Tablo row with activity:', newActivity);
+  updateFormatTableRow(activeSheet, selectedRow, newActivity, formData);
     
     // Apply color coding to the updated row - SIMPLE AND DIRECT
     console.log('🎨 Applying color directly to row:', selectedRow);
@@ -2227,16 +2234,16 @@ function applyOpportunityColorCoding(sheet, rowNumber) {
     }
     
     // Get the status from the Fırsat Durumu column
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
-    
-    if (firsatDurumuIndex === -1) {
-      console.error('❌ Fırsat Durumu column not found');
-      console.log('Available headers:', headers);
-      return;
-    }
-    
-    const status = sheet.getRange(rowNumber, firsatDurumuIndex + 1).getValue();
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const firsatDurumuIndex = findColumnIndex(headers, ['Fırsat Durumu', 'Fırsat durumu']);
+  
+  if (firsatDurumuIndex === -1) {
+    console.error('❌ Fırsat Durumu column not found');
+    console.log('Available headers:', headers);
+    return;
+  }
+  
+  const status = sheet.getRange(rowNumber, firsatDurumuIndex + 1).getValue();
     console.log('📋 Status found:', status, 'in row:', rowNumber, 'column:', firsatDurumuIndex + 1);
     
     let color = 'rgb(255, 255, 255)'; // Default white
