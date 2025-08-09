@@ -1367,58 +1367,80 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         allData.push(rowDataCopy);
       }
 
-      let rowsToAppend = allData;
+      // Upsert logic
+      let rowsToAppend = [];
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const existing = sheet.getLastRow() > 1
+        ? sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues()
+        : [];
 
-      // Incremental append: skip duplicates
-      if (effectiveMode === 'append') {
-        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-        const existing = sheet.getLastRow() > 1
-          ? sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues()
-          : [];
-
-        function findIdx(names) {
-          for (let i = 0; i < headers.length; i++) {
-            const h = String(headers[i] || '').trim().toLowerCase();
-            for (const name of names) {
-              if (h === String(name).trim().toLowerCase()) return i;
-            }
+      function findIdx(names) {
+        for (let i = 0; i < headers.length; i++) {
+          const h = String(headers[i] || '').trim().toLowerCase();
+          for (const name of names) {
+            if (h === String(name).trim().toLowerCase()) return i;
           }
-          return -1;
         }
-
-        const idxCode = findIdx(['Temsilci Kodu', 'Kod']);
-        const idxCompany = findIdx(['Company name', 'Company']);
-        const idxStatus = findIdx(['Fırsat Durumu', 'Randevu durumu', 'Toplantı durumu', 'Durum']);
-        const idxDate = findIdx(['Fırsat Tarihi', 'Randevu Tarihi', 'Toplantı Tarihi', 'Tarih']);
-        const idxLog = findIdx(['Log']);
-
-        function canonicalStatus(value) {
-          const v = String(value || '').toLowerCase();
-          if (v.includes('ilet')) return 'Fırsat İletildi';
-          if (v.includes('bilgi')) return 'Bilgi Verildi';
-          if (v.includes('yeniden') || v.includes('ara')) return 'Yeniden Aranacak';
-          return String(value || '');
-        }
-        function canonicalDate(value) {
-          return formatDateValue(value);
-        }
-
-        function rowKey(row) {
-          const parts = [];
-          parts.push(String(idxCode >= 0 ? row[idxCode] : ''));
-          parts.push(String(idxCompany >= 0 ? row[idxCompany] : ''));
-          parts.push(canonicalStatus(idxStatus >= 0 ? row[idxStatus] : ''));
-          parts.push(canonicalDate(idxDate >= 0 ? row[idxDate] : ''));
-          parts.push(String(idxLog >= 0 ? row[idxLog] : ''));
-          return parts.join('||').trim();
-        }
-
-        const existingSet = new Set();
-        for (const r of existing) existingSet.add(rowKey(r));
-
-        rowsToAppend = allData.filter(r => !existingSet.has(rowKey(r)));
+        return -1;
       }
 
+      const idxCode = findIdx(['Temsilci Kodu', 'Kod']);
+      const idxCompany = findIdx(['Company name', 'Company']);
+      const idxStatus = findIdx(['Fırsat Durumu', 'Randevu durumu', 'Toplantı durumu', 'Durum']);
+      const idxDate = findIdx(['Fırsat Tarihi', 'Randevu Tarihi', 'Toplantı Tarihi', 'Tarih']);
+      const idxLog = findIdx(['Log']);
+
+      function canonicalStatus(value) {
+        const v = String(value || '').toLowerCase();
+        if (v.includes('ilet')) return 'Fırsat İletildi';
+        if (v.includes('bilgi')) return 'Bilgi Verildi';
+        if (v.includes('yeniden') || v.includes('ara')) return 'Yeniden Aranacak';
+        return String(value || '');
+      }
+      function canonicalDate(value) {
+        return formatDateValue(value);
+      }
+
+      function upsertKey(row) {
+        const parts = [];
+        parts.push(String(idxCode >= 0 ? row[idxCode] : ''));
+        parts.push(String(idxCompany >= 0 ? row[idxCompany] : ''));
+        parts.push(canonicalStatus(idxStatus >= 0 ? row[idxStatus] : ''));
+        parts.push(canonicalDate(idxDate >= 0 ? row[idxDate] : ''));
+        return parts.join('||').trim();
+      }
+
+      // Build existing key -> rowIndex map
+      const keyToRowIndex = new Map();
+      for (let i = 0; i < existing.length; i++) {
+        keyToRowIndex.set(upsertKey(existing[i]), i + 2); // 2-based
+      }
+
+      // Track updates to apply
+      const updates = []; // {rowIndex, values}
+
+      for (const r of allData) {
+        const key = upsertKey(r);
+        if (keyToRowIndex.has(key)) {
+          // Compare and update if any difference
+          const rowIndex = keyToRowIndex.get(key);
+          const current = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+          const changed = current.some((v, idx) => String(v) !== String(r[idx]));
+          if (changed) {
+            updates.push({ rowIndex, values: r });
+          }
+        } else {
+          rowsToAppend.push(r);
+        }
+      }
+
+      // Apply updates
+      for (const u of updates) {
+        sheet.getRange(u.rowIndex, 1, 1, headers.length).setValues([u.values]);
+        applyColorCodingToManagerData(sheet, sheet.getName(), u.rowIndex, 1);
+      }
+
+      // Apply appends
       if (rowsToAppend.length > 0 && rowsToAppend[0].length > 0) {
         const startRow = sheet.getLastRow() + 1;
         const targetRange = sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length);
