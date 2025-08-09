@@ -1842,36 +1842,8 @@ function createOpportunityInFirsatlarim(spreadsheet, rowData, opportunityData) {
     firsatlarimSheet = createFirsatlarimSheet(spreadsheet);
   }
   
-  // Define Fırsatlarım columns based on sayfa_kolonlari.md
-  const firsatlarimColumns = [
-    'Kod',
-    'Kaynak',
-    'Keyword',
-    'Location',
-    'Company name',
-    'Category',
-    'Website',
-    'Phone',
-    'Yetkili Tel',
-    'Mail',
-    'İsim Soyisim',
-    'Fırsat Durumu',
-    'Fırsat Tarihi',
-    'Yorum',
-    'Yönetici Not',
-    'CMS Adı',
-    'CMS Grubu',
-    'E-Ticaret İzi',
-    'Site Hızı',
-    'Site Trafiği',
-    'Log',
-    'Toplantı formatı',
-    'Address',
-    'City',
-    'Rating count',
-    'Review',
-    'Maplink'
-  ];
+  // Columns: use existing sheet headers to avoid misalignment
+  const firsatlarimColumns = firsatlarimSheet.getRange(1, 1, 1, firsatlarimSheet.getLastColumn()).getValues()[0];
   
   // Prepare opportunity row data
   const opportunityRow = prepareOpportunityRow(rowData, opportunityData, firsatlarimColumns, firsatlarimSheet);
@@ -5798,13 +5770,14 @@ function findNextAvailableColumn(sheet) {
  * Refresh all Format Tablo validation rules
  * This function fixes K20 validation errors
  */
-function refreshFormatTabloValidation() {
+function refreshFormatTabloValidation(params) {
   console.log('Starting refreshFormatTabloValidation');
   
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const allSheets = spreadsheet.getSheets();
     let formatTabloCount = 0;
+    const isSilent = params && params.silent === true;
     
     for (let i = 0; i < allSheets.length; i++) {
       const sheet = allSheets[i];
@@ -5820,7 +5793,11 @@ function refreshFormatTabloValidation() {
     }
     
     console.log(`Refreshed validation for ${formatTabloCount} Format Tablo sheets`);
-    SpreadsheetApp.getUi().alert(`Veri doğrulama kuralları ${formatTabloCount} Format Tablo sayfası için yenilendi!`);
+    if (isSilent) {
+      SpreadsheetApp.getActive().toast(`Format Tablo doğrulama yenilendi (${formatTabloCount})`);
+    } else {
+      SpreadsheetApp.getUi().alert(`Veri doğrulama kuralları ${formatTabloCount} Format Tablo sayfası için yenilendi!`);
+    }
     
     return {
       success: true,
