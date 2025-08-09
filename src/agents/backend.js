@@ -4462,6 +4462,9 @@ function createAdminMenu() {
     menu.addItem('🎨 Manuel Renk Uygula', 'applyManualColorCoding');
     menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
     menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
+    menu.addSeparator();
+    menu.addItem('📵 Telefonu olmayanları sil', 'deleteRowsWithoutPhone');
+    menu.addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite');
     
     // Add menu to UI
     menu.addToUi();
