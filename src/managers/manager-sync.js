@@ -393,21 +393,18 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
     }
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     let statusColumnIndex = -1;
-    switch (sheetName) {
-      case 'Randevular':
-        statusColumnIndex = headers.indexOf('Randevu durumu');
-        break;
-      case 'Fırsatlar':
-        statusColumnIndex = headers.indexOf('Fırsat Durumu');
-        if (statusColumnIndex === -1) {
-          statusColumnIndex = headers.indexOf('Aktivite'); // Fallback for Fırsatlar
-        }
-        break;
-      case 'Toplantılar':
-        statusColumnIndex = headers.indexOf('Toplantı durumu');
-        break;
-      default:
-        statusColumnIndex = headers.indexOf('Aktivite');
+    const lowerName = String(sheetName || '').toLowerCase();
+    if (lowerName.includes('randevu')) {
+      statusColumnIndex = headers.indexOf('Randevu durumu');
+    } else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) {
+      statusColumnIndex = headers.indexOf('Fırsat Durumu');
+      if (statusColumnIndex === -1) {
+        statusColumnIndex = headers.indexOf('Aktivite'); // Fallback for Fırsatlar
+      }
+    } else if (lowerName.includes('toplant')) {
+      statusColumnIndex = headers.indexOf('Toplantı durumu');
+    } else {
+      statusColumnIndex = headers.indexOf('Aktivite');
     }
     if (statusColumnIndex === -1) {
       return;
@@ -1344,13 +1341,19 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       return;
     }
     const effectiveMode = mode || 'replace';
-    let sheet = managerFile.getSheetByName(sheetName);
+
+    // In append mode, use aggregate sheets with 'T ' prefix (e.g., T Randevular)
+    const targetSheetName = effectiveMode === 'append' ? `T ${sheetName}` : sheetName;
+    const baseTypeForHeaders = sheetName; // Randevular | Fırsatlar | Toplantılar
+
+    let sheet = managerFile.getSheetByName(targetSheetName);
     if (!sheet) {
-      sheet = managerFile.insertSheet(sheetName);
-      createManagerSheetHeaders(sheet, sheetName);
+      sheet = managerFile.insertSheet(targetSheetName);
+      // Create headers according to base sheet type (not the prefixed name)
+      createManagerSheetHeaders(sheet, baseTypeForHeaders);
     }
 
-    // Replace mode: clear previous rows of this employee
+    // Replace mode: clear previous rows of this employee (within the target sheet)
     if (effectiveMode !== 'append') {
       clearEmployeeData(sheet, employeeCode);
     }
@@ -1389,12 +1392,23 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         const idxDate = findIdx(['Fırsat Tarihi', 'Randevu Tarihi', 'Toplantı Tarihi', 'Tarih']);
         const idxLog = findIdx(['Log']);
 
+        function canonicalStatus(value) {
+          const v = String(value || '').toLowerCase();
+          if (v.includes('ilet')) return 'Fırsat İletildi';
+          if (v.includes('bilgi')) return 'Bilgi Verildi';
+          if (v.includes('yeniden') || v.includes('ara')) return 'Yeniden Aranacak';
+          return String(value || '');
+        }
+        function canonicalDate(value) {
+          return formatDateValue(value);
+        }
+
         function rowKey(row) {
           const parts = [];
           parts.push(String(idxCode >= 0 ? row[idxCode] : ''));
           parts.push(String(idxCompany >= 0 ? row[idxCompany] : ''));
-          parts.push(String(idxStatus >= 0 ? row[idxStatus] : ''));
-          parts.push(String(idxDate >= 0 ? row[idxDate] : ''));
+          parts.push(canonicalStatus(idxStatus >= 0 ? row[idxStatus] : ''));
+          parts.push(canonicalDate(idxDate >= 0 ? row[idxDate] : ''));
           parts.push(String(idxLog >= 0 ? row[idxLog] : ''));
           return parts.join('||').trim();
         }
@@ -1409,8 +1423,9 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         const startRow = sheet.getLastRow() + 1;
         const targetRange = sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length);
         targetRange.setValues(rowsToAppend);
-        applyColorCodingToManagerData(sheet, sheetName, startRow, rowsToAppend.length);
-        optimizeColumnWidths(sheet, sheetName);
+        // For color coding, pass the actual sheet name; detection is tolerant
+        applyColorCodingToManagerData(sheet, sheet.getName(), startRow, rowsToAppend.length);
+        optimizeColumnWidths(sheet, baseTypeForHeaders);
       }
     }
   } catch (error) {
