@@ -656,6 +656,12 @@ function syncSingleEmployee(employeeCode, options) {
     if (!managerFile) {
       throw new Error('Yönetici dosyası bulunamadı');
     }
+
+    // Focus mode: clear entire manager sheets to show only this employee's data
+    if (mode === 'replace') {
+      clearAllDataExceptHeadersForFocus(managerFile);
+    }
+
     const totalStats = { totalRecords: 0, employeeStats: {}, errors: [] };
     const employeeData = collectEmployeeData(managerFile, employeeCode);
     const employeeStats = { employeeCode, totalRecords: 0, sheetStats: {} };
@@ -2296,5 +2302,31 @@ function onEdit(e) {
   } catch (error) {
     console.error('Function failed:', error);
     // Non-blocking onEdit
+  }
+}
+
+function clearAllDataExceptHeadersForFocus(managerFile) {
+  console.log('Function started:', { scope: 'focus-clear' });
+  try {
+    if (!managerFile) {
+      console.error('❌ Invalid managerFile for focus clear');
+      return;
+    }
+    const targetSheets = ['Randevular', 'Fırsatlar', 'Toplantılar'];
+    for (const name of targetSheets) {
+      const sheet = managerFile.getSheetByName(name);
+      if (!sheet) continue;
+      const lastRow = sheet.getLastRow();
+      const lastCol = sheet.getLastColumn();
+      if (lastRow > 1 && lastCol > 0) {
+        sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+        console.log(`🧹 Focus mode: cleared data in ${name}`);
+      }
+    }
+    console.log('Processing complete:', { cleared: true });
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
   }
 }
