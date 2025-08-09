@@ -1138,6 +1138,14 @@ function collectAllData() {
     // Show results
     showSyncResults(totalStats);
     
+    // Auto-apply colors and validations after sync
+    try {
+      applyColorCodingToAllManagerSheets();
+      applyDataValidationToAllManagerSheets();
+    } catch (postSyncError) {
+      console.error('Post-sync styling/validation error:', postSyncError);
+    }
+    
     console.log('✅ Complete data collection finished');
     return totalStats;
     
