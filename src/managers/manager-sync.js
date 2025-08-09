@@ -2042,10 +2042,10 @@ function createHeadersForIsolatedSheet(sheet, baseType) {
 function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCode) {
   console.log('Function started:', { employeeCode, baseSheetName, rows: data ? data.length : 0 });
   try {
-    const isolatedName = `${employeeCode} - ${baseSheetName}`; // e.g., "SB 004 - Fırsatlar"
-    let sheet = managerFile.getSheetByName(isolatedName);
+    const isolatedName = `${employeeCode} – ${baseSheetName}`; // e.g., "SB 004 – Fırsatlar"
+    let sheet = managerFile.getSheetByName(isolatedName) || managerFile.getSheetByName(`${employeeCode} - ${baseSheetName}`) || managerFile.getSheetByName(`${employeeCode} – ${baseSheetName}`);
     if (!sheet) {
-      sheet = managerFile.insertSheet(isolatedName);
+      sheet = managerFile.insertSheet(`${employeeCode} - ${baseSheetName}`);
       createHeadersForIsolatedSheet(sheet, baseSheetName);
     }
  
@@ -2062,15 +2062,27 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
                     : baseSheetName === 'Fırsatlar' ? idxT('Fırsat Durumu')
                     : idxT('Toplantı durumu');
  
+    // Canonicalizers to avoid duplicate keys due to format differences
+    function canonStr(v) { return String(v == null ? '' : v).trim(); }
+    function canonDate(v) { return formatDateValue(v); }
+    function canonStatus(v) {
+      if (baseSheetName !== 'Fırsatlar') return canonStr(v);
+      const s = String(v || '').toLowerCase();
+      if (s.indexOf('ilet') !== -1) return 'Fırsat İletildi';
+      if (s.indexOf('bilgi') !== -1) return 'Bilgi Verildi';
+      if (s.indexOf('yeniden') !== -1 || s.indexOf('ara') !== -1) return 'Yeniden Aranacak';
+      return canonStr(v);
+    }
+ 
     // Build existing index map (key -> rowIndex)
     const existingRowsCount = sheet.getLastRow() > 1 ? sheet.getLastRow() - 1 : 0;
     const existingValues = existingRowsCount > 0 ? sheet.getRange(2, 1, existingRowsCount, lastColT).getValues() : [];
     function rowKeyFromArray(arr) {
       const parts = [
-        String(iCode >= 0 ? arr[iCode] : ''),
-        String(iComp >= 0 ? arr[iComp] : ''),
-        String(iDate >= 0 ? arr[iDate] : ''),
-        String(iStatus >= 0 ? arr[iStatus] : '')
+        iCode >= 0 ? canonStr(arr[iCode]) : '',
+        iComp >= 0 ? canonStr(arr[iComp]) : '',
+        iDate >= 0 ? canonDate(arr[iDate]) : '',
+        iStatus >= 0 ? canonStatus(arr[iStatus]) : ''
       ];
       return parts.join('||');
     }
@@ -2132,8 +2144,8 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
       SpreadsheetApp.getUi().ButtonSet.OK
     );
  
-    console.log('Processing complete:', { isolatedName, sameCount, updateCount, newCount });
-    return { success: true, sheet: isolatedName, sameCount, updateCount, newCount };
+    console.log('Processing complete:', { isolatedName: sheet.getName(), sameCount, updateCount, newCount });
+    return { success: true, sheet: sheet.getName(), sameCount, updateCount, newCount };
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
