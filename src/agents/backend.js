@@ -1212,41 +1212,62 @@ function applyFormatTableColorCoding(sheet, rowNumber, activity) {
       return;
     }
     
+    // Normalize activity (trim + fuzzy match for known variants)
+    const actRaw = activity ? activity.toString().trim() : '';
+    const actLower = actRaw.toLowerCase();
+    let normalizedActivity = actRaw;
+    
+    // Fuzzy normalization for "Fırsat İletildi"
+    if (actLower.includes('fırsat') && actLower.includes('iletildi')) {
+      normalizedActivity = 'Fırsat İletildi';
+    }
+    
+    // If normalized differs, try to fix the cell value to exact label for future consistency
+    try {
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const aktiviteIdx = headers.indexOf('Aktivite');
+      if (aktiviteIdx !== -1 && normalizedActivity && normalizedActivity !== actRaw) {
+        sheet.getRange(rowNumber, aktiviteIdx + 1).setValue(normalizedActivity);
+        console.log(`🔧 Aktivite düzeltildi: "${actRaw}" → "${normalizedActivity}"`);
+      }
+    } catch (fixErr) {
+      console.log('Aktivite normalizasyonu sırasında uyarı:', fixErr);
+    }
+    
     let color = 'rgb(255, 255, 255)'; // Default white
     
     // Check if activity is empty, null, or undefined
-    if (!activity || activity === '' || activity === null || activity === undefined) {
+    if (!normalizedActivity) {
       console.log('⚠️ Empty activity - applying white color');
       color = 'rgb(255, 255, 255)'; // White
     }
     // Map activity to color using centralized system
-    else if (activity === 'Randevu Alındı') {
+    else if (normalizedActivity === 'Randevu Alındı') {
       color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
-    } else if (activity === 'İleri Tarih Randevu') {
+    } else if (normalizedActivity === 'İleri Tarih Randevu') {
       color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
-    } else if (activity === 'Randevu Teyitlendi') {
+    } else if (normalizedActivity === 'Randevu Teyitlendi') {
       color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
-    } else if (activity === 'Randevu Ertelendi') {
+    } else if (normalizedActivity === 'Randevu Ertelendi') {
       color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
-    } else if (activity === 'Randevu İptal oldu') {
+    } else if (normalizedActivity === 'Randevu İptal oldu') {
       color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
-    } else if (activity === 'Fırsat İletildi') {
+    } else if (normalizedActivity === 'Fırsat İletildi') {
       color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
       console.log('🔍 Debug - Fırsat İletildi color found:', color);
-    } else if (activity === 'Bilgi Verildi') {
+    } else if (normalizedActivity === 'Bilgi Verildi') {
       color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
-    } else if (activity === 'Yeniden Aranacak') {
+    } else if (normalizedActivity === 'Yeniden Aranacak') {
       color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
-    } else if (activity === 'İlgilenmiyor') {
+    } else if (normalizedActivity === 'İlgilenmiyor') {
       color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
-    } else if (activity === 'Ulaşılamadı') {
+    } else if (normalizedActivity === 'Ulaşılamadı') {
       color = CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
-    } else if (activity === 'Toplantı Tamamlandı') {
+    } else if (normalizedActivity === 'Toplantı Tamamlandı') {
       color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
     } else {
-      console.log('⚠️ Unknown activity:', activity, '- using default white');
+      console.log('⚠️ Unknown activity:', normalizedActivity, '- using default white');
       console.log('🔍 Debug - Available colors:', Object.keys(CRM_CONFIG.COLOR_CODES));
-      console.log('🔍 Debug - CRM_CONFIG.COLOR_CODES:', CRM_CONFIG.COLOR_CODES);
     }
     
     // Apply color to entire row
@@ -1255,9 +1276,7 @@ function applyFormatTableColorCoding(sheet, rowNumber, activity) {
     
     try {
       range.setBackground(color);
-      console.log(`✅ Successfully applied color ${color} to row ${rowNumber} for activity: ${activity}`);
-      console.log(`🔍 Debug - Range applied: ${range.getA1Notation()}`);
-      console.log(`🔍 Debug - Color applied: ${color}`);
+      console.log(`✅ Successfully applied color ${color} to row ${rowNumber} for activity: ${normalizedActivity}`);
     } catch (setBackgroundError) {
       console.error(`❌ Error setting background color:`, setBackgroundError);
       throw setBackgroundError;
