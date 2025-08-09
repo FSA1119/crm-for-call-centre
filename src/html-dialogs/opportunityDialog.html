@@ -198,7 +198,7 @@
             <select id="firsatDurumu" name="firsatDurumu">
               <option value="Bilgi Verildi" selected>Bilgi Verildi</option>
               <option value="Yeniden Aranacak">Yeniden Aranacak</option>
-              <option value="Fırsat iletildi">Fırsat iletildi</option>
+              <option value="Fırsat İletildi">Fırsat İletildi</option>
             </select>
           </div>
           <div class="form-group">
@@ -327,8 +327,8 @@
     // Auto-fill suggestions based on company data
     window.addEventListener('load', function() {
       // Pre-fill some fields if available
-      const companyName = '<?= rowData['Company name'] || '' ?>';
-      const phone = '<?= rowData['Phone'] || '' ?>';
+      const companyName = <?= JSON.stringify(rowData['Company name'] || '') ?>;
+      const phone = <?= JSON.stringify(rowData['Phone'] || '') ?>;
       
       if (companyName && !document.getElementById('isimSoyisim').value) {
         // Try to extract contact person from company name
