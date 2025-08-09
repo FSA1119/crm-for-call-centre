@@ -1842,6 +1842,13 @@ function createOpportunityInFirsatlarim(spreadsheet, rowData, opportunityData) {
     firsatlarimSheet = createFirsatlarimSheet(spreadsheet);
   }
   
+  // Ensure up-to-date validation before writing values (prevents transient validation errors)
+  try {
+    setFirsatlarimDataValidation(firsatlarimSheet);
+  } catch (e) {
+    console.log('Pre-write validation refresh warning (ignored):', e);
+  }
+  
   // Columns: use existing sheet headers to avoid misalignment
   const firsatlarimColumns = firsatlarimSheet.getRange(1, 1, 1, firsatlarimSheet.getLastColumn()).getValues()[0];
   
