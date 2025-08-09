@@ -1367,11 +1367,12 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         allData.push(rowDataCopy);
       }
 
-      // Upsert logic
+      // Upsert logic (restricted to same employee code)
       let rowsToAppend = [];
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const lastCol = sheet.getLastColumn();
+      const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
       const existing = sheet.getLastRow() > 1
-        ? sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues()
+        ? sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues()
         : [];
 
       function findIdx(names) {
@@ -1389,12 +1390,8 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       const idxStatus = findIdx(['Fırsat Durumu', 'Randevu durumu', 'Toplantı durumu', 'Durum']);
       const idxDate = findIdx(['Fırsat Tarihi', 'Randevu Tarihi', 'Toplantı Tarihi', 'Tarih']);
 
-      function canonicalCode(value) {
-        return String(value || '').trim();
-      }
-      function canonicalCompany(value) {
-        return String(value || '').replace(/\s+/g, ' ').trim();
-      }
+      function canonicalCode(value) { return String(value || '').trim(); }
+      function canonicalCompany(value) { return String(value || '').replace(/\s+/g, ' ').trim(); }
       function canonicalStatus(value) {
         const v = String(value || '').toLowerCase();
         if (v.includes('ilet')) return 'Fırsat İletildi';
@@ -1402,57 +1399,82 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         if (v.includes('yeniden') || v.includes('ara')) return 'Yeniden Aranacak';
         return String(value || '').trim();
       }
-      function canonicalDate(value) {
-        return formatDateValue(value);
+      function canonicalDate(value) { return formatDateValue(value); }
+
+      function strictKey(row) {
+        return [
+          canonicalCode(idxCode >= 0 ? row[idxCode] : ''),
+          canonicalCompany(idxCompany >= 0 ? row[idxCompany] : ''),
+          canonicalStatus(idxStatus >= 0 ? row[idxStatus] : ''),
+          canonicalDate(idxDate >= 0 ? row[idxDate] : '')
+        ].join('||');
+      }
+      function softKey(row) {
+        return [
+          canonicalCode(idxCode >= 0 ? row[idxCode] : ''),
+          canonicalCompany(idxCompany >= 0 ? row[idxCompany] : '')
+        ].join('||');
       }
 
-      function upsertKey(row) {
-        const parts = [];
-        parts.push(canonicalCode(idxCode >= 0 ? row[idxCode] : ''));
-        parts.push(canonicalCompany(idxCompany >= 0 ? row[idxCompany] : ''));
-        parts.push(canonicalStatus(idxStatus >= 0 ? row[idxStatus] : ''));
-        parts.push(canonicalDate(idxDate >= 0 ? row[idxDate] : ''));
-        return parts.join('||');
-      }
+      const codeNorm = canonicalCode(employeeCode);
 
-      // Build existing key -> rowIndex map
-      const keyToRowIndex = new Map();
+      // Build existing maps only for the same employee
+      const strictMap = new Map();              // strictKey -> rowIndex
+      const softMap = new Map();                // softKey -> rowIndex (or -1 if ambiguous)
       for (let i = 0; i < existing.length; i++) {
-        keyToRowIndex.set(upsertKey(existing[i]), i + 2); // 2-based
+        const r = existing[i];
+        if (canonicalCode(r[idxCode]) !== codeNorm) continue; // restrict to same employee
+        const sKey = strictKey(r);
+        strictMap.set(sKey, i + 2); // 2-based
+        const soKey = softKey(r);
+        if (!softMap.has(soKey)) softMap.set(soKey, i + 2);
+        else softMap.set(soKey, -1); // ambiguous
       }
 
-      // Track updates to apply
       const updates = []; // {rowIndex, values}
 
       for (const r of allData) {
-        const key = upsertKey(r);
-        if (keyToRowIndex.has(key)) {
-          // Compare and update if any difference
-          const rowIndex = keyToRowIndex.get(key);
-          const current = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+        // ensure row's code is the intended employee code
+        r[idxCode] = codeNorm;
+        const sKey = strictKey(r);
+        if (strictMap.has(sKey)) {
+          const rowIndex = strictMap.get(sKey);
+          const current = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
           const changed = current.some((v, idx) => String(v) !== String(r[idx]));
-          if (changed) {
-            updates.push({ rowIndex, values: r });
-          }
-        } else {
-          rowsToAppend.push(r);
+          if (changed) updates.push({ rowIndex, values: r });
+          continue;
         }
+        const soKey = softKey(r);
+        if (softMap.has(soKey) && softMap.get(soKey) > 0) {
+          const rowIndex = softMap.get(soKey);
+          const current = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
+          const changed = current.some((v, idx) => String(v) !== String(r[idx]));
+          if (changed) updates.push({ rowIndex, values: r });
+          continue;
+        }
+        rowsToAppend.push(r);
       }
 
       // Apply updates
       for (const u of updates) {
-        sheet.getRange(u.rowIndex, 1, 1, headers.length).setValues([u.values]);
+        sheet.getRange(u.rowIndex, 1, 1, lastCol).setValues([u.values]);
         applyColorCodingToManagerData(sheet, sheet.getName(), u.rowIndex, 1);
       }
 
       // Apply appends
       if (rowsToAppend.length > 0 && rowsToAppend[0].length > 0) {
         const startRow = sheet.getLastRow() + 1;
-        const targetRange = sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length);
-        targetRange.setValues(rowsToAppend);
-        // For color coding, pass the actual sheet name; detection is tolerant
+        sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
         applyColorCodingToManagerData(sheet, sheet.getName(), startRow, rowsToAppend.length);
         optimizeColumnWidths(sheet, baseTypeForHeaders);
+      }
+
+      // Optional: group by employee code after operation so visual order is clear
+      if (effectiveMode === 'append' && idxCode >= 0) {
+        const lastRow = sheet.getLastRow();
+        if (lastRow > 2) {
+          sheet.getRange(2, 1, lastRow - 1, lastCol).sort([{ column: idxCode + 1, ascending: true }]);
+        }
       }
     }
   } catch (error) {
