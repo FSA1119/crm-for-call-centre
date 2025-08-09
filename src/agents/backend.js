@@ -1861,6 +1861,13 @@ function createOpportunityInFirsatlarim(spreadsheet, rowData, opportunityData) {
   console.log('🔍 Debug - Applying color coding to row:', nextRow);
   console.log('🔍 Debug - Opportunity data:', opportunityData);
   applyOpportunityColorCoding(firsatlarimSheet, nextRow);
+
+  // Ensure validation options are correct (refresh)
+  try {
+    setFirsatlarimDataValidation(firsatlarimSheet);
+  } catch (e) {
+    console.log('Validation refresh warning (ignored):', e);
+  }
   
   // Sort by date after adding new opportunity
   console.log('📅 Sorting Fırsatlarım by date after adding new opportunity');
@@ -3729,8 +3736,8 @@ function onOpen() {
     try {
       console.log('Auto-applying data validation to all sheets with extended coverage...');
       
-      // Directly apply refreshFormatTabloValidation for maximum coverage
-      refreshFormatTabloValidation();
+      // Directly apply refreshFormatTabloValidation for maximum coverage (silent)
+      refreshFormatTabloValidation({ silent: true });
       
       console.log('Extended data validation applied successfully');
     } catch (error) {
