@@ -3783,17 +3783,28 @@ function onOpen() {
       .addItem('Fırsat ekle', 'showAddOpportunityDialog')
       .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
       .addSeparator()
-      .addItem('🧰 Sektör Yardımcısı', 'showSectorHelperDialog')
       .addItem('📦 Dataset Raporu', 'showDatasetReportDialog');
 
-    const raporlarSubMenu = ui.createMenu('Raporlarım')
+        const raporlarSubMenu = ui.createMenu('Raporlarım')
       .addItem('📊 Günlük', 'generateDailyReport')
       .addItem('📅 Haftalık', 'generateMonthlyReport')
       .addItem('📈 Detaylı', 'showGenerateReportDialog');
 
     crmMenu.addSubMenu(raporlarSubMenu).addToUi();
-      
-    console.log('CRM menu created for all sheets');
+
+    // Create standalone Sector Helper menu (always visible)
+    try {
+      const existingMenus2 = ui.getMenus();
+      const helperMenu = existingMenus2.find(menu => menu.getName() === 'Sektör Yardımcısı');
+      if (helperMenu) {
+        helperMenu.remove();
+      }
+    } catch (e) {}
+    ui.createMenu('Sektör Yardımcısı')
+      .addItem('Yan Paneli Aç', 'showSectorHelperDialog')
+      .addToUi();
+        
+    console.log('CRM menu and Sector Helper menu created');
   }
 }
 
