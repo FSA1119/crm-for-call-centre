@@ -2494,6 +2494,12 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
   // Add to Toplantılarım
   const nextRow = toplantilarimSheet.getLastRow() + 1;
   toplantilarimSheet.getRange(nextRow, 1, 1, toplantilarimColumns.length).setValues([meetingRow]);
+
+  // Kaynak kolonunu metin formatında zorla (dataset adı bozulmasın)
+  const kaynakIdx = toplantilarimColumns.indexOf('Kaynak') + 1;
+  if (kaynakIdx > 0) {
+    toplantilarimSheet.getRange(nextRow, kaynakIdx, 1, 1).setNumberFormat('@');
+  }
   
   // Force Kod column to be text format to prevent int conversion
   const kodColumnIndex = toplantilarimColumns.indexOf('Kod') + 1;
@@ -2577,9 +2583,12 @@ function prepareMeetingRow(rowData, meetingData, columns, sheet) {
         row[index] = String(rowData.Kod || '');
         break;
       case 'Kaynak':
-        // Use the source sheet name (Randevularım) instead of target sheet name
-        // For meetings, the source is always Randevularım
-        row[index] = 'Randevularım';
+        // Kaynak: Randevularım satırındaki orijinal dataset adı varsa onu taşı
+        if (rowData.Kaynak && rowData.Kaynak.toString().trim() !== '') {
+          row[index] = rowData.Kaynak;
+        } else {
+          row[index] = 'Randevularım';
+        }
         break;
       case 'Keyword':
       case 'Location':
@@ -3772,7 +3781,9 @@ function onOpen() {
     const crmMenu = ui.createMenu('CRM')
       .addItem('Randevu al', 'showTakeAppointmentDialog')
       .addItem('Fırsat ekle', 'showAddOpportunityDialog')
-      .addItem('Toplantıya Geç', 'showMoveToMeetingDialog');
+      .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
+      .addSeparator()
+      .addItem('📦 Dataset Raporu', 'showDatasetReportDialog');
 
     const raporlarSubMenu = ui.createMenu('Raporlarım')
       .addItem('📊 Günlük', 'generateDailyReport')
