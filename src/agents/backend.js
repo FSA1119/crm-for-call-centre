@@ -3783,6 +3783,7 @@ function onOpen() {
       .addItem('Fırsat ekle', 'showAddOpportunityDialog')
       .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
       .addSeparator()
+      .addItem('🧰 Sektör Yardımcısı', 'showSectorHelperDialog')
       .addItem('📦 Dataset Raporu', 'showDatasetReportDialog');
 
     const raporlarSubMenu = ui.createMenu('Raporlarım')
@@ -4508,10 +4509,6 @@ function createAdminMenu() {
     
     menu.addSubMenu(bakım);
     
-    // Yardımcı araçlar
-    menu.addSeparator();
-    menu.addItem('🧰 Sektör Yardımcısı', 'showSectorHelperDialog');
-    
     // Add menu to UI
     menu.addToUi();
     
@@ -4639,18 +4636,18 @@ function showSectorHelperDialog(parameters) {
       throw new Error('Invalid input provided');
     }
     const sheet = SpreadsheetApp.getActiveSheet();
-    const range = SpreadsheetApp.getActiveRange();
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const categoryIdx = findColumnIndex(headers, ['Category']);
-    let currentCategory = '';
-    if (range && range.getRow() > 1 && categoryIdx !== -1) {
-      currentCategory = (sheet.getRange(range.getRow(), categoryIdx + 1).getValue() || '').toString();
+    // Format Tablo değilse uyarı
+    if (!isFormatTable(sheet)) {
+      SpreadsheetApp.getUi().alert('Bilgi', 'Sektör Yardımcısı sadece Format Tablo sayfalarında kullanılabilir.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return { success: false };
     }
-    const refs = getSectorReferences(currentCategory);
+    // Dataset anahtarını sayfa adı olarak kullan
+    const datasetKey = sheet.getName();
+    const refs = getSectorReferences(datasetKey);
     const tmpl = HtmlService.createTemplateFromFile('helperDialog');
-    tmpl.category = currentCategory;
+    tmpl.category = datasetKey;
     tmpl.references = refs;
-    const html = tmpl.evaluate().setWidth(600).setHeight(500);
+    const html = tmpl.evaluate().setWidth(360).setHeight(420);
     SpreadsheetApp.getUi().showSidebar(html);
     return { success: true };
   } catch (error) {
@@ -4667,7 +4664,7 @@ function ensureSectorReferenceSheet() {
   if (!s) {
     s = ss.insertSheet(sheetName);
     s.getRange(1, 1, 1, 3).setValues([[
-      'Category',
+      'Dataset',
       'Referanslar (satır içi; \n ile ayrılmış)',
       'Notlar'
     ]]);
@@ -4676,18 +4673,18 @@ function ensureSectorReferenceSheet() {
   return s;
 }
 
-function getSectorReferences(category) {
+function getSectorReferences(datasetKey) {
   const s = ensureSectorReferenceSheet();
   const lastRow = s.getLastRow();
-  if (lastRow <= 1) return { category: category || '', references: [], notes: '' };
+  if (lastRow <= 1) return { category: datasetKey || '', references: [], notes: '' };
   const vals = s.getRange(2, 1, lastRow - 1, 3).getValues();
   for (const row of vals) {
-    if ((row[0] || '').toString().trim().toLowerCase() === (category || '').toString().trim().toLowerCase()) {
+    if ((row[0] || '').toString().trim().toLowerCase() === (datasetKey || '').toString().trim().toLowerCase()) {
       const refs = (row[1] || '').toString().split('\n').filter(Boolean);
-      return { category, references: refs, notes: (row[2] || '').toString() };
+      return { category: datasetKey, references: refs, notes: (row[2] || '').toString() };
     }
   }
-  return { category: category || '', references: [], notes: '' };
+  return { category: datasetKey || '', references: [], notes: '' };
 }
 
 function saveSectorReferences(payload) {
@@ -4699,8 +4696,8 @@ function saveSectorReferences(payload) {
     const target = (payload.category || '').toString().trim().toLowerCase();
     let found = false;
     for (let i = 0; i < vals.length; i++) {
-      const cat = (vals[i][0] || '').toString().trim().toLowerCase();
-      if (cat === target) {
+      const key = (vals[i][0] || '').toString().trim().toLowerCase();
+      if (key === target) {
         s.getRange(i + 2, 1, 1, 3).setValues([[payload.category || '', (payload.references || []).join('\n'), payload.notes || '']]);
         found = true;
         break;
