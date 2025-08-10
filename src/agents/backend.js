@@ -4522,6 +4522,320 @@ function createAdminMenu() {
   }
 }
 
+/**
+ * 🔎 Mükerrerleri Bul (Firma + Telefon)
+ */
+function findDuplicatesInFormatTable(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const sheetName = sheet.getName();
+    if (!isFormatTable(sheet) && sheetName !== 'Randevularım' && sheetName !== 'Fırsatlarım' && sheetName !== 'Toplantılarım') {
+      throw new Error('Bu işlem sadece Format Tablo / Randevularım / Fırsatlarım / Toplantılarım sayfalarında yapılabilir');
+    }
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      ui.alert('Bilgi', 'Veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, duplicates: 0 };
+    }
+    const headers = data[0];
+    const companyIdx = findColumnIndex(headers, ['Company name', 'Company Name']);
+    const phoneIdx = findColumnIndex(headers, ['Phone']);
+    if (companyIdx === -1) {
+      throw new Error("'Company name' kolonu bulunamadı");
+    }
+    const keyToRows = new Map();
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const company = (row[companyIdx] || '').toString().trim();
+      if (!company) continue;
+      const phoneRaw = phoneIdx !== -1 ? (row[phoneIdx] || '').toString() : '';
+      const phoneDigits = phoneRaw.replace(/\D+/g, '');
+      const phoneKey = phoneDigits.length >= 7 ? phoneDigits : '';
+      const key = `${company.toLowerCase()}|${phoneKey}`;
+      if (!keyToRows.has(key)) keyToRows.set(key, []);
+      keyToRows.get(key).push(i + 1);
+    }
+    const duplicates = [...keyToRows.entries()].filter(([, rows]) => rows.length > 1);
+    const ss = sheet.getParent();
+    const reportName = '🧪 Mükerrer Raporu';
+    let report = ss.getSheetByName(reportName) || ss.insertSheet(reportName);
+    report.clear();
+    const headerRow = ['Key', 'Şirket', 'Telefon', 'Tekrar Sayısı', 'Satırlar'];
+    report.getRange(1, 1, 1, headerRow.length).setValues([headerRow]).setFontWeight('bold');
+    let r = 2;
+    duplicates.forEach(([key, rows]) => {
+      const [companyKey, phoneKey] = key.split('|');
+      const company = companyKey ? companyKey : '';
+      const phone = phoneKey ? phoneKey : '';
+      report.getRange(r, 1, 1, 5).setValues([[key, company, phone, rows.length, rows.join(', ')]]);
+      r++;
+    });
+    if (r > 2) {
+      report.setFrozenRows(1);
+      report.getRange(1, 1, r - 1, headerRow.length).setBorder(true, true, true, true, true, true);
+      report.autoResizeColumns(1, headerRow.length);
+    }
+    ui.alert('Mükerrer tarama tamamlandı', `Toplam grup: ${duplicates.length}\nDetaylar '${reportName}' sayfasında.`, ui.ButtonSet.OK);
+    return { success: true, groups: duplicates.length };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🧭 Lokasyona göre sırala (A→Z)
+ */
+function sortActiveSheetByLocation(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      ui.alert('Bilgi', 'Sıralanacak veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true };
+    }
+    const headers = data[0];
+    const locationIdx = findColumnIndex(headers, ['Location', 'Lokasyon']);
+    if (locationIdx === -1) {
+      throw new Error("'Location' kolonu bulunamadı");
+    }
+    const rows = data.slice(1);
+    rows.sort((a, b) => {
+      const la = (a[locationIdx] || '').toString().toLocaleLowerCase('tr-TR');
+      const lb = (b[locationIdx] || '').toString().toLocaleLowerCase('tr-TR');
+      if (la < lb) return -1;
+      if (la > lb) return 1;
+      return 0;
+    });
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    sheet.setFrozenRows(1);
+    ui.alert('Sıralama tamam', 'Location A→Z sıralandı.', ui.ButtonSet.OK);
+    return { success: true };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🧰 Sektör Yardımcısı – aktif satırdaki Category için referansları gösterir
+ */
+function showSectorHelperDialog(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const range = SpreadsheetApp.getActiveRange();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const categoryIdx = findColumnIndex(headers, ['Category']);
+    let currentCategory = '';
+    if (range && range.getRow() > 1 && categoryIdx !== -1) {
+      currentCategory = (sheet.getRange(range.getRow(), categoryIdx + 1).getValue() || '').toString();
+    }
+    const refs = getSectorReferences(currentCategory);
+    const tmpl = HtmlService.createTemplateFromFile('helperDialog');
+    tmpl.category = currentCategory;
+    tmpl.references = refs;
+    const html = tmpl.evaluate().setWidth(600).setHeight(500);
+    SpreadsheetApp.getUi().showSidebar(html);
+    return { success: true };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+function ensureSectorReferenceSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = 'Config - Sektör Referans';
+  let s = ss.getSheetByName(sheetName);
+  if (!s) {
+    s = ss.insertSheet(sheetName);
+    s.getRange(1, 1, 1, 3).setValues([[
+      'Category',
+      'Referanslar (satır içi; \n ile ayrılmış)',
+      'Notlar'
+    ]]);
+    s.setFrozenRows(1);
+  }
+  return s;
+}
+
+function getSectorReferences(category) {
+  const s = ensureSectorReferenceSheet();
+  const lastRow = s.getLastRow();
+  if (lastRow <= 1) return { category: category || '', references: [], notes: '' };
+  const vals = s.getRange(2, 1, lastRow - 1, 3).getValues();
+  for (const row of vals) {
+    if ((row[0] || '').toString().trim().toLowerCase() === (category || '').toString().trim().toLowerCase()) {
+      const refs = (row[1] || '').toString().split('\n').filter(Boolean);
+      return { category, references: refs, notes: (row[2] || '').toString() };
+    }
+  }
+  return { category: category || '', references: [], notes: '' };
+}
+
+function saveSectorReferences(payload) {
+  console.log('Saving sector references:', payload);
+  try {
+    const s = ensureSectorReferenceSheet();
+    const lastRow = s.getLastRow();
+    const vals = lastRow > 1 ? s.getRange(2, 1, lastRow - 1, 3).getValues() : [];
+    const target = (payload.category || '').toString().trim().toLowerCase();
+    let found = false;
+    for (let i = 0; i < vals.length; i++) {
+      const cat = (vals[i][0] || '').toString().trim().toLowerCase();
+      if (cat === target) {
+        s.getRange(i + 2, 1, 1, 3).setValues([[payload.category || '', (payload.references || []).join('\n'), payload.notes || '']]);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      s.getRange(lastRow + 1, 1, 1, 3).setValues([[payload.category || '', (payload.references || []).join('\n'), payload.notes || '']]);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Save failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * 📦 Dataset Raporu
+ */
+function generateDatasetReport(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const sheets = ss.getSheets();
+    const datasetNames = sheets.map(s => s.getName()).filter(name => isFormatTable(ss.getSheetByName(name)));
+    if (datasetNames.length === 0) {
+      ui.alert('Bilgi', 'Herhangi bir Format Tablo bulunamadı.', ui.ButtonSet.OK);
+      return { success: true };
+    }
+    const resp = ui.prompt('Dataset Raporu', `Dataset (Format Tablo) seçin:\n${datasetNames.join(', ')}`, ui.ButtonSet.OK_CANCEL);
+    if (resp.getSelectedButton() !== ui.Button.OK) {
+      return { success: false, message: 'İptal edildi' };
+    }
+    const dataset = resp.getResponseText().trim();
+    if (!dataset) throw new Error('Dataset adı boş olamaz');
+    const reportName = 'Data Raporları';
+    let report = ss.getSheetByName(reportName) || ss.insertSheet(reportName);
+    const startRow = report.getLastRow() + 2;
+    const ftSheet = ss.getSheetByName(dataset);
+    if (!ftSheet) throw new Error(`Format Tablo bulunamadı: ${dataset}`);
+    const ftData = ftSheet.getDataRange().getValues();
+    const ftHeaders = ftData[0] || [];
+    const ftRows = ftData.slice(1);
+    const idxAktivite = ftHeaders.indexOf('Aktivite');
+    const totalContacts = ftRows.filter(r => r.some(c => c !== '')).length;
+    const ftCounts = countByValues(ftRows, idxAktivite, ['İlgilenmiyor','Ulaşılamadı','Randevu Alındı','İleri Tarih Randevu','Bilgi Verildi','Yeniden Aranacak','Fırsat İletildi']);
+    const rSheet = ss.getSheetByName('Randevularım');
+    const rCounts = rSheet ? countBySource(rSheet, dataset, ['Randevu durumu'], ['Randevu Alındı','Randevu Teyitlendi','Randevu Ertelendi','Randevu İptal oldu','İleri Tarih Randevu']) : {};
+    const fSheet = ss.getSheetByName('Fırsatlarım');
+    const fCounts = fSheet ? countBySource(fSheet, dataset, ['Fırsat Durumu'], ['Yeniden Aranacak','Bilgi Verildi','Fırsat İletildi']) : {};
+    const tSheet = ss.getSheetByName('Toplantılarım');
+    const tCounts = tSheet ? countBySource(tSheet, dataset, ['Toplantı Sonucu'], ['Satış Yapıldı','Teklif iletildi','Beklemede','Satış İptal']) : {};
+    const safe = (v) => Number(v || 0);
+    const percent = (v, base) => base > 0 ? Math.round((safe(v)/base)*1000)/10 : 0;
+    const rows = [];
+    rows.push([`📦 DATASET RAPORU – ${dataset}`]);
+    rows.push([]);
+    rows.push(['Toplam Kontak', totalContacts]);
+    rows.push(['Randevu Alındı', safe(rCounts['Randevu Alındı']||0), `%${percent(rCounts['Randevu Alındı'], totalContacts)}`]);
+    rows.push(['Fırsat İletildi', safe(fCounts['Fırsat İletildi']||0), `%${percent(fCounts['Fırsat İletildi'], totalContacts)}`]);
+    rows.push(['Satış Yapıldı', safe(tCounts['Satış Yapıldı']||0), `%${percent(tCounts['Satış Yapıldı'], totalContacts)}`]);
+    rows.push([]);
+    rows.push(['Ulaşılamadı', safe(ftCounts['Ulaşılamadı']||0), `%${percent(ftCounts['Ulaşılamadı'], totalContacts)}`]);
+    rows.push(['İlgilenmiyor', safe(ftCounts['İlgilenmiyor']||0), `%${percent(ftCounts['İlgilenmiyor'], totalContacts)}`]);
+    rows.push([]);
+    rows.push(['Randevu Dağılımı']);
+    rows.push(['Randevu Alındı', safe(rCounts['Randevu Alındı']||0)]);
+    rows.push(['Randevu Teyitlendi', safe(rCounts['Randevu Teyitlendi']||0)]);
+    rows.push(['Randevu Ertelendi', safe(rCounts['Randevu Ertelendi']||0)]);
+    rows.push(['Randevu İptal oldu', safe(rCounts['Randevu İptal oldu']||0)]);
+    rows.push(['İleri Tarih Randevu', safe(rCounts['İleri Tarih Randevu']||0)]);
+    rows.push([]);
+    rows.push(['Fırsat Dağılımı']);
+    rows.push(['Yeniden Aranacak', safe(fCounts['Yeniden Aranacak']||0)]);
+    rows.push(['Bilgi Verildi', safe(fCounts['Bilgi Verildi']||0)]);
+    rows.push(['Fırsat İletildi', safe(fCounts['Fırsat İletildi']||0)]);
+    rows.push([]);
+    rows.push(['Toplantı Sonuçları']);
+    rows.push(['Satış Yapıldı', safe(tCounts['Satış Yapıldı']||0)]);
+    rows.push(['Teklif iletildi', safe(tCounts['Teklif iletildi']||0)]);
+    rows.push(['Beklemede', safe(tCounts['Beklemede']||0)]);
+    rows.push(['Satış İptal', safe(tCounts['Satış İptal']||0)]);
+    if (rows.length > 0) {
+      report.getRange(startRow, 1, rows.length, Math.max(...rows.map(r => r.length))).setValues(rows);
+      report.getRange(startRow, 1).setFontWeight('bold').setFontSize(13).setFontColor('#1a73e8');
+      report.getRange(startRow+2, 1, 1, 2).setFontWeight('bold');
+      report.getRange(startRow+6, 1, 1, 2).setFontWeight('bold');
+    }
+    ui.alert('✅ Dataset Raporu', `${dataset} için rapor yazıldı.`, ui.ButtonSet.OK);
+    return { success: true };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+function countByValues(rows, valueIdx, keys) {
+  const counts = {};
+  keys.forEach(k => counts[k] = 0);
+  if (valueIdx === -1) return counts;
+  rows.forEach(r => {
+    const v = (r[valueIdx] || '').toString().trim();
+    if (v && counts.hasOwnProperty(v)) counts[v]++;
+  });
+  return counts;
+}
+
+function countBySource(sheet, dataset, statusHeaderAliases, keys) {
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return {};
+  const headers = data[0];
+  const rows = data.slice(1);
+  const kaynakIdx = headers.indexOf('Kaynak');
+  const statusIdx = findColumnIndex(headers, statusHeaderAliases);
+  const counts = {};
+  keys.forEach(k => counts[k] = 0);
+  if (kaynakIdx === -1 || statusIdx === -1) return counts;
+  rows.forEach(r => {
+    const k = (r[kaynakIdx] || '').toString().trim();
+    if (k !== dataset) return;
+    const v = (r[statusIdx] || '').toString().trim();
+    if (counts.hasOwnProperty(v)) counts[v]++;
+  });
+  return counts;
+}
+
+function showDatasetReportDialog() {
+  console.log('Showing dataset report flow');
+  generateDatasetReport({});
+}
+
 
 /**
  * Applies appointment color coding to Fırsatlarım row (when appointment is taken)
