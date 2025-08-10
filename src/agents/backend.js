@@ -4727,71 +4727,83 @@ function generateDatasetReport(parameters) {
     }
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const ui = SpreadsheetApp.getUi();
-    const sheets = ss.getSheets();
-    const datasetNames = sheets.map(s => s.getName()).filter(name => isFormatTable(ss.getSheetByName(name)));
-    if (datasetNames.length === 0) {
-      ui.alert('Bilgi', 'Herhangi bir Format Tablo bulunamadı.', ui.ButtonSet.OK);
-      return { success: true };
+
+    // Basit mod: aktif sayfa bir Format Tablo ise o dataset üzerinden raporla; değilse prompt ile sor
+    let dataset = '';
+    const activeSheet = SpreadsheetApp.getActiveSheet();
+    if (isFormatTable(activeSheet)) {
+      dataset = activeSheet.getName();
+    } else {
+      const sheets = ss.getSheets();
+      const datasetNames = sheets.map(s => s.getName()).filter(name => isFormatTable(ss.getSheetByName(name)));
+      if (datasetNames.length === 0) {
+        ui.alert('Bilgi', 'Herhangi bir Format Tablo bulunamadı.', ui.ButtonSet.OK);
+        return { success: true };
+      }
+      const resp = ui.prompt('Dataset Raporu', `Dataset (Format Tablo) seçin:\n${datasetNames.join(', ')}`, ui.ButtonSet.OK_CANCEL);
+      if (resp.getSelectedButton() !== ui.Button.OK) {
+        return { success: false, message: 'İptal edildi' };
+      }
+      dataset = resp.getResponseText().trim();
+      if (!dataset) throw new Error('Dataset adı boş olamaz');
     }
-    const resp = ui.prompt('Dataset Raporu', `Dataset (Format Tablo) seçin:\n${datasetNames.join(', ')}`, ui.ButtonSet.OK_CANCEL);
-    if (resp.getSelectedButton() !== ui.Button.OK) {
-      return { success: false, message: 'İptal edildi' };
-    }
-    const dataset = resp.getResponseText().trim();
-    if (!dataset) throw new Error('Dataset adı boş olamaz');
+
     const reportName = 'Data Raporları';
     let report = ss.getSheetByName(reportName) || ss.insertSheet(reportName);
     const startRow = report.getLastRow() + 2;
+
+    // Format Tablo’dan sadece ulaşılamadı / ilgilenmiyor sayımları (stabil değilse bile anlık)
     const ftSheet = ss.getSheetByName(dataset);
-    if (!ftSheet) throw new Error(`Format Tablo bulunamadı: ${dataset}`);
-    const ftData = ftSheet.getDataRange().getValues();
-    const ftHeaders = ftData[0] || [];
-    const ftRows = ftData.slice(1);
-    const idxAktivite = ftHeaders.indexOf('Aktivite');
-    const totalContacts = ftRows.filter(r => r.some(c => c !== '')).length;
-    const ftCounts = countByValues(ftRows, idxAktivite, ['İlgilenmiyor','Ulaşılamadı','Randevu Alındı','İleri Tarih Randevu','Bilgi Verildi','Yeniden Aranacak','Fırsat İletildi']);
+    let ftCounts = { 'Ulaşılamadı': 0, 'İlgilenmiyor': 0 };
+    let totalContacts = 0;
+    if (ftSheet) {
+      const ftData = ftSheet.getDataRange().getValues();
+      const ftHeaders = ftData[0] || [];
+      const ftRows = ftData.slice(1);
+      const idxAktivite = ftHeaders.indexOf('Aktivite');
+      totalContacts = ftRows.filter(r => r.some(c => c !== '')).length;
+      const tmp = countByValues(ftRows, idxAktivite, ['İlgilenmiyor','Ulaşılamadı']);
+      ftCounts = { 'Ulaşılamadı': tmp['Ulaşılamadı']||0, 'İlgilenmiyor': tmp['İlgilenmiyor']||0 };
+    }
+
+    // Randevu/Fırsat/Toplantı sayımları her zaman ilgili sayfalardan (dataset=Kaynak)
     const rSheet = ss.getSheetByName('Randevularım');
     const rCounts = rSheet ? countBySource(rSheet, dataset, ['Randevu durumu'], ['Randevu Alındı','Randevu Teyitlendi','Randevu Ertelendi','Randevu İptal oldu','İleri Tarih Randevu']) : {};
     const fSheet = ss.getSheetByName('Fırsatlarım');
     const fCounts = fSheet ? countBySource(fSheet, dataset, ['Fırsat Durumu'], ['Yeniden Aranacak','Bilgi Verildi','Fırsat İletildi']) : {};
     const tSheet = ss.getSheetByName('Toplantılarım');
     const tCounts = tSheet ? countBySource(tSheet, dataset, ['Toplantı Sonucu'], ['Satış Yapıldı','Teklif iletildi','Beklemede','Satış İptal']) : {};
+
     const safe = (v) => Number(v || 0);
     const percent = (v, base) => base > 0 ? Math.round((safe(v)/base)*1000)/10 : 0;
+
     const rows = [];
     rows.push([`📦 DATASET RAPORU – ${dataset}`]);
     rows.push([]);
     rows.push(['Toplam Kontak', totalContacts]);
-    rows.push(['Randevu Alındı', safe(rCounts['Randevu Alındı']||0), `%${percent(rCounts['Randevu Alındı'], totalContacts)}`]);
-    rows.push(['Fırsat İletildi', safe(fCounts['Fırsat İletildi']||0), `%${percent(fCounts['Fırsat İletildi'], totalContacts)}`]);
-    rows.push(['Satış Yapıldı', safe(tCounts['Satış Yapıldı']||0), `%${percent(tCounts['Satış Yapıldı'], totalContacts)}`]);
-    rows.push([]);
     rows.push(['Ulaşılamadı', safe(ftCounts['Ulaşılamadı']||0), `%${percent(ftCounts['Ulaşılamadı'], totalContacts)}`]);
     rows.push(['İlgilenmiyor', safe(ftCounts['İlgilenmiyor']||0), `%${percent(ftCounts['İlgilenmiyor'], totalContacts)}`]);
     rows.push([]);
-    rows.push(['Randevu Dağılımı']);
     rows.push(['Randevu Alındı', safe(rCounts['Randevu Alındı']||0)]);
     rows.push(['Randevu Teyitlendi', safe(rCounts['Randevu Teyitlendi']||0)]);
     rows.push(['Randevu Ertelendi', safe(rCounts['Randevu Ertelendi']||0)]);
     rows.push(['Randevu İptal oldu', safe(rCounts['Randevu İptal oldu']||0)]);
     rows.push(['İleri Tarih Randevu', safe(rCounts['İleri Tarih Randevu']||0)]);
     rows.push([]);
-    rows.push(['Fırsat Dağılımı']);
     rows.push(['Yeniden Aranacak', safe(fCounts['Yeniden Aranacak']||0)]);
     rows.push(['Bilgi Verildi', safe(fCounts['Bilgi Verildi']||0)]);
     rows.push(['Fırsat İletildi', safe(fCounts['Fırsat İletildi']||0)]);
     rows.push([]);
-    rows.push(['Toplantı Sonuçları']);
     rows.push(['Satış Yapıldı', safe(tCounts['Satış Yapıldı']||0)]);
     rows.push(['Teklif iletildi', safe(tCounts['Teklif iletildi']||0)]);
     rows.push(['Beklemede', safe(tCounts['Beklemede']||0)]);
     rows.push(['Satış İptal', safe(tCounts['Satış İptal']||0)]);
+
     if (rows.length > 0) {
       report.getRange(startRow, 1, rows.length, Math.max(...rows.map(r => r.length))).setValues(rows);
       report.getRange(startRow, 1).setFontWeight('bold').setFontSize(13).setFontColor('#1a73e8');
-      report.getRange(startRow+2, 1, 1, 2).setFontWeight('bold');
-      report.getRange(startRow+6, 1, 1, 2).setFontWeight('bold');
     }
+
     ui.alert('✅ Dataset Raporu', `${dataset} için rapor yazıldı.`, ui.ButtonSet.OK);
     return { success: true };
   } catch (error) {
@@ -4833,7 +4845,7 @@ function countBySource(sheet, dataset, statusHeaderAliases, keys) {
 
 function showDatasetReportDialog() {
   console.log('Showing dataset report flow');
-  generateDatasetReport({});
+  generateDatasetReport({ mode: 'simple' });
 }
 
 
