@@ -454,7 +454,7 @@ function decodeTurkishText(text) {
       '%C3%96': 'Ö', // Ö
       '%C3%B6': 'ö', // ö
       '%C3%9C': 'Ü', // Ü
-      '%C3%bc': 'ü', // ü
+      '%C3%BC': 'ü', // ü
       '%C5%9E': 'Ş', // Ş
       '%C5%9F': 'ş', // ş
       '%C4%9E': 'Ğ', // Ğ
@@ -4490,9 +4490,16 @@ function createAdminMenu() {
       .addItem('🎨 Renkleri Yenile (Tüm sayfalar)', 'refreshAllColors')
       .addSeparator()
       .addItem('📵 Telefonu olmayanları sil', 'deleteRowsWithoutPhone')
-      .addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite');
+      .addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite')
+      .addSeparator()
+      .addItem('🔎 Mükerrerleri Bul (Firma + Telefon)', 'findDuplicatesInFormatTable')
+      .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation');
     
     menu.addSubMenu(bakım);
+    
+    // Yardımcı araçlar
+    menu.addSeparator();
+    menu.addItem('🧰 Sektör Yardımcısı', 'showSectorHelperDialog');
     
     // Add menu to UI
     menu.addToUi();

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 12px; }
+      h2 { margin: 0 0 8px; }
+      label { font-weight: bold; display: block; margin-top: 12px; }
+      textarea { width: 100%; height: 140px; }
+      input[type="text"] { width: 100%; }
+      .row { margin-bottom: 8px; }
+      .actions { margin-top: 12px; display: flex; gap: 8px; }
+      .note { color: #5f6368; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h2>🧰 Sektör Yardımcısı</h2>
+    <div class="row">
+      <label>Seçilen Kategori</label>
+      <input id="category" type="text" value="<?= category ?>" placeholder="Örn: Mobilya" />
+    </div>
+
+    <div class="row">
+      <label>Referanslar (her satıra bir satır)</label>
+      <textarea id="refs"><?= (references && references.references) ? references.references.join('\n') : '' ?></textarea>
+      <div class="note">Bu listeyi temsilciler ile paylaşmak için yan paneli açık bırakabilirsiniz.</div>
+    </div>
+
+    <div class="row">
+      <label>Notlar</label>
+      <input id="notes" type="text" value="<?= (references && references.notes) ? references.notes : '' ?>" />
+    </div>
+
+    <div class="actions">
+      <button onclick="save()">Kaydet</button>
+    </div>
+
+    <script>
+      function save() {
+        const payload = {
+          category: document.getElementById('category').value.trim(),
+          references: document.getElementById('refs').value.split('\n').map(s => s.trim()).filter(Boolean),
+          notes: document.getElementById('notes').value.trim()
+        };
+        google.script.run.withSuccessHandler(function() {
+          alert('Kaydedildi');
+        }).withFailureHandler(function(err){
+          alert('Hata: ' + err.message);
+        }).saveSectorReferences(payload);
+      }
+    </script>
+  </body>
+</html>
