@@ -2757,34 +2757,45 @@ function onEdit(e) {
     const sheet = e.range.getSheet();
     if (!sheet) return;
 
-    // Allow both 'Randevular' and aggregated variants like 'T Randevular'
     const nameLower = String(sheet.getName() || '').toLowerCase();
-    if (!nameLower.includes('randevu')) return;
+    // Only handle Randevular or Toplantılar
+    if (!nameLower.includes('randevu') && !nameLower.includes('toplant')) return;
 
     const lastCol = sheet.getLastColumn();
-    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
     const editedCol = e.range.getColumn();
-    const header = headers[editedCol - 1];
+    const header = headers[editedCol - 1] || '';
+    const headerLower = String(header).toLowerCase();
 
-    // Trigger when Toplantı Sonucu, Toplantı Tarihi veya Randevu durumu edited
-    const interesting = ['Toplantı Sonucu','Toplantı Tarihi','Randevu durumu'];
-    if (interesting.indexOf(header) === -1) return;
+    function idxOf(names){
+      const lowered = headers.map(h => String(h||'').toLowerCase());
+      for (const n of names){ const i = lowered.indexOf(String(n).toLowerCase()); if (i!==-1) return i; }
+      return -1;
+    }
+
+    // Interested in meeting-related edits
+    const isMeetingResult = headerLower.indexOf('toplantı sonucu') !== -1 || headerLower.indexOf('toplanti sonucu') !== -1;
+    const isMeetingDate = headerLower.indexOf('toplantı tarihi') !== -1 || headerLower.indexOf('toplanti tarihi') !== -1;
+    const isRandevuStatus = headerLower.indexOf('randevu durumu') !== -1 || headerLower.indexOf('randevu') !== -1;
+    if (!(isMeetingResult || isMeetingDate || isRandevuStatus)) return;
 
     const rowIndex = e.range.getRow();
     if (rowIndex <= 1) return;
 
-    const idxSonuc = headers.indexOf('Toplantı Sonucu');
-    const idxTarih = headers.indexOf('Toplantı Tarihi');
-    const valSonuc = idxSonuc !== -1 ? sheet.getRange(rowIndex, idxSonuc + 1).getValue() : '';
+    const idxSonuc = idxOf(['Toplantı Sonucu','Toplanti Sonucu']);
+    const idxTarih = idxOf(['Toplantı Tarihi','Toplanti Tarihi']);
 
-    // If 'Toplantı Sonucu' cleared by user, clear the meeting date
-    if (header === 'Toplantı Sonucu' && (!e.value || e.value === '')) {
+    // If meeting result cleared, clear its date and recolor, then stop
+    if (isMeetingResult && (!e.value || String(e.value).trim() === '')) {
       if (idxTarih !== -1) sheet.getRange(rowIndex, idxTarih + 1).clearContent();
+      applyColorCodingToManagerData(sheet, sheet.getName(), rowIndex, 1);
+      return;
     }
 
     // If result chosen but meeting date empty, set today's date automatically
-    if (header === 'Toplantı Sonucu' && (!sheet.getRange(rowIndex, (idxTarih+1)).getValue())) {
-      if (idxTarih !== -1) {
+    if (isMeetingResult && idxTarih !== -1) {
+      const curDate = sheet.getRange(rowIndex, idxTarih + 1).getValue();
+      if (!curDate) {
         const today = new Date();
         sheet.getRange(rowIndex, idxTarih + 1).setValue(today);
       }
@@ -2793,10 +2804,14 @@ function onEdit(e) {
     // Re-color the edited row to reflect new state immediately
     applyColorCodingToManagerData(sheet, sheet.getName(), rowIndex, 1);
 
-    // If meeting data is present, copy to T Toplantılar
-    const hasMeeting = (idxSonuc !== -1 && String(valSonuc||'').trim() !== '') || (idxTarih !== -1 && String(sheet.getRange(rowIndex, idxTarih + 1).getValue()||'').trim() !== '');
-    if (hasMeeting) {
-      copyRandevuRowToToplantilar(sheet, rowIndex, { navigateToMeetings: false });
+    // Copy to meetings only when editing Randevular
+    if (nameLower.includes('randevu')) {
+      const valSonuc = idxSonuc !== -1 ? sheet.getRange(rowIndex, idxSonuc + 1).getDisplayValue() : '';
+      const valTarih = idxTarih !== -1 ? sheet.getRange(rowIndex, idxTarih + 1).getValue() : '';
+      const hasMeeting = (String(valSonuc||'').trim() !== '') || !!valTarih;
+      if (hasMeeting) {
+        copyRandevuRowToToplantilar(sheet, rowIndex, { navigateToMeetings: false });
+      }
     }
   } catch (error) {
     console.error('Function failed:', error);
