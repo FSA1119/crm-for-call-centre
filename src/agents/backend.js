@@ -4516,7 +4516,8 @@ function createAdminMenu() {
       .addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite')
       .addSeparator()
       .addItem('🔎 Mükerrerleri Bul (Firma + Telefon)', 'findDuplicatesInFormatTable')
-      .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation');
+      .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation')
+      .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm');
     
     menu.addSubMenu(bakım);
     
@@ -7258,6 +7259,74 @@ function testDateSorting() {
   } catch (error) {
     console.error('❌ Test hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Test hatası: ' + error.message);
+  }
+}
+
+// ========================================
+// 🧽 MÜKERRER SİLME (ONAYLI)
+// ========================================
+function deleteDuplicateRowsWithConfirm(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    const ui = SpreadsheetApp.getUi();
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      ui.alert('Bilgi', 'Veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, deleted: 0 };
+    }
+    const headers = data[0];
+    const rows = data.slice(1);
+    const companyIdx = findColumnIndex(headers, ['Company name', 'Company Name']);
+    const phoneIdx = findColumnIndex(headers, ['Phone']);
+    if (companyIdx === -1) {
+      throw new Error("'Company name' kolonu bulunamadı");
+    }
+    const keyToRowIndexes = new Map();
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const rowNumber = i + 2;
+      const company = (r[companyIdx] || '').toString().trim();
+      if (!company) continue;
+      const phoneRaw = phoneIdx !== -1 ? (r[phoneIdx] || '').toString() : '';
+      const phoneDigits = phoneRaw.replace(/\D+/g, '');
+      const phoneKey = phoneDigits.length >= 7 ? phoneDigits : '';
+      const key = `${company.toLowerCase()}|${phoneKey}`;
+      if (!keyToRowIndexes.has(key)) keyToRowIndexes.set(key, []);
+      keyToRowIndexes.get(key).push(rowNumber);
+    }
+    const dupGroups = [...keyToRowIndexes.entries()].filter(([, arr]) => arr.length > 1);
+    if (dupGroups.length === 0) {
+      ui.alert('Mükerrer bulunamadı');
+      return { success: true, deleted: 0 };
+    }
+    let deleted = 0;
+    for (const [key, rowNums] of dupGroups) {
+      const sorted = [...rowNums].sort((a,b) => b - a);
+      const keep = Math.min(...sorted);
+      for (const rowNum of sorted) {
+        if (rowNum === keep) continue;
+        const rowValues = sheet.getRange(rowNum, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const companyVal = rowValues[companyIdx];
+        const phoneVal = phoneIdx !== -1 ? rowValues[phoneIdx] : '';
+        const msg = `Satır ${rowNum} bulundu:\nŞirket: ${companyVal || ''}\nTelefon: ${phoneVal || ''}\nBu mükerrer kaydı silmek istiyor musunuz?`;
+        const res = ui.alert('Mükerrer Sil', msg, ui.ButtonSet.YES_NO);
+        if (res === ui.Button.YES) {
+          sheet.deleteRow(rowNum);
+          deleted++;
+        }
+      }
+    }
+    ui.alert('İşlem tamam', `${deleted} satır silindi.`, ui.ButtonSet.OK);
+    console.log('Processing complete:', { deleted });
+    return { success: true, deleted };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
   }
 }
 
