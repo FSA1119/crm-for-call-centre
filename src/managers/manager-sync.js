@@ -441,7 +441,7 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
         if (lowerName.includes('toplant')) {
           // Toplantılar: Sonuç 'Satış Yapıldı' ise özel mavi, aksi halde tamamlandı yeşili
           var resultVal = '';
-          try { if (typeof meetingResultIdx === 'number' && meetingResultIdx >= 0) { resultVal = String(sheet.getRange(rowNumber, meetingResultIdx + 1).getValue() || ''); } } catch(e) {}
+          try { if (typeof meetingResultIdx === 'number' && meetingResultIdx >= 0) { resultVal = String(sheet.getRange(rowNumber, meetingResultIdx + 1).getDisplayValue() || ''); } } catch(e) {}
           if (String(resultVal) === 'Satış Yapıldı') {
             color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
           } else {
@@ -4403,10 +4403,12 @@ function sortMeetingsSalesTop(sheet) {
     sheet.insertColumnAfter(lastCol);
     sheet.getRange(1, rankCol).setValue('ZZ__rank');
     const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues();
-    const ranks = values.map(r => {
+    const ranks = values.map((r, i) => {
       const t = String(r[idxResult]||'').toLowerCase().trim();
-      return (t==='satış yapıldı' || t==='satis yapildi') ? 0 : 1;
-    }).map(v => [v]);
+      // ikincil kriter: aynı güne ait kayıtların stabil sıralanması için satır index'i
+      const primary = (t==='satış yapıldı' || t==='satis yapildi') ? 0 : 1;
+      return [primary*100000 + i];
+    });
     sheet.getRange(2, rankCol, ranks.length, 1).setValues(ranks);
 
     // Sort by rank asc, then by Toplantı Tarihi asc
