@@ -4376,27 +4376,34 @@ function generateComparisonSeriesManager(params) {
 
 // Keep 'Satış Yapıldı' rows at top in meetings, then sort by Toplantı Tarihi
 function sortMeetingsSalesTop(sheet) {
-  try { sheet.getRange(1,1,1,1).getValues(); } catch(e) { SpreadsheetApp.flush(); }
-  try {
-    if (!sheet) return;
-    const lastRow = sheet.getLastRow();
-    if (lastRow <= 2) return;
-    const lastCol = sheet.getLastColumn();
-    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    const idxResult = headers.indexOf('Toplantı Sonucu');
-    const idxDate = headers.indexOf('Toplantı Tarihi');
-    if (idxResult === -1 || idxDate === -1) return;
-    const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
-    const values = rng.getValues();
-    function d(v){ try{ const x = parseDdMmYyyy(v); return x || new Date('2100-12-31'); }catch(e){ return new Date('2100-12-31'); } }
-    values.sort(function(a,b){
-      const aSale = String(a[idxResult]||'') === 'Satış Yapıldı' ? -1 : 0;
-      const bSale = String(b[idxResult]||'') === 'Satış Yapıldı' ? -1 : 0;
-      if (aSale !== bSale) return bSale - aSale; // satış yapılanlar en üstte
-      return d(a[idxDate]) - d(b[idxDate]);
-    });
-    rng.setValues(values);
-  } catch (err) {
-    console.log('⚠️ sortMeetingsSalesTop skipped:', err && err.message);
-  }
+      try { sheet.getRange(1,1,1,1).getValues(); } catch(e) { SpreadsheetApp.flush(); }
+    try {
+      if (!sheet) return;
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 2) return;
+      const lastCol = sheet.getLastColumn();
+      const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+      function findIdx(cands){
+        const lowered = headers.map(h => String(h||'').trim().toLowerCase());
+        for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; }
+        return -1;
+      }
+      const idxResult = findIdx(['Toplantı Sonucu','Toplantı sonucu']);
+      const idxDate = findIdx(['Toplantı Tarihi','Toplantı tarihi']);
+      if (idxResult === -1 || idxDate === -1) return;
+      const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+      const values = rng.getDisplayValues();
+      function d(v){ try{ const x = parseDdMmYyyy(v); return x || new Date('2100-12-31'); }catch(e){ return new Date('2100-12-31'); } }
+      function isSale(s){ const t=String(s||'').toLowerCase().trim(); return t==='satış yapıldı' || t==='satis yapildi'; }
+      values.sort(function(a,b){
+        const aSale = isSale(a[idxResult]) ? -1 : 0;
+        const bSale = isSale(b[idxResult]) ? -1 : 0;
+        if (aSale !== bSale) return bSale - aSale;
+        return d(a[idxDate]) - d(b[idxDate]);
+      });
+      // write back preserving types where possible
+      sheet.getRange(2, 1, values.length, lastCol).setValues(values.map(r => r.map(c=>c)));
+    } catch (err) {
+      console.log('⚠️ sortMeetingsSalesTop skipped:', err && err.message);
+    }
 }
