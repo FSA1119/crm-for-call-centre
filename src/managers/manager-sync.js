@@ -2560,10 +2560,12 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex) {
       }
     }
 
-    // Görsel geri bildirim: Kaynak satırı toplantı rengiyle işaretle
+    // Görsel geri bildirim: Kaynak satırı toplantı rengiyle işaretle + font stilini vurgula
     try {
       const meetingColor = CRM_CONFIG && CRM_CONFIG.COLOR_CODES && CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'] ? CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'] : '#C8E6C9';
       applyRowColor(randevularSheet, rowIndex, meetingColor);
+      const srcRange = randevularSheet.getRange(rowIndex, 1, 1, randevularSheet.getLastColumn());
+      srcRange.setFontStyle('italic').setFontWeight('bold');
     } catch (colorErr) {
       console.log('⚠️ Source row highlight failed:', colorErr && colorErr.message);
     }
