@@ -2762,8 +2762,9 @@ function onEdit(e) {
     const editedCol = e.range.getColumn();
     const header = headers[editedCol - 1];
 
-    // Trigger when Toplantı Sonucu or Toplantı Tarihi edited
-    if (header !== 'Toplantı Sonucu' && header !== 'Toplantı Tarihi') return;
+    // Trigger when Toplantı Sonucu, Toplantı Tarihi veya Randevu durumu edited
+    const interesting = ['Toplantı Sonucu','Toplantı Tarihi','Randevu durumu'];
+    if (interesting.indexOf(header) === -1) return;
 
     const rowIndex = e.range.getRow();
     if (rowIndex <= 1) return;
@@ -2771,27 +2772,28 @@ function onEdit(e) {
     const idxSonuc = headers.indexOf('Toplantı Sonucu');
     const idxTarih = headers.indexOf('Toplantı Tarihi');
     const valSonuc = idxSonuc !== -1 ? sheet.getRange(rowIndex, idxSonuc + 1).getValue() : '';
-    let valTarih = idxTarih !== -1 ? sheet.getRange(rowIndex, idxTarih + 1).getValue() : '';
 
-    // If 'Toplantı Sonucu' cleared by user, clear the meeting date and stop
+    // If 'Toplantı Sonucu' cleared by user, clear the meeting date
     if (header === 'Toplantı Sonucu' && (!e.value || e.value === '')) {
       if (idxTarih !== -1) sheet.getRange(rowIndex, idxTarih + 1).clearContent();
-      return;
     }
 
     // If result chosen but meeting date empty, set today's date automatically
-    if (header === 'Toplantı Sonucu' && (!valTarih || valTarih === '')) {
+    if (header === 'Toplantı Sonucu' && (!sheet.getRange(rowIndex, (idxTarih+1)).getValue())) {
       if (idxTarih !== -1) {
         const today = new Date();
         sheet.getRange(rowIndex, idxTarih + 1).setValue(today);
-        valTarih = today;
       }
     }
 
-    // Require at least meeting date or result to create meeting
-    if (!valSonuc && !valTarih) return;
+    // Re-color the edited row to reflect new state immediately
+    applyColorCodingToManagerData(sheet, sheet.getName(), rowIndex, 1);
 
-    copyRandevuRowToToplantilar(sheet, rowIndex);
+    // If meeting data is present, copy to T Toplantılar
+    const hasMeeting = (idxSonuc !== -1 && String(valSonuc||'').trim() !== '') || (idxTarih !== -1 && String(sheet.getRange(rowIndex, idxTarih + 1).getValue()||'').trim() !== '');
+    if (hasMeeting) {
+      copyRandevuRowToToplantilar(sheet, rowIndex, { navigateToMeetings: false });
+    }
   } catch (error) {
     console.error('Function failed:', error);
     // Non-blocking onEdit
@@ -4376,34 +4378,42 @@ function generateComparisonSeriesManager(params) {
 
 // Keep 'Satış Yapıldı' rows at top in meetings, then sort by Toplantı Tarihi
 function sortMeetingsSalesTop(sheet) {
-      try { sheet.getRange(1,1,1,1).getValues(); } catch(e) { SpreadsheetApp.flush(); }
-    try {
-      if (!sheet) return;
-      const lastRow = sheet.getLastRow();
-      if (lastRow <= 2) return;
-      const lastCol = sheet.getLastColumn();
-      const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-      function findIdx(cands){
-        const lowered = headers.map(h => String(h||'').trim().toLowerCase());
-        for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; }
-        return -1;
-      }
-      const idxResult = findIdx(['Toplantı Sonucu','Toplantı sonucu']);
-      const idxDate = findIdx(['Toplantı Tarihi','Toplantı tarihi']);
-      if (idxResult === -1 || idxDate === -1) return;
-      const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
-      const values = rng.getDisplayValues();
-      function d(v){ try{ const x = parseDdMmYyyy(v); return x || new Date('2100-12-31'); }catch(e){ return new Date('2100-12-31'); } }
-      function isSale(s){ const t=String(s||'').toLowerCase().trim(); return t==='satış yapıldı' || t==='satis yapildi'; }
-      values.sort(function(a,b){
-        const aSale = isSale(a[idxResult]) ? -1 : 0;
-        const bSale = isSale(b[idxResult]) ? -1 : 0;
-        if (aSale !== bSale) return bSale - aSale;
-        return d(a[idxDate]) - d(b[idxDate]);
-      });
-      // write back preserving types where possible
-      sheet.getRange(2, 1, values.length, lastCol).setValues(values.map(r => r.map(c=>c)));
-    } catch (err) {
-      console.log('⚠️ sortMeetingsSalesTop skipped:', err && err.message);
+  try { sheet.getRange(1,1,1,1).getValues(); } catch(e) { SpreadsheetApp.flush(); }
+  try {
+    if (!sheet) return;
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 2) return;
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    function findIdx(cands){
+      const lowered = headers.map(h => String(h||'').trim().toLowerCase());
+      for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; }
+      return -1;
     }
+    const idxResult = findIdx(['Toplantı Sonucu','Toplantı sonucu']);
+    const idxDate = findIdx(['Toplantı Tarihi','Toplantı tarihi']);
+    if (idxResult === -1 || idxDate === -1) return;
+
+    // Create temporary rank column at the end
+    const rankCol = lastCol + 1;
+    sheet.insertColumnAfter(lastCol);
+    sheet.getRange(1, rankCol).setValue('ZZ__rank');
+    const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues();
+    const ranks = values.map(r => {
+      const t = String(r[idxResult]||'').toLowerCase().trim();
+      return (t==='satış yapıldı' || t==='satis yapildi') ? 0 : 1;
+    }).map(v => [v]);
+    sheet.getRange(2, rankCol, ranks.length, 1).setValues(ranks);
+
+    // Sort by rank asc, then by Toplantı Tarihi asc
+    sheet.getRange(2, 1, lastRow - 1, rankCol).sort([
+      { column: rankCol, ascending: true },
+      { column: idxDate + 1, ascending: true }
+    ]);
+
+    // Remove temp column
+    sheet.deleteColumn(rankCol);
+  } catch (err) {
+    console.log('⚠️ sortMeetingsSalesTop skipped:', err && err.message);
+  }
 }
