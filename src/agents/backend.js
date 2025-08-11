@@ -4804,7 +4804,17 @@ function generateDatasetReport(parameters) {
     rows.push(['Satış İptal', safe(tCounts['Satış İptal']||0)]);
 
     if (rows.length > 0) {
-      report.getRange(startRow, 1, rows.length, Math.max(...rows.map(r => r.length))).setValues(rows);
+      const maxColumns = Math.max(...rows.map(r => (r && r.length) ? r.length : 1));
+      const normalizedRows = rows.map(r => {
+        const out = new Array(maxColumns).fill('');
+        if (Array.isArray(r)) {
+          for (let i = 0; i < Math.min(r.length, maxColumns); i++) out[i] = r[i] ?? '';
+        } else {
+          out[0] = r ?? '';
+        }
+        return out;
+      });
+      report.getRange(startRow, 1, normalizedRows.length, maxColumns).setValues(normalizedRows);
       report.getRange(startRow, 1).setFontWeight('bold').setFontSize(13).setFontColor('#1a73e8');
     }
 
