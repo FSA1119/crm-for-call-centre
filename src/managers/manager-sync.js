@@ -40,6 +40,9 @@ const CRM_CONFIG = {
     
     // Meeting Colors
     'Toplantı Tamamlandı': 'rgb(200, 230, 201)',  // Light Green
+    'Toplantı Teklif': 'rgb(165, 214, 167)',      // Darker Green
+    'Toplantı Beklemede': 'rgb(255, 243, 224)',   // Soft Orange
+    'Toplantı İptal': 'rgb(255, 235, 238)',       // Light Red
     'Satış Yapıldı': 'rgb(187, 222, 251)'        // Light Blue
   },
   
@@ -442,8 +445,13 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           // Toplantılar: Sonuç 'Satış Yapıldı' ise özel mavi, aksi halde tamamlandı yeşili
           var resultVal = '';
           try { if (typeof meetingResultIdx === 'number' && meetingResultIdx >= 0) { resultVal = String(sheet.getRange(rowNumber, meetingResultIdx + 1).getDisplayValue() || ''); } } catch(e) {}
-          if (String(resultVal) === 'Satış Yapıldı') {
+          const rv = String(resultVal).toLowerCase();
+          if (rv === 'satış yapıldı' || rv === 'satis yapildi') {
             color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+          } else if (rv.indexOf('teklif') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
+          } else if (rv.indexOf('iptal') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı İptal'];
           } else {
             color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
           }
@@ -459,6 +467,16 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
         } else     if (status === 'Fırsat İletildi' || String(status).toLowerCase().includes('teklif')) {
           color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+          // Meeting-aware darker green if meeting result contains teklif
+          try {
+            const meetingResIdx2 = headers.indexOf('Toplantı Sonucu');
+            if (meetingResIdx2 !== -1) {
+              const res2 = String(sheet.getRange(rowNumber, meetingResIdx2 + 1).getDisplayValue()||'').toLowerCase();
+              if (res2.indexOf('teklif') !== -1) {
+                color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
+              }
+            }
+          } catch (e2) {}
         } else if (status === 'Bilgi Verildi') {
           color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
         } else if (status === 'Yeniden Aranacak') {
@@ -1059,8 +1077,8 @@ function applyManualManagerColorCoding() {
     
     console.log('Current sheet:', sheetName);
     
-    if (sheetName === 'Randevular') {
-      console.log('Applying color coding to Randevular');
+    if (String(sheetName||'').toLowerCase().includes('randevu')) {
+      console.log('Applying color coding to Randevular/T Randevular');
       
       const data = sheet.getDataRange().getValues();
       const headers = data[0];
@@ -1074,11 +1092,11 @@ function applyManualManagerColorCoding() {
             applyColorCodingToManagerData(sheet, sheetName, i + 1, 1);
           }
         }
-        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Randevular renk kodlaması uygulandı', SpreadsheetApp.getUi().ButtonSet.OK);
+        SpreadsheetApp.getUi().alert('✅ Tamamlandı', `${sheetName} renk kodlaması uygulandı`, SpreadsheetApp.getUi().ButtonSet.OK);
       } else {
         SpreadsheetApp.getUi().alert('❌ Hata', 'Randevu durumu sütunu bulunamadı', SpreadsheetApp.getUi().ButtonSet.OK);
       }
-    } else if (sheetName === 'Fırsatlar') {
+    } else if (String(sheetName||'').toLowerCase().includes('fırsat') || String(sheetName||'').toLowerCase().includes('firsat')) {
       console.log('Applying color coding to Fırsatlar');
       
       const data = sheet.getDataRange().getValues();
@@ -1097,8 +1115,15 @@ function applyManualManagerColorCoding() {
       } else {
         SpreadsheetApp.getUi().alert('❌ Hata', 'Fırsat Durumu sütunu bulunamadı', SpreadsheetApp.getUi().ButtonSet.OK);
       }
+    } else if (String(sheetName || '').toLowerCase().includes('toplant')) {
+      console.log('Applying color coding to Toplantılar');
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        applyColorCodingToManagerData(sheet, sheetName, 2, lastRow - 1);
+        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Toplantılar renk kodlaması uygulandı', SpreadsheetApp.getUi().ButtonSet.OK);
+      }
     } else {
-      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu fonksiyon sadece Randevular veya Fırsatlar sayfalarında çalışır', SpreadsheetApp.getUi().ButtonSet.OK);
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Bu fonksiyon sadece Randevular/Fırsatlar/Toplantılar sayfalarında çalışır', SpreadsheetApp.getUi().ButtonSet.OK);
     }
     
   } catch (error) {
