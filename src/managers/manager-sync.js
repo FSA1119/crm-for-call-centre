@@ -39,7 +39,8 @@ const CRM_CONFIG = {
     'Ulaşılamadı': 'rgb(255, 235, 238)',         // #FFEBEE - Light Red (Yeniden arama için farklı)
     
     // Meeting Colors
-    'Toplantı Tamamlandı': 'rgb(200, 230, 201)'  // Light Green
+    'Toplantı Tamamlandı': 'rgb(200, 230, 201)',  // Light Green
+    'Satış Yapıldı': 'rgb(187, 222, 251)'        // Light Blue
   },
   
   // 🎨 Manager Sheet Header Colors - Visual Hierarchy
@@ -418,8 +419,10 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
     } else if (lowerName.includes('toplant')) {
       // Try multiple candidates for meeting status
       statusColumnIndex = headers.indexOf('Toplantı durumu');
-      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Toplantı Sonucu');
-      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu durumu');
+             if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Toplantı Sonucu');
+       if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu durumu');
+       // Ayrıca Toplantı Sonucu için indeks
+       var meetingResultIdx = headers.indexOf('Toplantı Sonucu');
     } else {
       statusColumnIndex = headers.indexOf('Aktivite');
     }
@@ -433,11 +436,17 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
       console.log(`Manager color coding - Row ${rowNumber}, Status: "${status}", Sheet: ${sheetName}`);
       if (status && status !== '') {
         let color = 'rgb(255, 255, 255)';
-        if (lowerName.includes('toplant')) {
-          // Any meeting result/status colors as completed meeting
-          color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
-        } else if (status === 'Randevu Alındı') {
-          color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+                 if (lowerName.includes('toplant')) {
+           // Toplantılar: Sonuç 'Satış Yapıldı' ise özel mavi, aksi halde tamamlandı yeşili
+           var resultVal = '';
+           try { if (typeof meetingResultIdx === 'number' && meetingResultIdx >= 0) { resultVal = String(sheet.getRange(rowNumber, meetingResultIdx + 1).getValue() || ''); } } catch(e) {}
+           if (String(resultVal) === 'Satış Yapıldı') {
+             color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+           } else {
+             color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+           }
+         } else if (status === 'Randevu Alındı') {
+           color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
         } else if (status === 'İleri Tarih Randevu') {
           color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
         } else if (status === 'Randevu Teyitlendi') {
@@ -2568,6 +2577,70 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex) {
       srcRange.setFontStyle('italic').setFontWeight('bold');
     } catch (colorErr) {
       console.log('⚠️ Source row highlight failed:', colorErr && colorErr.message);
+    }
+
+    // Temsilci dosyasına da yansıt (anında geri yazma)
+    try {
+      // Temsilci kodunu randevudan al
+      var empCodeIdx = findIdxInsensitive(headersR, ['Kod','Temsilci Kodu']);
+      var employeeCode = empCodeIdx !== -1 ? String(rowR[empCodeIdx] || '').trim() : '';
+      if (employeeCode) {
+        var employeeFile = findEmployeeFile(employeeCode);
+        if (employeeFile) {
+          var empSheet = employeeFile.getSheetByName('Toplantılar');
+          if (!empSheet) { empSheet = employeeFile.insertSheet('Toplantılar'); }
+          empSheet = ensureToplantilarSchema(employeeFile);
+
+          var lastColE = empSheet.getLastColumn();
+          var headersE = empSheet.getRange(1, 1, 1, lastColE).getValues()[0];
+          function idxE(name){ return headersE.indexOf(name); }
+
+          // Çıkış dizisi: temsilci sayfasının başlıklarına göre doldur
+          var empOut = new Array(headersE.length).fill('');
+          // Birebir eşleşen başlıkları kopyala
+          headersE.forEach(function(h,i){ var sIdx=headersR.indexOf(h); if (sIdx!==-1) empOut[i]=rowR[sIdx]; });
+          // Farklı isimli başlıklar için eşleştirme
+          var pairs = [
+            ['Kod','Kod'],
+            ['Kod','Temsilci Kodu'],
+            ['Randevu durumu','Randevu durumu'],
+            ['Randevu Tarihi','Randevu Tarihi'],
+            ['Toplantı Tarihi','Toplantı Tarihi'],
+            ['Saat','Saat'],
+            ['Toplantı Sonucu','Toplantı Sonucu'],
+            ['Toplantı formatı','Toplantı formatı']
+          ];
+          pairs.forEach(function(p){ var di=idxE(p[0]); var si=idxR(p[1]); if (di!==-1 && si!==-1) empOut[di]=rowR[si]; });
+          // Varsayılan toplantı durumu
+          var eDur = idxE('Toplantı durumu'); if (eDur!==-1 && !empOut[eDur]) empOut[eDur]='Toplantı Tamamlandı';
+          // Saat temizleme
+          var eSaat = idxE('Saat'); if (eSaat!==-1){ var vv=empOut[eSaat]; if (String(vv)==='30.12.1899' || (vv instanceof Date && vv.getFullYear && vv.getFullYear()===1899)) empOut[eSaat]=''; }
+
+          // Unique key: Kod + Company name + Toplantı Tarihi
+          var eKod = idxE('Kod')!==-1? idxE('Kod'): idxE('Temsilci Kodu');
+          var eComp = idxE('Company name');
+          var eDate = idxE('Toplantı Tarihi');
+          var eKey = [empOut[eKod] || rowR[idxR('Kod')] || rowR[idxR('Temsilci Kodu')], empOut[eComp], empOut[eDate]].join('||');
+
+          var eExisting = empSheet.getLastRow()>1? empSheet.getRange(2,1,empSheet.getLastRow()-1,lastColE).getValues(): [];
+          var eRow = -1;
+          for (var i2=0;i2<eExisting.length;i2++){ var rr=eExisting[i2]; var kk=[rr[eKod], rr[eComp], rr[eDate]].join('||'); if (kk===eKey){ eRow=i2+2; break; } }
+          if (eRow===-1){
+            var eStart = empSheet.getLastRow()+1;
+            empSheet.getRange(eStart,1,1,empOut.length).setValues([empOut]);
+            if (getOnlyColorTouchedRowsFlag()) applyColorCodingToManagerData(empSheet, 'Toplantılar', eStart, 1);
+          } else {
+            empSheet.getRange(eRow,1,1,empOut.length).setValues([empOut]);
+            if (getOnlyColorTouchedRowsFlag()) applyColorCodingToManagerData(empSheet, 'Toplantılar', eRow, 1);
+          }
+          optimizeColumnWidths(empSheet, 'Toplantılar');
+          applyManagerSheetDataValidation(empSheet, 'Toplantılar');
+        } else {
+          console.log('⚠️ Employee file not found for code:', employeeCode);
+        }
+      }
+    } catch (mirrorErr) {
+      console.log('⚠️ Mirror to employee failed:', mirrorErr && mirrorErr.message);
     }
 
     optimizeColumnWidths(toplantilarSheet, 'Toplantılar');
