@@ -1346,9 +1346,9 @@ function collectSheetData(sheet, employeeCode) {
       targetColumns = [
         'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
         'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Toplantı durumu', 'Toplantı Tarihi',
-        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-        'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+          'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Toplantıyı Yapan'
       ];
     } else {
       // Fallback (keep previous default)
@@ -1568,7 +1568,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         const lastRow = sheet.getLastRow();
         if (effectiveMode === 'append' && lastRow > 2) {
           const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
-          // For T Randevular: sort by Randevu Tarihi (and Saat)
+          // For T Randevular and T Toplantılar: sort by date, but in meetings keep 'Satış Yapıldı' on top
           if (lowerBase.includes('randevu')) {
             const dateIdx = findIdx(['Randevu Tarihi','Tarih']);
             const timeIdx = findIdx(['Saat']);
@@ -1592,6 +1592,10 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
               rng.setValues(values);
             }
           } else if (lowerBase.includes('toplant')) {
+            // Sadece T Toplantılar için çalıştır
+            if (!/^T\s/i.test(sheet.getName())) {
+              // Yönetici ana Toplantılar sayfasında sıralama yapma
+            }
             // Toplantılar (append): 'Satış Yapıldı' en üstte, ardından Toplantı Tarihi
             const resultIdx = findIdx(['Toplantı Sonucu']);
             const dateIdx = findIdx(['Toplantı Tarihi']);
@@ -1643,9 +1647,9 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
           'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
           'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
-        ];
-        break;
+                    'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Toplantıyı Yapan'
+         ];
+         break;
       case 'Fırsatlar':
         headers = [
           'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
@@ -1662,7 +1666,7 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
                 'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
       'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli',
-      'Toplantı Tarihi', 'Toplantıyı Yapan', 'Yeni Takip Tarihi', 'Maplink'
+      'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan'
         ];
         break;
       default:
@@ -2515,14 +2519,15 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
   console.log('Function started:', { rowIndex });
   try {
     const ss = randevularSheet.getParent();
-    let toplantilarSheet = ss.getSheetByName('Toplantılar');
+    // Hedef sayfa: tercih T Toplantılar, yoksa Toplantılar
+    let toplantilarSheet = ss.getSheetByName('T Toplantılar') || ss.getSheetByName('Toplantılar');
     if (!toplantilarSheet) {
       toplantilarSheet = ss.insertSheet('Toplantılar');
       createManagerSheetHeaders(toplantilarSheet, 'Toplantılar');
     }
 
     // Ensure schema has all required columns (e.g., Maplink)
-    toplantilarSheet = ensureToplantilarSchema(ss);
+    toplantilarSheet = ensureToplantilarSchema(ss, (ss.getSheetByName('T Toplantılar') ? 'T Toplantılar' : 'Toplantılar'));
 
     const lastColR = randevularSheet.getLastColumn();
     const headersR = randevularSheet.getRange(1, 1, 1, lastColR).getValues()[0];
@@ -2635,7 +2640,7 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
         if (employeeFile) {
           var empSheet = employeeFile.getSheetByName('Toplantılar');
           if (!empSheet) { empSheet = employeeFile.insertSheet('Toplantılar'); }
-          empSheet = ensureToplantilarSchema(employeeFile);
+          empSheet = ensureToplantilarSchema(employeeFile, 'Toplantılar');
 
           var lastColE = empSheet.getLastColumn();
           var headersE = empSheet.getRange(1, 1, 1, lastColE).getValues()[0];
@@ -2842,12 +2847,13 @@ function toggleOnlyColorTouchedRows() {
   }
 }
 
-function ensureToplantilarSchema(ss) {
+function ensureToplantilarSchema(ss, sheetNameOverride) {
   console.log('Function started:', { action: 'ensureToplantilarSchema' });
   try {
-    let sheet = ss.getSheetByName('Toplantılar');
+    const desiredName = sheetNameOverride || 'Toplantılar';
+    let sheet = ss.getSheetByName(desiredName);
     if (!sheet) {
-      sheet = ss.insertSheet('Toplantılar');
+      sheet = ss.insertSheet(desiredName);
       createManagerSheetHeaders(sheet, 'Toplantılar');
       applyManagerSheetDataValidation(sheet, 'Toplantılar');
       return sheet;
@@ -2858,7 +2864,7 @@ function ensureToplantilarSchema(ss) {
       'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
       'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
       'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-      'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Toplantıyı Yapan', 'Yeni Takip Tarihi', 'Maplink'
+      'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan'
     ];
 
     const lastCol = sheet.getLastColumn();
