@@ -563,9 +563,13 @@ function createManagerMenu() {
         .addSeparator();
 
     // Bakım
-    menu.addItem('🎨 Renk Kodlaması Yenile', 'forceRefreshManagerColorCoding')
-        .addItem('🎨 Manuel Renk Uygula', 'applyManualManagerColorCoding')
-        .addItem('🔄 Dropdown Yenile', 'applyDataValidationToAllManagerSheets')
+    const maintenance = ui.createMenu('🧼 Bakım');
+    maintenance.addItem('🎨 (Yönetici) Renk Kodlaması – Tüm Sayfalar', 'forceRefreshManagerColorCoding')
+               .addItem('🎨 (Yönetici) Bu Sayfayı Yenile', 'applyManualManagerColorCoding')
+               .addSeparator()
+               .addItem('🎨 (Temsilci) Renkleri Yenile – Tümü', 'refreshAgentColorCodingAll')
+               .addItem('🎨 (Temsilci) Renkleri Yenile – Seçili Kod', 'refreshAgentColorCodingPrompt');
+    menu.addSubMenu(maintenance)
         .addSeparator();
     
     menu.addItem('Senkronizasyon Durumu', 'showSyncStatus')
@@ -4415,5 +4419,63 @@ function sortMeetingsSalesTop(sheet) {
     sheet.deleteColumn(rankCol);
   } catch (err) {
     console.log('⚠️ sortMeetingsSalesTop skipped:', err && err.message);
+  }
+}
+
+function refreshAgentColorCodingAll() {
+  console.log('Function started:', { action: 'refreshAgentColorCodingAll' });
+  try {
+    let processed = 0;
+    for (const [code, fileId] of Object.entries(EMPLOYEE_FILES)) {
+      try {
+        const file = SpreadsheetApp.openById(fileId);
+        const sheets = file.getSheets();
+        for (const sh of sheets) {
+          const name = sh.getName();
+          const low = String(name||'').toLowerCase();
+          if (low.includes('randevu') || low.includes('fırsat') || low.includes('firsat') || low.includes('toplant')) {
+            const rows = sh.getLastRow();
+            if (rows > 1) {
+              applyColorCodingToManagerData(sh, name, 2, rows - 1);
+              processed++;
+            }
+          }
+        }
+      } catch (errFile) {
+        console.log('⚠️ Agent color refresh failed:', code, errFile && errFile.message);
+      }
+    }
+    SpreadsheetApp.getUi().alert('Renk Yenileme', `Temsilci dosyalarında ${processed} sayfa renklendirildi.`, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+  }
+}
+
+function refreshAgentColorCodingPrompt() {
+  console.log('Function started:', { action: 'refreshAgentColorCodingPrompt' });
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const resp = ui.prompt('Temsilci Kodu', 'Örn: SB 004', ui.ButtonSet.OK_CANCEL);
+    if (resp.getSelectedButton() !== ui.Button.OK) return;
+    const code = (resp.getResponseText()||'').trim();
+    if (!EMPLOYEE_FILES[code]) { ui.alert('Hata', 'Geçersiz temsilci kodu', ui.ButtonSet.OK); return; }
+    const file = findEmployeeFile(code);
+    if (!file) { ui.alert('Hata', 'Dosya açılamadı', ui.ButtonSet.OK); return; }
+    const sheets = file.getSheets();
+    let processed = 0;
+    for (const sh of sheets) {
+      const name = sh.getName();
+      const low = String(name||'').toLowerCase();
+      if (low.includes('randevu') || low.includes('fırsat') || low.includes('firsat') || low.includes('toplant')) {
+        const rows = sh.getLastRow();
+        if (rows > 1) {
+          applyColorCodingToManagerData(sh, name, 2, rows - 1);
+          processed++;
+        }
+      }
+    }
+    ui.alert('Renk Yenileme', `${code} için ${processed} sayfa renklendirildi.`, ui.ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
   }
 }
