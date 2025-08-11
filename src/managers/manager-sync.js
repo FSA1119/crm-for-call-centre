@@ -2560,6 +2560,14 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex) {
       }
     }
 
+    // Görsel geri bildirim: Kaynak satırı toplantı rengiyle işaretle
+    try {
+      const meetingColor = CRM_CONFIG && CRM_CONFIG.COLOR_CODES && CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'] ? CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'] : '#C8E6C9';
+      applyRowColor(randevularSheet, rowIndex, meetingColor);
+    } catch (colorErr) {
+      console.log('⚠️ Source row highlight failed:', colorErr && colorErr.message);
+    }
+
     optimizeColumnWidths(toplantilarSheet, 'Toplantılar');
     applyManagerSheetDataValidation(toplantilarSheet, 'Toplantılar');
 
@@ -3057,6 +3065,15 @@ function generateDailyReportManager(options) {
 
     report.getRange(1,1,rows.length,2).setValues(rows);
     report.getRange(1,1,1,2).setFontWeight('bold');
+    report.getRange(2,2,rows.length-1,1).setHorizontalAlignment('center').setFontStyle('italic');
+    // Highlight totals rows lightly
+    try {
+      const labels = rows.map(r => r[0]);
+      const idxKontak = labels.indexOf('📊 TOPLAM KONTAK');
+      const idxIslem = labels.indexOf('📈 TOPLAM İŞLEM');
+      if (idxKontak !== -1) report.getRange(idxKontak + 1, 1, 1, 2).setBackground('#E3F2FD');
+      if (idxIslem !== -1) report.getRange(idxIslem + 1, 1, 1, 2).setBackground('#E8F5E8');
+    } catch(e) { console.log('⚠️ Daily totals highlight failed:', e && e.message); }
     report.getRange(rows.length,1,1,2).setFontStyle('italic').setHorizontalAlignment('center');
     report.autoResizeColumns(1,2);
 
@@ -3410,6 +3427,14 @@ function generateWeeklyReportManager(options) {
 
     report.getRange(1,1,rows.length,2).setValues(rows);
     report.getRange(1,1,1,2).setFontWeight('bold');
+    report.getRange(2,2,rows.length-1,1).setHorizontalAlignment('center').setFontStyle('italic');
+    try {
+      const labels = rows.map(r => r[0]);
+      const idxKontak = labels.indexOf('📊 TOPLAM KONTAK');
+      const idxIslem = labels.indexOf('📈 TOPLAM İŞLEM');
+      if (idxKontak !== -1) report.getRange(idxKontak + 1, 1, 1, 2).setBackground('#E3F2FD');
+      if (idxIslem !== -1) report.getRange(idxIslem + 1, 1, 1, 2).setBackground('#E8F5E8');
+    } catch(e) { console.log('⚠️ Weekly totals highlight failed:', e && e.message); }
     report.getRange(rows.length,1,1,2).setFontStyle('italic').setHorizontalAlignment('center');
     report.autoResizeColumns(1,2);
 
@@ -3724,6 +3749,14 @@ function generateMonthlyReportManager(options) {
 
     report.getRange(1,1,rows.length,2).setValues(rows);
     report.getRange(1,1,1,2).setFontWeight('bold');
+    report.getRange(2,2,rows.length-1,1).setHorizontalAlignment('center').setFontStyle('italic');
+    try {
+      const labels = rows.map(r => r[0]);
+      const idxKontak = labels.indexOf('📊 TOPLAM KONTAK');
+      const idxIslem = labels.indexOf('📈 TOPLAM İŞLEM');
+      if (idxKontak !== -1) report.getRange(idxKontak + 1, 1, 1, 2).setBackground('#E3F2FD');
+      if (idxIslem !== -1) report.getRange(idxIslem + 1, 1, 1, 2).setBackground('#E8F5E8');
+    } catch(e) { console.log('⚠️ Monthly totals highlight failed:', e && e.message); }
     report.getRange(rows.length,1,1,2).setFontStyle('italic').setHorizontalAlignment('center');
     report.autoResizeColumns(1,2);
 
@@ -4134,21 +4167,23 @@ function generateComparisonSeriesManager(params) {
       targetSheet.setColumnWidths(2, 1, 90);  // Kod
       // Başlık arka planı
       targetSheet.getRange(1, 1, 1, header.length).setBackground('#f1f3f4');
-      // Yüzde sütunlarını biçimlendir (Ulaşılamadı %, İlgilenmiyor %, Ulaşma Oranı %, Fırsat Oranı %)
+      // Sayısal/%, ortalı ve italik biçimlendirme, TOPLAM kolonlarını renklendir
       const rowsCount = output.length;
       if (rowsCount > 0) {
-        // Sayısal sütunlar (3..11): sağa hizala, italik, binlik ayraç
+        // Sayısal sütunlar (3..11): ortala, italik, binlik ayraç
         targetSheet.getRange(2, 3, rowsCount, 9)
-          .setHorizontalAlignment('right')
+          .setHorizontalAlignment('center')
           .setFontStyle('italic')
           .setNumberFormat('#,##0');
-        // Yüzde sütunları (12..15): sağa hizala, italik, yüzde formatı
+        // Yüzde sütunları (12..15): ortala, italik, yüzde formatı
         targetSheet.getRange(2, 12, rowsCount, 4)
-          .setHorizontalAlignment('right')
+          .setHorizontalAlignment('center')
           .setFontStyle('italic')
           .setNumberFormat('0.0%');
-        // TOPLAM sütunlarını kalın yap (10..11)
-        targetSheet.getRange(2, 10, rowsCount, 2).setFontWeight('bold');
+        // TOPLAM sütunlarını kalın ve arka planlı yap (10..11)
+        targetSheet.getRange(2, 10, rowsCount, 2)
+          .setFontWeight('bold')
+          .setBackground('#E3F2FD');
       }
     }
     targetSheet.autoResizeColumns(3, header.length - 2);
