@@ -407,13 +407,14 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
       console.error('Invalid parameters for color coding');
       return;
     }
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     let statusColumnIndex = -1;
     const lowerName = String(sheetName || '').toLowerCase();
     if (lowerName.includes('randevu')) {
       statusColumnIndex = headers.indexOf('Randevu durumu');
       if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu Durumu');
       var randevuMeetingResultIdx = headers.indexOf('Toplantı Sonucu');
+      if (randevuMeetingResultIdx === -1) randevuMeetingResultIdx = headers.indexOf('Toplantı sonucu');
     } else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) {
       statusColumnIndex = headers.indexOf('Fırsat Durumu');
       if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Aktivite');
@@ -456,7 +457,7 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
         } else if (status === 'Randevu İptal oldu') {
           color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
-        } else if (status === 'Fırsat İletildi') {
+        } else     if (status === 'Fırsat İletildi' || String(status).toLowerCase().includes('teklif')) {
           color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
         } else if (status === 'Bilgi Verildi') {
           color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
@@ -2528,15 +2529,15 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
   console.log('Function started:', { rowIndex });
   try {
     const ss = randevularSheet.getParent();
-    // Hedef sayfa: tercih T Toplantılar, yoksa Toplantılar
-    let toplantilarSheet = ss.getSheetByName('T Toplantılar') || ss.getSheetByName('Toplantılar');
+    // Hedef sayfa: her zaman 'T Toplantılar'
+    let toplantilarSheet = ss.getSheetByName('T Toplantılar');
     if (!toplantilarSheet) {
-      toplantilarSheet = ss.insertSheet('Toplantılar');
+      toplantilarSheet = ss.insertSheet('T Toplantılar');
       createManagerSheetHeaders(toplantilarSheet, 'Toplantılar');
     }
 
-    // Ensure schema has all required columns (e.g., Maplink)
-    toplantilarSheet = ensureToplantilarSchema(ss, (ss.getSheetByName('T Toplantılar') ? 'T Toplantılar' : 'Toplantılar'));
+    // Ensure schema has all required columns
+    toplantilarSheet = ensureToplantilarSchema(ss, 'T Toplantılar');
 
     const lastColR = randevularSheet.getLastColumn();
     const headersR = randevularSheet.getRange(1, 1, 1, lastColR).getValues()[0];
@@ -2558,9 +2559,10 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
 
     const output = new Array(headersT.length).fill('');
 
-    // Map common fields by exact header if exists
+    // Map common fields by exact header if exists (display values)
+    const headersRDisplay = randevularSheet.getRange(1,1,1,lastColR).getDisplayValues()[0];
     headersT.forEach((h, i) => {
-      const srcIdx = headersR.indexOf(h);
+      const srcIdx = headersRDisplay.indexOf(h);
       if (srcIdx !== -1) output[i] = rowR[srcIdx];
     });
 
@@ -2638,10 +2640,8 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
       }
     }
 
-    // Sorting: only for T Toplantılar
-    if (/^T\s/i.test(toplantilarSheet.getName())) {
-      sortMeetingsSalesTop(toplantilarSheet);
-    }
+    // Sıralama: her iki sayfada da uygula (T Toplantılar ve Toplantılar)
+    sortMeetingsSalesTop(toplantilarSheet);
 
     optimizeColumnWidths(toplantilarSheet, 'Toplantılar');
     applyManagerSheetDataValidation(toplantilarSheet, 'Toplantılar');
@@ -4376,6 +4376,7 @@ function generateComparisonSeriesManager(params) {
 
 // Keep 'Satış Yapıldı' rows at top in meetings, then sort by Toplantı Tarihi
 function sortMeetingsSalesTop(sheet) {
+  try { sheet.getRange(1,1,1,1).getValues(); } catch(e) { SpreadsheetApp.flush(); }
   try {
     if (!sheet) return;
     const lastRow = sheet.getLastRow();
