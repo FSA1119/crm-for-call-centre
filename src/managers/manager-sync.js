@@ -413,16 +413,17 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
     if (lowerName.includes('randevu')) {
       statusColumnIndex = headers.indexOf('Randevu durumu');
       if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu Durumu');
+      var randevuMeetingResultIdx = headers.indexOf('Toplantı Sonucu');
     } else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) {
       statusColumnIndex = headers.indexOf('Fırsat Durumu');
       if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Aktivite');
     } else if (lowerName.includes('toplant')) {
       // Try multiple candidates for meeting status
       statusColumnIndex = headers.indexOf('Toplantı durumu');
-             if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Toplantı Sonucu');
-       if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu durumu');
-       // Ayrıca Toplantı Sonucu için indeks
-       var meetingResultIdx = headers.indexOf('Toplantı Sonucu');
+      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Toplantı Sonucu');
+      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu durumu');
+      // Ayrıca Toplantı Sonucu için indeks
+      var meetingResultIdx = headers.indexOf('Toplantı Sonucu');
     } else {
       statusColumnIndex = headers.indexOf('Aktivite');
     }
@@ -436,17 +437,17 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
       console.log(`Manager color coding - Row ${rowNumber}, Status: "${status}", Sheet: ${sheetName}`);
       if (status && status !== '') {
         let color = 'rgb(255, 255, 255)';
-                 if (lowerName.includes('toplant')) {
-           // Toplantılar: Sonuç 'Satış Yapıldı' ise özel mavi, aksi halde tamamlandı yeşili
-           var resultVal = '';
-           try { if (typeof meetingResultIdx === 'number' && meetingResultIdx >= 0) { resultVal = String(sheet.getRange(rowNumber, meetingResultIdx + 1).getValue() || ''); } } catch(e) {}
-           if (String(resultVal) === 'Satış Yapıldı') {
-             color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
-           } else {
-             color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
-           }
-         } else if (status === 'Randevu Alındı') {
-           color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+        if (lowerName.includes('toplant')) {
+          // Toplantılar: Sonuç 'Satış Yapıldı' ise özel mavi, aksi halde tamamlandı yeşili
+          var resultVal = '';
+          try { if (typeof meetingResultIdx === 'number' && meetingResultIdx >= 0) { resultVal = String(sheet.getRange(rowNumber, meetingResultIdx + 1).getValue() || ''); } } catch(e) {}
+          if (String(resultVal) === 'Satış Yapıldı') {
+            color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+          } else {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+          }
+        } else if (status === 'Randevu Alındı') {
+          color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
         } else if (status === 'İleri Tarih Randevu') {
           color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
         } else if (status === 'Randevu Teyitlendi') {
@@ -468,7 +469,15 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
         } else if (status === 'Toplantı Tamamlandı') {
           color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
         }
-        
+        // Randevular sayfasında Toplantı Sonucu 'Satış Yapıldı' ise ayrı renk
+        if (lowerName.includes('randevu') && typeof randevuMeetingResultIdx === 'number' && randevuMeetingResultIdx >= 0) {
+          try {
+            const res = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getValue() || '');
+            if (res === 'Satış Yapıldı') {
+              color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+            }
+          } catch (e) {}
+        }
         applyRowColor(sheet, rowNumber, color);
       }
     }
@@ -2119,7 +2128,7 @@ console.log('👥 Employee codes:', Object.keys(CRM_CONFIG.EMPLOYEE_CODES));
 console.log('🎨 Color codes:', Object.keys(CRM_CONFIG.COLOR_CODES));
 console.log('🚀 Manager system ready for production use');
 
-// Конфигурация файлов для синхронизации
+// Konfiğurasyon dosyaları için senkronizasyon
 const EMPLOYEE_FILES = {
   'LG 001': '1JdU8uIXOcmSQ1c70OOklcR97tqdmDTeCeikpa8DHltE',
   'NT 002': '1Q6IIfbIlTTM8hf1Nv67KLiHGzoAJUBWIhp7rOel9ngQ',
@@ -2162,7 +2171,7 @@ function promptEmployeeCodeForReports() {
   }
 }
 
-// Safe wrappers – call generators if present; otherwise show info
+// Güvenli kapsayıcılar – eğer mevcut ise çağrıcıları çağır; aksi takdirde bilgi göster
 function generateDailyReportAutoSeriesManager(options) {
   console.log('Function started:', options || {});
   try {
@@ -2592,19 +2601,28 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
     const dDurum = idxT('Toplantı durumu');
     if (dDurum !== -1) output[dDurum] = 'Toplantı Tamamlandı';
 
-    // Upsert: avoid duplicates (by Kod + Company name + Toplantı Tarihi)
+    // Upsert: avoid duplicates (by Kod + Company name + Toplantı Tarihi). If tarih boşsa Kod+Company ile güncelle.
     let iKodKey = idxT('Kod') !== -1 ? idxT('Kod') : idxT('Temsilci Kodu');
     const iComp = idxT('Company name');
     const iDate = idxT('Toplantı Tarihi');
 
-    const key = [output[iKodKey] || rowR[idxR('Kod')] || rowR[idxR('Temsilci Kodu')], output[iComp], output[iDate]].join('||');
+    const keyStrict = [output[iKodKey] || rowR[idxR('Kod')] || rowR[idxR('Temsilci Kodu')], output[iComp], output[iDate]].join('||');
 
     let existingRow = -1;
     const existing = toplantilarSheet.getLastRow() > 1 ? toplantilarSheet.getRange(2, 1, toplantilarSheet.getLastRow() - 1, lastColT).getValues() : [];
     for (let i = 0; i < existing.length; i++) {
       const r = existing[i];
       const k = [r[iKodKey], r[iComp], r[iDate]].join('||');
-      if (k === key) { existingRow = i + 2; break; }
+      if (k === keyStrict) { existingRow = i + 2; break; }
+    }
+    // Soft match if date empty/changed: match by code+company
+    if (existingRow === -1) {
+      const softKey = [output[iKodKey] || rowR[idxR('Kod')] || rowR[idxR('Temsilci Kodu')], output[iComp]].join('||');
+      for (let i = 0; i < existing.length; i++) {
+        const r = existing[i];
+        const kSoft = [r[iKodKey], r[iComp]].join('||');
+        if (kSoft === softKey) { existingRow = i + 2; break; }
+      }
     }
 
     if (existingRow === -1) {
@@ -2619,6 +2637,14 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
         applyColorCodingToManagerData(toplantilarSheet, 'Toplantılar', existingRow, 1);
       }
     }
+
+    // Sorting: only for T Toplantılar
+    if (/^T\s/i.test(toplantilarSheet.getName())) {
+      sortMeetingsSalesTop(toplantilarSheet);
+    }
+
+    optimizeColumnWidths(toplantilarSheet, 'Toplantılar');
+    applyManagerSheetDataValidation(toplantilarSheet, 'Toplantılar');
 
     // Görsel geri bildirim: Kaynak satırı toplantı rengiyle işaretle + font stilini vurgula
     try {
@@ -2667,7 +2693,7 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
           // Saat temizleme
           var eSaat = idxE('Saat'); if (eSaat!==-1){ var vv=empOut[eSaat]; if (String(vv)==='30.12.1899' || (vv instanceof Date && vv.getFullYear && vv.getFullYear()===1899)) empOut[eSaat]=''; }
 
-          // Unique key: Kod + Company name + Toplantı Tarihi
+          // Unique key: Kod + Company name + Toplantı Tarihi (yoksa Kod+Company)
           var eKod = idxE('Kod')!==-1? idxE('Kod'): idxE('Temsilci Kodu');
           var eComp = idxE('Company name');
           var eDate = idxE('Toplantı Tarihi');
@@ -2676,6 +2702,11 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
           var eExisting = empSheet.getLastRow()>1? empSheet.getRange(2,1,empSheet.getLastRow()-1,lastColE).getValues(): [];
           var eRow = -1;
           for (var i2=0;i2<eExisting.length;i2++){ var rr=eExisting[i2]; var kk=[rr[eKod], rr[eComp], rr[eDate]].join('||'); if (kk===eKey){ eRow=i2+2; break; } }
+          if (eRow===-1){
+            // Soft key fallback
+            var softKey = [empOut[eKod] || rowR[idxR('Kod')] || rowR[idxR('Temsilci Kodu')], empOut[eComp]].join('||');
+            for (var i3=0;i3<eExisting.length;i3++){ var rr2=eExisting[i3]; var kk2=[rr2[eKod], rr2[eComp]].join('||'); if (kk2===softKey){ eRow=i3+2; break; } }
+          }
           if (eRow===-1){
             var eStart = empSheet.getLastRow()+1;
             empSheet.getRange(eStart,1,1,empOut.length).setValues([empOut]);
@@ -2686,18 +2717,6 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
           }
           optimizeColumnWidths(empSheet, 'Toplantılar');
           applyManagerSheetDataValidation(empSheet, 'Toplantılar');
-
-          // Bilgilendirme: Temsilci dosyasındaki toplantıya gitmek ister misiniz?
-          try {
-            var empUrl = employeeFile.getUrl() + '#gid=' + empSheet.getSheetId();
-            var html = HtmlService.createHtmlOutput('<div style="font-family:Arial;padding:12px;">' +
-              '<div>Toplantı, <b>' + employeeCode + '</b> temsilci dosyasına da işlendi.</div>' +
-              '<div style="margin-top:10px;"><a target="_blank" href="' + empUrl + '">Temsilci Toplantılar sayfasını aç</a></div>' +
-            '</div>').setWidth(360).setHeight(120);
-            SpreadsheetApp.getUi().showModelessDialog(html, 'Bilgi');
-          } catch (infoErr) {
-            console.log('⚠️ Mirror info dialog failed:', infoErr && infoErr.message);
-          }
         } else {
           console.log('⚠️ Employee file not found for code:', employeeCode);
         }
@@ -2705,9 +2724,6 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
     } catch (mirrorErr) {
       console.log('⚠️ Mirror to employee failed:', mirrorErr && mirrorErr.message);
     }
-
-    optimizeColumnWidths(toplantilarSheet, 'Toplantılar');
-    applyManagerSheetDataValidation(toplantilarSheet, 'Toplantılar');
 
     // Navigasyon: İsteğe bağlı toplantılar sayfasına geç veya randevularda kal
     try {
@@ -4355,5 +4371,31 @@ function generateComparisonSeriesManager(params) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
     throw error;
+  }
+}
+
+// Keep 'Satış Yapıldı' rows at top in meetings, then sort by Toplantı Tarihi
+function sortMeetingsSalesTop(sheet) {
+  try {
+    if (!sheet) return;
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 2) return;
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    const idxResult = headers.indexOf('Toplantı Sonucu');
+    const idxDate = headers.indexOf('Toplantı Tarihi');
+    if (idxResult === -1 || idxDate === -1) return;
+    const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    const values = rng.getValues();
+    function d(v){ try{ const x = parseDdMmYyyy(v); return x || new Date('2100-12-31'); }catch(e){ return new Date('2100-12-31'); } }
+    values.sort(function(a,b){
+      const aSale = String(a[idxResult]||'') === 'Satış Yapıldı' ? -1 : 0;
+      const bSale = String(b[idxResult]||'') === 'Satış Yapıldı' ? -1 : 0;
+      if (aSale !== bSale) return bSale - aSale; // satış yapılanlar en üstte
+      return d(a[idxDate]) - d(b[idxDate]);
+    });
+    rng.setValues(values);
+  } catch (err) {
+    console.log('⚠️ sortMeetingsSalesTop skipped:', err && err.message);
   }
 }
