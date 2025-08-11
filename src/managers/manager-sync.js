@@ -2552,7 +2552,7 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex) {
     const existing = toplantilarSheet.getLastRow() > 1 ? toplantilarSheet.getRange(2, 1, toplantilarSheet.getLastRow() - 1, lastColT).getValues() : [];
     for (let i = 0; i < existing.length; i++) {
       const r = existing[i];
-      const k = [r[iKod], r[iComp], r[iDate]].join('||');
+      const k = [r[iKodKey], r[iComp], r[iDate]].join('||');
       if (k === key) { existingRow = i + 2; break; }
     }
 
