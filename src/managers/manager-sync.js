@@ -1563,12 +1563,41 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       optimizeColumnWidths(sheet, baseTypeForHeaders);
       applyManagerSheetDataValidation(sheet, baseTypeForHeaders);
 
-      // Optional: group by employee code after operation so visual order is clear
-      if (effectiveMode === 'append' && idxCode >= 0) {
+      // Sorting for appended aggregate sheets
+      try {
         const lastRow = sheet.getLastRow();
-        if (lastRow > 2) {
-          sheet.getRange(2, 1, lastRow - 1, lastCol).sort([{ column: idxCode + 1, ascending: true }]);
+        if (effectiveMode === 'append' && lastRow > 2) {
+          const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
+          // For T Randevular: sort by Randevu Tarihi (and Saat)
+          if (lowerBase.includes('randevu')) {
+            const dateIdx = findIdx(['Randevu Tarihi','Tarih']);
+            const timeIdx = findIdx(['Saat']);
+            if (dateIdx >= 0) {
+              const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+              const values = rng.getValues();
+              function parseTime(v){
+                if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
+                const s = String(v || '').trim();
+                const m = s.match(/^(\d{1,2}):(\d{2})/);
+                if (m) return Number(m[1])*60 + Number(m[2]);
+                return 0;
+              }
+              values.sort(function(a,b){
+                const da = parseDdMmYyyy(a[dateIdx]) || new Date('2100-12-31');
+                const db = parseDdMmYyyy(b[dateIdx]) || new Date('2100-12-31');
+                if (da.getTime() !== db.getTime()) return da - db;
+                if (timeIdx >= 0) return parseTime(a[timeIdx]) - parseTime(b[timeIdx]);
+                return 0;
+              });
+              rng.setValues(values);
+            }
+          } else if (idxCode >= 0) {
+            // Other aggregate sheets: keep grouped by code
+            sheet.getRange(2, 1, lastRow - 1, lastCol).sort([{ column: idxCode + 1, ascending: true }]);
+          }
         }
+      } catch (sortErr) {
+        console.log('⚠️ Sorting skipped:', sortErr && sortErr.message);
       }
     }
 
@@ -1614,9 +1643,9 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
           'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
           'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli',
-          'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Maplink'
+                'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+      'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli',
+      'Toplantı Tarihi', 'Toplantıyı Yapan', 'Yeni Takip Tarihi', 'Maplink'
         ];
         break;
       default:
@@ -2456,7 +2485,7 @@ function moveSelectedRandevuToMeeting() {
       return;
     }
     const rowIndex = range.getRow();
-    copyRandevuRowToToplantilar(sheet, rowIndex);
+    copyRandevuRowToToplantilar(sheet, rowIndex, { navigateToMeetings: true });
     console.log('Processing complete:', { rowIndex });
   } catch (error) {
     console.error('Function failed:', error);
@@ -2465,7 +2494,7 @@ function moveSelectedRandevuToMeeting() {
   }
 }
 
-function copyRandevuRowToToplantilar(randevularSheet, rowIndex) {
+function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
   console.log('Function started:', { rowIndex });
   try {
     const ss = randevularSheet.getParent();
@@ -2635,6 +2664,18 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex) {
           }
           optimizeColumnWidths(empSheet, 'Toplantılar');
           applyManagerSheetDataValidation(empSheet, 'Toplantılar');
+
+          // Bilgilendirme: Temsilci dosyasındaki toplantıya gitmek ister misiniz?
+          try {
+            var empUrl = employeeFile.getUrl() + '#gid=' + empSheet.getSheetId();
+            var html = HtmlService.createHtmlOutput('<div style="font-family:Arial;padding:12px;">' +
+              '<div>Toplantı, <b>' + employeeCode + '</b> temsilci dosyasına da işlendi.</div>' +
+              '<div style="margin-top:10px;"><a target="_blank" href="' + empUrl + '">Temsilci Toplantılar sayfasını aç</a></div>' +
+            '</div>').setWidth(360).setHeight(120);
+            SpreadsheetApp.getUi().showModelessDialog(html, 'Bilgi');
+          } catch (infoErr) {
+            console.log('⚠️ Mirror info dialog failed:', infoErr && infoErr.message);
+          }
         } else {
           console.log('⚠️ Employee file not found for code:', employeeCode);
         }
@@ -2645,6 +2686,20 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex) {
 
     optimizeColumnWidths(toplantilarSheet, 'Toplantılar');
     applyManagerSheetDataValidation(toplantilarSheet, 'Toplantılar');
+
+    // Navigasyon: İsteğe bağlı toplantılar sayfasına geç veya randevularda kal
+    try {
+      const wantsNav = options && options.navigateToMeetings;
+      if (wantsNav) {
+        ss.setActiveSheet(toplantilarSheet);
+        toplantilarSheet.setActiveSelection(toplantilarSheet.getRange(Math.max(2, toplantilarSheet.getLastRow()), 1));
+      } else {
+        ss.setActiveSheet(randevularSheet);
+        randevularSheet.setActiveSelection(randevularSheet.getRange(rowIndex, 1));
+      }
+    } catch (navErr) {
+      console.log('⚠️ Navigation restore failed:', navErr && navErr.message);
+    }
 
   } catch (error) {
     console.error('Function failed:', error);
@@ -2786,7 +2841,7 @@ function ensureToplantilarSchema(ss) {
       'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
       'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
       'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-      'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Maplink'
+      'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Toplantıyı Yapan', 'Yeni Takip Tarihi', 'Maplink'
     ];
 
     const lastCol = sheet.getLastColumn();
@@ -2864,11 +2919,15 @@ function openMeetingDetailsEditor() {
               <option>Soğuk</option>
             </select>
           </div>
-          <label>Yeni Takip Tarihi</label>
-          <div class="row">
-            <input type="date" name="yeniTakipTarihi" />
-          </div>
-          <label>Yönetici Not</label>
+                     <label>Yeni Takip Tarihi</label>
+           <div class="row">
+             <input type="date" name="yeniTakipTarihi" />
+           </div>
+           <label>Toplantıyı Yapan (İsim / E-posta)</label>
+           <div class="row">
+             <input type="text" name="toplantiyiYapan" placeholder="Ad Soyad veya e-posta" style="width:100%" />
+           </div>
+           <label>Yönetici Not</label>
           <div class="row">
             <textarea name="yoneticiNot" rows="4" style="width:100%"></textarea>
           </div>
@@ -2885,6 +2944,7 @@ function openMeetingDetailsEditor() {
               teklifDetayi: Array.from(form.querySelectorAll('input[name="teklifDetayi"]:checked')).map(i=>i.value).join(', '),
               satisPotansiyeli: form.satisPotansiyeli.value || '',
               yeniTakipTarihi: form.yeniTakipTarihi.value || '',
+              toplantiyiYapan: form.toplantiyiYapan.value || '',
               yoneticiNot: form.yoneticiNot.value || ''
             };
             google.script.run.withSuccessHandler(function(){google.script.host.close();}).processMeetingDetailsForm(data);
@@ -2921,6 +2981,7 @@ function processMeetingDetailsForm(formData) {
     const idxTeklif = idx('Teklif Detayı');
     const idxPot = idx('Satış Potansiyeli');
     const idxYeni = idx('Yeni Takip Tarihi');
+    const idxYapan = idx('Toplantıyı Yapan');
     const idxNot = idx('Yönetici Not');
 
     if (idxTeklif !== -1) sheet.getRange(rowIndex, idxTeklif + 1).setValue(formData.teklifDetayi || '');
@@ -2936,6 +2997,8 @@ function processMeetingDetailsForm(formData) {
         sheet.getRange(rowIndex, idxYeni + 1).setValue('');
       }
     }
+
+    if (idxYapan !== -1) sheet.getRange(rowIndex, idxYapan + 1).setValue(formData.toplantiyiYapan || '');
 
     if (idxNot !== -1) sheet.getRange(rowIndex, idxNot + 1).setValue(formData.yoneticiNot || '');
 
