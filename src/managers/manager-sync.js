@@ -887,7 +887,7 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
       return;
     }
     
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     
     // Apply validation based on sheet type
     switch (sheetName) {
