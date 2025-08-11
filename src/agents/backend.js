@@ -17,7 +17,7 @@ const CRM_CONFIG = {
     'KO 003': 'Kadir Öztürk',
     'SB 004': 'Sinem Bakalcı',
     'KM 005': 'Kübra Murat',
-    'CA 006': 'Canan Arslan'
+    'GŞ 006': 'Canan Arslan'
   },
   
   // Manager file
