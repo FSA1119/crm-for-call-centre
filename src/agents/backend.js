@@ -3785,12 +3785,7 @@ function onOpen() {
       .addSeparator()
       .addItem('📦 Dataset Raporu', 'showDatasetReportDialog');
 
-        const raporlarSubMenu = ui.createMenu('Raporlarım')
-      .addItem('📊 Günlük', 'generateDailyReport')
-      .addItem('📅 Haftalık', 'generateMonthlyReport')
-      .addItem('📈 Detaylı', 'showGenerateReportDialog');
-
-    crmMenu.addSubMenu(raporlarSubMenu).addToUi();
+        crmMenu.addToUi();
 
     // Create standalone Sector Helper menu (always visible)
     try {
