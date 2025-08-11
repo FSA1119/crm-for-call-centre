@@ -40,7 +40,7 @@ const CRM_CONFIG = {
     
     // Meeting Colors
     'Toplantı Tamamlandı': 'rgb(200, 230, 201)',  // Light Green
-    'Satış Yapıldı': 'rgb(187, 222, 251)'        // Light Blue
+    'Satış Yapıldı': 'rgb(66, 165, 245)'         // Bright Blue
   },
   
   // 🎨 Manager Sheet Header Colors - Visual Hierarchy
@@ -1588,6 +1588,23 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
                 if (da.getTime() !== db.getTime()) return da - db;
                 if (timeIdx >= 0) return parseTime(a[timeIdx]) - parseTime(b[timeIdx]);
                 return 0;
+              });
+              rng.setValues(values);
+            }
+          } else if (lowerBase.includes('toplant')) {
+            // Toplantılar (append): 'Satış Yapıldı' en üstte, ardından Toplantı Tarihi
+            const resultIdx = findIdx(['Toplantı Sonucu']);
+            const dateIdx = findIdx(['Toplantı Tarihi']);
+            if (resultIdx >= 0 && dateIdx >= 0) {
+              const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+              const values = rng.getValues();
+              values.sort(function(a,b){
+                const aSale = String(a[resultIdx]||'') === 'Satış Yapıldı' ? 0 : 1;
+                const bSale = String(b[resultIdx]||'') === 'Satış Yapıldı' ? 0 : 1;
+                if (aSale !== bSale) return aSale - bSale; // satış yapılan önce
+                const da = parseDdMmYyyy(a[dateIdx]) || new Date('2100-12-31');
+                const db = parseDdMmYyyy(b[dateIdx]) || new Date('2100-12-31');
+                return da - db;
               });
               rng.setValues(values);
             }
