@@ -40,7 +40,7 @@ const CRM_CONFIG = {
     
     // Meeting Colors
     'Toplantı Tamamlandı': 'rgb(200, 230, 201)',  // Light Green
-    'Satış Yapıldı': 'rgb(66, 165, 245)'         // Bright Blue
+    'Satış Yapıldı': 'rgb(187, 222, 251)'        // Light Blue
   },
   
   // 🎨 Manager Sheet Header Colors - Visual Hierarchy
@@ -125,7 +125,7 @@ function applyRowColor(sheet, rowNumber, color) {
       console.error('Invalid parameters for color application');
       return;
     }
-    const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+    const range = sheet.getRange(rowNumber, 1, 1, sheet.getMaxColumns());
     range.setBackground(color);
   } catch (error) {
     console.error('Color application failed:', error);
@@ -1599,9 +1599,9 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
               const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
               const values = rng.getValues();
               values.sort(function(a,b){
-                const aSale = String(a[resultIdx]||'') === 'Satış Yapıldı' ? 0 : 1;
-                const bSale = String(b[resultIdx]||'') === 'Satış Yapıldı' ? 0 : 1;
-                if (aSale !== bSale) return aSale - bSale; // satış yapılan önce
+                const aSale = String(a[resultIdx]||'') === 'Satış Yapıldı' ? -1 : 0;
+                const bSale = String(b[resultIdx]||'') === 'Satış Yapıldı' ? -1 : 0;
+                if (aSale !== bSale) return bSale - aSale; // satış yapılanlar en üstte
                 const da = parseDdMmYyyy(a[dateIdx]) || new Date('2100-12-31');
                 const db = parseDdMmYyyy(b[dateIdx]) || new Date('2100-12-31');
                 return da - db;

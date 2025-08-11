@@ -171,7 +171,7 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 | Satış Potansiyeli | dropdown |
 | Toplantı Tarihi | datepicker |
 | Yeni Takip Tarihi | datepicker |
-| Maplink | input |
+Toplantıyı Yapan
 
 Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon  
 Toplantı Sonucu (dropdown): Satış Yapıldı, Teklif iletildi, Beklemede, Satış İptal  
