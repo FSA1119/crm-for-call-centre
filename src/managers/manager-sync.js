@@ -20,8 +20,7 @@ const CRM_CONFIG = {
   
   // 📁 File Management - Data Sources
   MANAGER_FILE: 'FSA_019 - Yonetici Takip Dosyasi',
-  
-  // 🎨 Centralized Color System - Visual Harmony (SYNCED WITH TEMSILCI)
+
   COLOR_CODES: {
     // Primary Status Colors - Görseldeki Renkler
     'Randevu Alındı': 'rgb(232, 245, 232)',      // #E8F5E8 - Light Green
