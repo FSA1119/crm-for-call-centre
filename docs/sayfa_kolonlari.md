@@ -144,23 +144,23 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 | Keyword | input |
 | Location | input |
 | Company name | input |
-| Category | input |
-| Website | input |
-| Phone | input |
-| Yetkili Tel | input |
-| Mail | input |
 | İsim Soyisim | input |
-| Randevu durumu | dropdown |
-| Randevu Tarihi | datepicker |
-| Saat | datepicker |
-| Yorum | input |
-| Yönetici Not | input |
 | Toplantı Sonucu | dropdown |
 | Teklif Detayı | multiselect |
 | Satış Potansiyeli | dropdown |
 | Toplantı Tarihi | datepicker |
 | Yeni Takip Tarihi | datepicker |
 | Toplantıyı Yapan | input |
+| Category | input |
+| Website | input |
+| Phone | input |
+| Yetkili Tel | input |
+| Mail | input |
+| Randevu durumu | dropdown |
+| Randevu Tarihi | datepicker |
+| Saat | datepicker |
+| Yorum | input |
+| Yönetici Not | input |
 | CMS Adı | input |
 | CMS Grubu | input |
 | E-Ticaret İzi | input |
