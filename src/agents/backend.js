@@ -3846,19 +3846,7 @@ function onOpen() {
 
         crmMenu.addToUi();
 
-    // Create standalone Sector Helper menu (always visible)
-    try {
-      const existingMenus2 = ui.getMenus();
-      const helperMenu = existingMenus2.find(menu => menu.getName() === 'Sektör Yardımcısı');
-      if (helperMenu) {
-        helperMenu.remove();
-      }
-    } catch (e) {}
-    ui.createMenu('Sektör Yardımcısı')
-      .addItem('Yan Paneli Aç', 'showSectorHelperDialog')
-      .addToUi();
-        
-    console.log('CRM menu and Sector Helper menu created');
+    console.log('CRM menu created');
   }
 }
 
@@ -4549,25 +4537,11 @@ function createAdminMenu() {
     menu.addSeparator();
     menu.addItem('Yeni Tablo oluştur', 'showCreateTableDialog');
     menu.addSeparator();
-    menu.addItem('🧪 Test Data Validation', 'testDataValidation');
-    menu.addSeparator();
-    menu.addItem('🔄 Apply Data Validation to All Sheets', 'applyDataValidationToExistingSheets');
-    menu.addItem('🔄 Refresh Format Tablo Validation', 'refreshFormatTabloValidation');
-    menu.addSeparator();
-    menu.addItem('📝 Update Existing Codes', 'updateExistingCodes');
-    menu.addSeparator();
-    menu.addItem('🧪 Test onEdit Trigger', 'testOnEditTrigger');
-    menu.addItem('🎨 Manuel Renk Uygula', 'applyManualColorCoding');
-    menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
-    menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
 
     // CMS Analizi alt menüsü
     const cmsMenu = SpreadsheetApp.getUi().createMenu('CMS Analizi')
-      .addItem('⚡ Seçili Satırlar', 'openCMSDetectionCurrentAgentSelection')
       .addItem('🛡️ Seçili Satırlar (Doğruluk)', 'openCMSDetectionCurrentAgentSelectionAccurate')
-      .addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable')
-      .addItem('🧱 CMS Sütunlarını Website Yanına Taşı (Format Tablo)', 'addCmsColumnsNextToWebsiteOnAllFormatTables')
-      .addItem('∞ Tümü (chunk=100)', 'openCMSDetectionCurrentAgentAll');
+      .addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable');
     menu.addSubMenu(cmsMenu);
     
     // Sıralama (Referans Sabit) alt menüsü
