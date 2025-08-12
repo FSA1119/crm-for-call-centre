@@ -1,7 +1,7 @@
 // ========================================
 // GOOGLE SHEETS CRM SYSTEM - BACKEND
 // ========================================
-// Version: 1.0
+// Version: 4.4
 // Author: CRM Development Team
 // Date: 2025-07-08
 
@@ -405,8 +405,9 @@ function createFormatTable(spreadsheet, hamVeriSheet, tableName) {
   newSheet.activate();
   const formatTableColumns = [
     'Kod', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+    'CMS Adı', 'CMS Grubu',
     'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Aktivite',
-    'Aktivite Tarihi', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu',
+    'Aktivite Tarihi', 'Yorum', 'Yönetici Not',
     'E-Ticaret İzi', 'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı',
     'Address', 'City', 'Rating count', 'Review', 'Maplink'
   ];
@@ -3728,6 +3729,64 @@ function showGenerateReportDialog() {
   generateReport({});
 }
 
+function addCmsColumnsNextToWebsiteOnAllFormatTables(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+    let processedSheets = 0;
+    sheets.forEach(sheet => {
+      if (!isFormatTable(sheet)) return;
+      const lastCol = sheet.getLastColumn();
+      if (lastCol < 1) return;
+      const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+      const iWebsite = headers.indexOf('Website');
+      if (iWebsite === -1) return;
+      let iCmsName = headers.indexOf('CMS Adı');
+      let iCmsGroup = headers.indexOf('CMS Grubu');
+      if (iCmsName === -1) {
+        sheet.insertColumnAfter(iWebsite + 1);
+        sheet.getRange(1, iWebsite + 2).setValue('CMS Adı');
+      }
+      const headers2 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      iCmsName = headers2.indexOf('CMS Adı');
+      iCmsGroup = headers2.indexOf('CMS Grubu');
+      if (iCmsGroup === -1) {
+        const insertAfter = Math.max(iWebsite + 1, iCmsName) + 1;
+        sheet.insertColumnAfter(insertAfter);
+        sheet.getRange(1, insertAfter + 1).setValue('CMS Grubu');
+      }
+      const headers3 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      const idxWebsite = headers3.indexOf('Website');
+      const idxCmsName = headers3.indexOf('CMS Adı');
+      const idxCmsGroup = headers3.indexOf('CMS Grubu');
+      const desiredCmsNameCol = idxWebsite + 2;
+      if (idxCmsName + 1 !== desiredCmsNameCol) {
+        sheet.moveColumns(sheet.getRange(1, idxCmsName + 1, sheet.getMaxRows(), 1), desiredCmsNameCol);
+      }
+      const headers4 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      const nameNow = headers4.indexOf('CMS Adı');
+      const groupNow = headers4.indexOf('CMS Grubu');
+      if (groupNow + 1 !== nameNow + 2) {
+        sheet.moveColumns(sheet.getRange(1, groupNow + 1, sheet.getMaxRows(), 1), nameNow + 2);
+      }
+      sheet.autoResizeColumn(idxWebsite + 2);
+      sheet.autoResizeColumn(idxWebsite + 3);
+      processedSheets++;
+    });
+    try { refreshFormatTabloValidation({ silent: true }); } catch (e) {}
+    SpreadsheetApp.getUi().alert('Tamam', `CMS sütunları Website yanına taşındı/oluşturuldu. İşlenen sayfa: ${processedSheets}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: true, processedSheets };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
 // ========================================
 // MENU CREATION
 // ========================================
@@ -4501,6 +4560,15 @@ function createAdminMenu() {
     menu.addItem('🎨 Manuel Renk Uygula', 'applyManualColorCoding');
     menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
     menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
+
+    // CMS Analizi alt menüsü
+    const cmsMenu = SpreadsheetApp.getUi().createMenu('CMS Analizi')
+      .addItem('⚡ Seçili Satırlar', 'openCMSDetectionCurrentAgentSelection')
+      .addItem('🛡️ Seçili Satırlar (Doğruluk)', 'openCMSDetectionCurrentAgentSelectionAccurate')
+      .addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable')
+      .addItem('🧱 CMS Sütunlarını Website Yanına Taşı (Format Tablo)', 'addCmsColumnsNextToWebsiteOnAllFormatTables')
+      .addItem('∞ Tümü (chunk=100)', 'openCMSDetectionCurrentAgentAll');
+    menu.addSubMenu(cmsMenu);
     
     // Bakım alt menüsü
     const bakım = SpreadsheetApp.getUi().createMenu('Bakım')

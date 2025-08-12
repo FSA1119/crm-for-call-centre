@@ -23,6 +23,8 @@ Bağlantılar:
 | Company name | input |
 | Category | input |
 | Website | input |
+| CMS Adı | input |
+| CMS Grubu | input |
 | Phone | input |
 | Yetkili Tel | input |
 | Mail | input |
@@ -31,8 +33,6 @@ Bağlantılar:
 | Aktivite Tarihi | datepicker |
 | Yorum | input |
 | Yönetici Not | input |
-| CMS Adı | input |
-| CMS Grubu | input |
 | E-Ticaret İzi | input |
 | Site Hızı | input |
 | Site Trafiği | input |
