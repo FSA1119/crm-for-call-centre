@@ -1721,13 +1721,12 @@ function createManagerSheetHeaders(sheet, sheetName) {
         break;
       case 'Toplantılar':
         headers = [
-          'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-          'Saat', 'Yorum', 'Yönetici Not',
-          // İstenen ekler: Yönetici Not'tan hemen sonra
+          'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
+          // İstenen ekler: Company name ve İsim Soyisim'den hemen sonra
           'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
-          // Devam
-          'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+          // Diğer alanlar
+          'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
+          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
           'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
           'Rating count', 'Review'
         ];
@@ -2948,10 +2947,10 @@ function ensureToplantilarSchema(ss, sheetNameOverride) {
     }
 
     const requiredHeaders = [
-      'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-      'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-      'Saat', 'Yorum', 'Yönetici Not',
+      'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
       'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
+      'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
+      'Saat', 'Yorum', 'Yönetici Not',
       'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
       'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
       'Rating count', 'Review'
@@ -2970,19 +2969,23 @@ function ensureToplantilarSchema(ss, sheetNameOverride) {
       }
     }
 
-    // Reorder: Move meeting fields right after 'Yönetici Not'
+    // Reorder: Move meeting fields right after 'İsim Soyisim' and ensure 'İsim Soyisim' follows 'Company name'
     try {
       const headersNow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-      const idxYon = headersNow.indexOf('Yönetici Not');
+      const idxCompany = headersNow.indexOf('Company name');
+      const idxIsim = headersNow.indexOf('İsim Soyisim');
+      if (idxCompany !== -1 && idxIsim !== -1 && idxIsim !== idxCompany + 1) {
+        sheet.moveColumns(sheet.getRange(1, idxIsim + 1, sheet.getMaxRows(), 1), idxCompany + 2);
+      }
+      const headersAfter = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      const idxIsimNow = headersAfter.indexOf('İsim Soyisim');
       const toMove = ['Toplantı Sonucu','Teklif Detayı','Satış Potansiyeli','Toplantı Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan'];
-      if (idxYon !== -1) {
-        let insertPos = idxYon + 2; // after Yönetici Not
+      if (idxIsimNow !== -1) {
+        let insertPos = idxIsimNow + 2; // after İsim Soyisim
         for (const name of toMove) {
-          const curIdx = headersNow.indexOf(name);
+          const curIdx = headersAfter.indexOf(name);
           if (curIdx !== -1 && curIdx + 1 !== insertPos) {
             sheet.moveColumns(sheet.getRange(1, curIdx + 1, sheet.getMaxRows(), 1), insertPos);
-            // Refresh headersNow indices minimally
-            headersNow.splice(insertPos - 1, 0, headersNow.splice(curIdx, 1)[0]);
             insertPos++;
           } else if (curIdx !== -1) {
             insertPos++;
