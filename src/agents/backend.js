@@ -4585,7 +4585,10 @@ function createAdminMenu() {
       .addSeparator()
       .addItem('🔎 Mükerrerleri Bul (Firma + Telefon)', 'findDuplicatesInFormatTable')
       .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation')
-      .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm');
+      .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm')
+      .addSeparator()
+      .addItem('📱 Telefon Tipi Hesapla (Bu sayfa)', 'upsertPhoneTypeColumnOnActiveSheet')
+      .addItem('📱 Telefon Tipi Sırala (Cep→Sabit→Kurumsal→Sanal)', 'sortByPhoneTypeOrderPreservingReference');
     
     menu.addSubMenu(bakım);
     
