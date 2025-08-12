@@ -689,7 +689,7 @@ const CMS_SIGNATURES = (function buildCMS() {
   addDomainSig(sig, 'Ticimax', ['ticimax.com']);
   addDomainSig(sig, 'IdeaSoft', ['ideasoft.com.tr','ideasoftcdn.com','ideacdn.net','ideasoftstore.com']);
   addDomainSig(sig, 'T-Soft', ['tsoft.com.tr','tsoftcdn.com','tsoftcdn2.com','tsoftstatic.com']);
-  addDomainSig(sig, 'İkas', ['ikas.com']);
+  addDomainSig(sig, 'İkas', ['ikas.com','cdn.ikas.com','ikascdn.com']);
   addDomainSig(sig, 'PlatinMarket', ['platinmarket.com']);
   addDomainSig(sig, 'Projesoft', ['projesoft.com.tr']);
   addDomainSig(sig, 'Faprika', ['faprika.com']);
@@ -714,7 +714,7 @@ const CMS_SIGNATURES = (function buildCMS() {
   addDomainSig(sig, 'eticaretim', ['eticaretim.com']);
   // Dünya SaaS
   addDomainSig(sig, 'Shopify', ['cdn.shopify.com', 'myshopify.com']);
-  addDomainSig(sig, 'Wix', ['wixstatic.com', 'wix.com', 'wixsite.com']);
+  addDomainSig(sig, 'Wix', ['wixstatic.com', 'wix.com', 'wixsite.com', 'parastorage.com']);
   addDomainSig(sig, 'BigCommerce', ['bigcommerce.com']);
   addDomainSig(sig, 'Squarespace', ['squarespace-cdn.com', 'squarespace.com']);
   addDomainSig(sig, 'Ecwid', ['ecwid.com']);
@@ -724,7 +724,7 @@ const CMS_SIGNATURES = (function buildCMS() {
   sig.push({ name: 'WordPress', html: [/wp-content\//i, /wp-include/i], headers: [/x-powered-by.*wordpress/i] });
   sig.push({ name: 'Magento', html: [/Magento/i, /mage\.(init|require)/i] });
   sig.push({ name: 'PrestaShop', html: [/PrestaShop/i, /prestashop/i] });
-  sig.push({ name: 'OpenCart', html: [/index\.php\?route=/i, /opencart/i] });
+  sig.push({ name: 'OpenCart', html: [/index\.php\?route=/i, /opencart/i, /catalog\/view\//i, /\/image\/cache\//i] });
   sig.push({ name: 'Shopware', html: [/shopware/i] });
   sig.push({ name: 'OsCommerce', html: [/oscommerce/i] });
   sig.push({ name: 'Zen Cart', html: [/zencart/i] });
