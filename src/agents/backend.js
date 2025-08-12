@@ -4570,6 +4570,11 @@ function createAdminMenu() {
       .addItem('∞ Tümü (chunk=100)', 'openCMSDetectionCurrentAgentAll');
     menu.addSubMenu(cmsMenu);
     
+    // Sıralama (Referans Sabit) alt menüsü
+    const refSortMenu = SpreadsheetApp.getUi().createMenu('Sıralama (Referans Sabit)')
+      .addItem('Dinamik Sıralama (Seçim)', 'openReferenceSafeSortDialog');
+    menu.addSubMenu(refSortMenu);
+    
     // Bakım alt menüsü
     const bakım = SpreadsheetApp.getUi().createMenu('Bakım')
       .addItem('🎨 Renkleri Yenile (Bu sayfa)', 'refreshColorsOnActiveSheet')
@@ -4591,6 +4596,131 @@ function createAdminMenu() {
     
   } catch (error) {
     console.error('Failed to create admin menu:', error);
+  }
+}
+
+// ========================================
+// 🔠 REFERENCE-SAFE SORTING (DYNAMIC DIALOG)
+// ========================================
+
+function openReferenceSafeSortDialog() {
+  console.log('Function started: openReferenceSafeSortDialog');
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const sheet = SpreadsheetApp.getActiveSheet();
+    if (!isFormatTable(sheet)) {
+      ui.alert('Bu komut sadece "Format Tablo" sayfalarında çalışır.');
+      return;
+    }
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 1) { ui.alert('Başlıklar yüklenemedi.'); return; }
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    const safeHeaders = headers.filter(h => String(h || '').trim().length > 0);
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 12px; }
+    h3 { margin: 0 0 8px 0; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .hdr { min-width: 220px; }
+    .list { height: 340px; overflow: auto; border: 1px solid #ddd; padding: 8px; }
+    button { margin-top: 12px; }
+    small { color: #555; }
+  </style>
+  <script>
+    const HEADERS = ${JSON.stringify(safeHeaders)};
+    function render() {
+      const list = document.getElementById('list');
+      for (const h of HEADERS) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = h;
+        const label = document.createElement('span'); label.textContent = h; label.className = 'hdr';
+        const dir = document.createElement('select');
+        const o1 = document.createElement('option'); o1.value = 'asc'; o1.text = 'A→Z (Artan)';
+        const o2 = document.createElement('option'); o2.value = 'desc'; o2.text = 'Z→A (Azalan)';
+        dir.appendChild(o1); dir.appendChild(o2);
+        row.appendChild(cb); row.appendChild(label); row.appendChild(dir);
+        list.appendChild(row);
+      }
+    }
+    function submitForm() {
+      const rows = Array.from(document.querySelectorAll('#list .row'));
+      const selected = [];
+      for (const r of rows) {
+        const cb = r.querySelector('input[type=\"checkbox\"]');
+        const dir = r.querySelector('select');
+        if (cb && cb.checked) {
+          selected.push({ headerName: cb.value, direction: dir.value });
+        }
+      }
+      if (selected.length === 0) { alert('En az bir sütun seçin.'); return; }
+      const payload = { selections: selected };
+      google.script.run
+        .withSuccessHandler(() => google.script.host.close())
+        .withFailureHandler(err => alert('Hata: ' + err.message))
+        .processReferenceSafeSort(payload);
+    }
+    window.onload = render;
+  </script>
+  </head>
+  <body>
+    <h3>Sıralama (Referans Sabit)</h3>
+    <div class="list" id="list"></div>
+    <small>Not: "CMS Grubu=Referans" satırları en üstte kalır; diğerleri seçtiğiniz sıraya göre sıralanır.</small>
+    <div>
+      <button onclick="submitForm()">Sırala</button>
+      <button onclick="google.script.host.close()">İptal</button>
+    </div>
+  </body>
+</html>`;
+    const output = HtmlService.createHtmlOutput(html).setWidth(500).setHeight(520);
+    ui.showModalDialog(output, 'Sıralama (Referans Sabit)');
+    console.log('Processing complete: dialog opened');
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Error: ' + error.message);
+    throw error;
+  }
+}
+
+function processReferenceSafeSort(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!parameters || !Array.isArray(parameters.selections) || parameters.selections.length === 0) {
+      throw new Error('Invalid input provided');
+    }
+    const ui = SpreadsheetApp.getUi();
+    const sheet = SpreadsheetApp.getActiveSheet();
+    if (!isFormatTable(sheet)) { ui.alert('Bu komut sadece "Format Tablo" sayfalarında çalışır.'); return; }
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastRow < 2) { ui.alert('Sıralanacak veri bulunamadı.'); return; }
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    const cmsGroupIdx = headers.indexOf('CMS Grubu') + 1;
+    if (cmsGroupIdx < 1) { throw new Error('"CMS Grubu" sütunu bulunamadı.'); }
+    const rankCol = lastCol + 1;
+    sheet.insertColumnAfter(lastCol);
+    sheet.getRange(1, rankCol).setValue('referans_rank_tmp');
+    const cmsGroupValues = sheet.getRange(2, cmsGroupIdx, lastRow - 1, 1).getDisplayValues();
+    const rankValues = cmsGroupValues.map(r => [String(r[0] || '').trim() === 'Referans' ? 0 : 1]);
+    sheet.getRange(2, rankCol, lastRow - 1, 1).setValues(rankValues);
+    const sortSpecs = [{ column: rankCol, ascending: true }];
+    for (const sel of parameters.selections) {
+      const idx = headers.indexOf(sel.headerName) + 1;
+      if (idx > 0) sortSpecs.push({ column: idx, ascending: sel.direction === 'asc' });
+    }
+    const rangeToSort = sheet.getRange(2, 1, lastRow - 1, rankCol);
+    rangeToSort.sort(sortSpecs);
+    sheet.deleteColumn(rankCol);
+    console.log('Processing complete:', { totalRows: lastRow - 1, sortSpecs });
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Error: ' + error.message);
+    throw error;
   }
 }
 

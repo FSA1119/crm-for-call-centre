@@ -590,6 +590,7 @@ function createManagerMenu() {
     menu.addSubMenu(maintenance)
         .addSeparator();
     
+    
     menu.addItem('Senkronizasyon Durumu', 'showSyncStatus')
         .addSeparator()
         .addItem('Verileri Temizle', 'cleanManagerData')
@@ -4521,3 +4522,20 @@ function refreshAgentColorCodingPrompt() {
     console.error('Function failed:', error);
   }
 }
+
+// ========================================
+// 🔠 REFERENCE-SAFE SORTING (DYNAMIC DIALOG)
+// ========================================
+
+/**
+ * Referans (CMS Grubu=Referans) satırlarını en üstte sabit tutarak,
+ * kullanıcıya seçtirdiği bir veya birden fazla sütuna göre A→Z/Z→A sıralama yapar.
+ * Yalnızca "Format Tablo" sayfalarında çalışır.
+ */
+// Dinamik sıralama diyalogu yönetici dosyasından kaldırıldı; temsilci tarafına taşındı.
+/**
+ * Dialogdan gelen seçimlere göre sıralamayı uygular. Referans (CMS Grubu=Referans)
+ * satırları için geçici rank kolonu kullanılır (0=Referans, 1=Diğer).
+ * @param {{ selections: { headerName: string, direction: 'asc'|'desc' }[] }} parameters 
+ */
+// Referans-sabit sıralama uygulaması yönetici tarafında yok; temsilci tarafında uygulanır.
