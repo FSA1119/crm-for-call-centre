@@ -15,7 +15,7 @@ const CRM_CONFIG = {
     'KO 003': 'Kadir Öztürk',
     'SB 004': 'Sinem Bakalcı',
     'KM 005': 'Kübra Murat',
-    'CA 006': 'Canan Arslan'
+    'GŞ 006': 'Canan Arslan'
   },
   
   // 📁 File Management - Data Sources
@@ -807,9 +807,9 @@ function syncSingleEmployee_SB_004() { console.log('🔄 Starting sync for singl
 function syncSingleEmployee_KM_005() { console.log('🔄 Starting sync for single employee: KM 005'); syncSingleEmployee('KM 005', { mode: 'replace' }); }
 
 /**
- * CA 006 için senkronizasyon fonksiyonu
+ * GŞ 006 için senkronizasyon fonksiyonu
  */
-function syncSingleEmployee_CA_006() { console.log('🔄 Starting sync for single employee: CA 006'); syncSingleEmployee('CA 006', { mode: 'replace' }); }
+function syncSingleEmployee_GŞ_006() { console.log('🔄 Starting sync for single employee: GŞ 006'); syncSingleEmployee('GŞ 006', { mode: 'replace' }); }
 
 // Append-mode wrappers
 function syncSingleEmployeeAppend_LG_001() { console.log('🔄 Starting APPEND sync: LG 001'); syncSingleEmployee('LG 001', { mode: 'append' }); }
@@ -817,7 +817,7 @@ function syncSingleEmployeeAppend_NT_002() { console.log('🔄 Starting APPEND s
 function syncSingleEmployeeAppend_KO_003() { console.log('🔄 Starting APPEND sync: KO 003'); syncSingleEmployee('KO 003', { mode: 'append' }); }
 function syncSingleEmployeeAppend_SB_004() { console.log('🔄 Starting APPEND sync: SB 004'); syncSingleEmployee('SB 004', { mode: 'append' }); }
 function syncSingleEmployeeAppend_KM_005() { console.log('🔄 Starting APPEND sync: KM 005'); syncSingleEmployee('KM 005', { mode: 'append' }); }
-function syncSingleEmployeeAppend_CA_006() { console.log('🔄 Starting APPEND sync: CA 006'); syncSingleEmployee('CA 006', { mode: 'append' }); }
+function syncSingleEmployeeAppend_GŞ_006() { console.log('🔄 Starting APPEND sync: GŞ 006'); syncSingleEmployee('GŞ 006', { mode: 'append' }); }
 
 // ========================================
 // 🚀 INITIALIZATION SYSTEM - SYSTEM STARTUP
@@ -2188,7 +2188,7 @@ const EMPLOYEE_FILES = {
   'KO 003': '1uLufPJqFSfm1WxqSzcvDOKW_hAv8AMhkQwljeiD51mc',
   'SB 004': '17RWqUrQ_m9h0ktJQ_E_55dt-Ao-RA01O6pUFbZ9DxDs',
   'KM 005': '15mwfzEBth_qIDEA8WofxOR5T3P8s-rMcMaLheBoV9uI',
-  'CA 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8'
+  'GŞ 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8'
 };
 
 const MANAGER_FILE_ID = '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A';
@@ -2551,7 +2551,7 @@ function syncSingleEmployeeIsolated_NT_002() { syncSingleEmployeeIsolated('NT 00
 function syncSingleEmployeeIsolated_KO_003() { syncSingleEmployeeIsolated('KO 003'); }
 function syncSingleEmployeeIsolated_SB_004() { syncSingleEmployeeIsolated('SB 004'); }
 function syncSingleEmployeeIsolated_KM_005() { syncSingleEmployeeIsolated('KM 005'); }
-function syncSingleEmployeeIsolated_CA_006() { syncSingleEmployeeIsolated('CA 006'); }
+function syncSingleEmployeeIsolated_GŞ_006() { syncSingleEmployeeIsolated('GŞ 006'); }
 
 function moveSelectedRandevuToMeeting() {
   console.log('Function started:', {});

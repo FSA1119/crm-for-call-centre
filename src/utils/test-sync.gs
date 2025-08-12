@@ -88,10 +88,10 @@ function testKM005Only() {
   testSingleEmployeeSync('KM 005');
 }
 
-// CA 006 özel test
-function testCA006Only() {
-  console.log('=== CA 006 ÖZEL TESTİ ===');
-  testSingleEmployeeSync('CA 006');
+// GŞ 006 özel test
+function testGS006Only() {
+  console.log('=== GŞ 006 ÖZEL TESTİ ===');
+  testSingleEmployeeSync('GŞ 006');
 }
 
 // Tek temsilci senkronizasyon testi
