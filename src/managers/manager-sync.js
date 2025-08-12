@@ -1720,10 +1720,13 @@ function createManagerSheetHeaders(sheet, sheetName) {
         headers = [
           'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
           'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-                'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-      'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli',
-      'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan'
+          'Saat', 'Yorum', 'Yönetici Not',
+          // İstenen ekler: Yönetici Not'tan hemen sonra
+          'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
+          // Devam
+          'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+          'Rating count', 'Review'
         ];
         break;
       default:
@@ -2944,9 +2947,11 @@ function ensureToplantilarSchema(ss, sheetNameOverride) {
     const requiredHeaders = [
       'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
       'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-      'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+      'Saat', 'Yorum', 'Yönetici Not',
+      'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
+      'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
       'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-      'Rating count', 'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan'
+      'Rating count', 'Review'
     ];
 
     const lastCol = sheet.getLastColumn();
@@ -2960,6 +2965,29 @@ function ensureToplantilarSchema(ss, sheetNameOverride) {
         sheet.getRange(1, newColIndex).setValue(h);
         appended++;
       }
+    }
+
+    // Reorder: Move meeting fields right after 'Yönetici Not'
+    try {
+      const headersNow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      const idxYon = headersNow.indexOf('Yönetici Not');
+      const toMove = ['Toplantı Sonucu','Teklif Detayı','Satış Potansiyeli','Toplantı Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan'];
+      if (idxYon !== -1) {
+        let insertPos = idxYon + 2; // after Yönetici Not
+        for (const name of toMove) {
+          const curIdx = headersNow.indexOf(name);
+          if (curIdx !== -1 && curIdx + 1 !== insertPos) {
+            sheet.moveColumns(sheet.getRange(1, curIdx + 1, sheet.getMaxRows(), 1), insertPos);
+            // Refresh headersNow indices minimally
+            headersNow.splice(insertPos - 1, 0, headersNow.splice(curIdx, 1)[0]);
+            insertPos++;
+          } else if (curIdx !== -1) {
+            insertPos++;
+          }
+        }
+      }
+    } catch (reorderErr) {
+      console.log('⚠️ Reorder skipped:', reorderErr && reorderErr.message);
     }
 
     if (appended > 0) {

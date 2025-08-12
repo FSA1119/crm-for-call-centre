@@ -155,6 +155,12 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 | Saat | datepicker |
 | Yorum | input |
 | Yönetici Not | input |
+| Toplantı Sonucu | dropdown |
+| Teklif Detayı | multiselect |
+| Satış Potansiyeli | dropdown |
+| Toplantı Tarihi | datepicker |
+| Yeni Takip Tarihi | datepicker |
+| Toplantıyı Yapan | input |
 | CMS Adı | input |
 | CMS Grubu | input |
 | E-Ticaret İzi | input |
@@ -166,12 +172,6 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 | City | input |
 | Rating count | input |
 | Review | input |
-| Toplantı Sonucu | dropdown |
-| Teklif Detayı | multiselect |
-| Satış Potansiyeli | dropdown |
-| Toplantı Tarihi | datepicker |
-| Yeni Takip Tarihi | datepicker |
-Toplantıyı Yapan
 
 Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon  
 Toplantı Sonucu (dropdown): Satış Yapıldı, Teklif iletildi, Beklemede, Satış İptal  
