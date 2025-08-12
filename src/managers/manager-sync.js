@@ -498,6 +498,23 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           } catch (e) {}
         }
         applyRowColor(sheet, rowNumber, color);
+
+        // Yeni: Randevular'da Toplantı Sonucu doluysa kursiv+kalın; boşsa normal
+        try {
+          if (lowerName.includes('randevu') && typeof randevuMeetingResultIdx === 'number' && randevuMeetingResultIdx >= 0) {
+            const resDisp = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getDisplayValue() || '').trim();
+            const rowRange = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+            if (resDisp) {
+              rowRange.setFontStyle('italic');
+              rowRange.setFontWeight('bold');
+            } else {
+              rowRange.setFontStyle('normal');
+              rowRange.setFontWeight('normal');
+            }
+          }
+        } catch (styleErr) {
+          console.log('⚠️ Font style apply skipped:', styleErr && styleErr.message);
+        }
       }
     }
   } catch (error) {
@@ -2815,6 +2832,8 @@ function onEdit(e) {
     if (isMeetingResult && (!e.value || String(e.value).trim() === '')) {
       if (idxTarih !== -1) sheet.getRange(rowIndex, idxTarih + 1).clearContent();
       applyColorCodingToManagerData(sheet, sheet.getName(), rowIndex, 1);
+      // Yeni: kursiv/kalın stilini sıfırla
+      try { sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).setFontStyle('normal').setFontWeight('normal'); } catch (styleResetErr) {}
       return;
     }
 
