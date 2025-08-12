@@ -76,7 +76,11 @@ function deepProbeCMS(finalUrl) {
       { name: 'WordPress', url: base + '/wp-json/', type: 'json' },
       { name: 'WordPress', url: base + '/wp-login.php', type: 'text', mustContain: 'WordPress' },
       { name: 'WooCommerce', url: base + '/wp-content/plugins/woocommerce/readme.txt', type: 'text', mustContain: 'WooCommerce' },
-      { name: 'WooCommerce', url: base + '/?wc-ajax=cart', type: 'json' }
+      { name: 'WooCommerce', url: base + '/?wc-ajax=cart', type: 'json' },
+      // IdeaSoft admin giriş sayfaları genellikle marka içerir
+      { name: 'IdeaSoft', url: base + '/admin', type: 'text', mustContain: 'IdeaSoft' },
+      { name: 'IdeaSoft', url: base + '/admin/login', type: 'text', mustContain: 'IdeaSoft' },
+      { name: 'IdeaSoft', url: base + '/Admin', type: 'text', mustContain: 'IdeaSoft' }
     ];
     const reqs = probes.map(p => ({ url: p.url, muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (LeadBot; CRM-Detector)' } }));
     const resps = UrlFetchApp.fetchAll(reqs);
@@ -683,7 +687,7 @@ const CMS_SIGNATURES = (function buildCMS() {
   const sig = [];
   // Türkiye hazır e-ticaret
   addDomainSig(sig, 'Ticimax', ['ticimax.com']);
-  addDomainSig(sig, 'IdeaSoft', ['ideasoft.com.tr']);
+  addDomainSig(sig, 'IdeaSoft', ['ideasoft.com.tr','ideasoftcdn.com','ideacdn.net','ideasoftstore.com']);
   addDomainSig(sig, 'T-Soft', ['tsoft.com.tr','tsoftcdn.com','tsoftcdn2.com','tsoftstatic.com']);
   addDomainSig(sig, 'İkas', ['ikas.com']);
   addDomainSig(sig, 'PlatinMarket', ['platinmarket.com']);
@@ -726,7 +730,7 @@ const CMS_SIGNATURES = (function buildCMS() {
   sig.push({ name: 'Zen Cart', html: [/zencart/i] });
   sig.push({ name: 'NopCommerce', html: [/nopcommerce/i] });
   // Footer attribution / metin tabanlı imzalar (TR sağlayıcılar)
-  sig.push({ name: 'IdeaSoft', html: [/ideasoft/i] });
+  sig.push({ name: 'IdeaSoft', html: [/ideasoft/i, /content=["']?IdeaSoft/i, /ideacdn/i, /ideasoftstatic/i] });
   sig.push({ name: 'T-Soft', html: [/T-Soft\s+E-?Ticaret\s+Sistemleri/i, /TEKROM\s+Teknoloji/i] });
   sig.push({ name: 'Ticimax', html: [/ticimax/i] });
   sig.push({ name: 'İkas', html: [/\bikas\b/i] });
