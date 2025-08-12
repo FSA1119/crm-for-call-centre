@@ -6944,8 +6944,7 @@ function analyzeEcommerce(website) {
  * @param {Object} parameters - Fonksiyon parametreleri
  * @returns {Object} - Sonuç objesi
  */
-
-  
+function runSiteSpeedTest(parameters) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     const sheetName = sheet.getName();
@@ -7056,7 +7055,7 @@ function analyzeEcommerce(website) {
       totalRows: rowCount
     };
     
-  } catch (error) {
+    } catch (error) {
     console.error('❌ Hız Testi hatası:', error);
     SpreadsheetApp.getUi().alert('Hız Testi sırasında hata oluştu: ' + error.message);
     throw error;
