@@ -488,12 +488,15 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
         } else if (status === 'Toplantı Tamamlandı') {
           color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
         }
-        // Randevular sayfasında Toplantı Sonucu 'Satış Yapıldı' ise ayrı renk
+        // Randevular: Toplantı Sonucu 'Satış Yapıldı' veya 'Teklif İletildi' ise override renk
         if (lowerName.includes('randevu') && typeof randevuMeetingResultIdx === 'number' && randevuMeetingResultIdx >= 0) {
           try {
-            const res = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getValue() || '');
+            const res = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getDisplayValue() || '').trim();
+            const resLower = res.toLowerCase();
             if (res === 'Satış Yapıldı') {
               color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+            } else if (resLower.indexOf('teklif') !== -1) {
+              color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
             }
           } catch (e) {}
         }
