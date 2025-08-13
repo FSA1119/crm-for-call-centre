@@ -1675,7 +1675,10 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
 
       // Per-sheet formatting/validation only for touched sheet
       optimizeColumnWidths(sheet, baseTypeForHeaders);
-      applyManagerSheetDataValidation(sheet, baseTypeForHeaders);
+            applyManagerSheetDataValidation(sheet, baseTypeForHeaders);
+
+      // Deduplicate by [Kod+Company name+Tarih] to avoid repeated rows on subsequent appends
+      try { removeDuplicatesInAggregateSheet(sheet, baseTypeForHeaders); } catch (_) {}
 
       // Sorting for appended aggregate sheets
       try {
@@ -4646,3 +4649,75 @@ function refreshAgentColorCodingPrompt() {
  * @param {{ selections: { headerName: string, direction: 'asc'|'desc' }[] }} parameters 
  */
 // Referans-sabit sıralama uygulaması yönetici tarafında yok; temsilci tarafında uygulanır.
+
+// === DEDUPE: remove duplicates in aggregate T sheets ===
+function removeDuplicatesInAggregateSheet(sheet, baseTypeForHeaders) {
+  try {
+    if (!sheet || sheet.getLastRow() < 2) return;
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+
+    // Column indices (tolerant names)
+    let idxCode = headers.indexOf('Temsilci Kodu');
+    if (idxCode === -1) idxCode = headers.indexOf('Kod');
+    const idxCompany = headers.indexOf('Company name');
+
+    let dateHeader = '';
+    if (String(baseTypeForHeaders).toLowerCase().includes('randevu')) dateHeader = 'Randevu Tarihi';
+    else if (String(baseTypeForHeaders).toLowerCase().includes('fırsat') || String(baseTypeForHeaders).toLowerCase().includes('firsat')) dateHeader = 'Fırsat Tarihi';
+    else if (String(baseTypeForHeaders).toLowerCase().includes('toplant')) dateHeader = 'Toplantı Tarihi';
+    let idxDate = headers.indexOf(dateHeader);
+
+    const idxTime = headers.indexOf('Saat');
+
+    if (idxCode === -1 || idxCompany === -1 || idxDate === -1) return;
+
+    const range = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getDisplayValues();
+
+    function norm(x) { return String(x || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+    function normDate(x) {
+      try {
+        if (x instanceof Date && !isNaN(x.getTime())) return Utilities.formatDate(x, Session.getScriptTimeZone(), 'dd.MM.yyyy');
+        const s = String(x || '').trim();
+        if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return s;
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? '' : Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd.MM.yyyy');
+      } catch (_) { return String(x || '').trim(); }
+    }
+
+    const seen = new Set();
+    const rowsToDelete = [];
+    // Iterate from top to bottom, but keep last occurrence: mark previous as delete
+    for (let i = 0; i < range.length; i++) {
+      const r = range[i];
+      const key = [norm(r[idxCode]), norm(r[idxCompany]), normDate(r[idxDate]), idxTime !== -1 ? norm(r[idxTime]) : ''].join('||');
+      if (seen.has(key)) {
+        rowsToDelete.push(i + 2); // 2-based row index
+      } else {
+        seen.add(key);
+      }
+    }
+    // Delete from bottom to top
+    for (let j = rowsToDelete.length - 1; j >= 0; j--) {
+      sheet.deleteRow(rowsToDelete[j]);
+    }
+  } catch (error) {
+    console.error('removeDuplicatesInAggregateSheet error:', error);
+  }
+}
+
+function runDedupeOnAllTAggregates() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const names = ['T Randevular', 'T Fırsatlar', 'T Toplantılar'];
+    for (const name of names) {
+      const sh = ss.getSheetByName(name);
+      if (!sh) continue;
+      const base = name.replace(/^T\s+/, '');
+      removeDuplicatesInAggregateSheet(sh, base);
+    }
+    SpreadsheetApp.getUi().alert('Tamam', 'T sayfalarında mükerrer kayıtlar temizlendi.', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Hata', String(e && e.message || e), SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
