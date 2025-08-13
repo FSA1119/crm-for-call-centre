@@ -831,6 +831,37 @@ function syncSingleEmployeeAppend_SB_004() { console.log('🔄 Starting APPEND s
 function syncSingleEmployeeAppend_KM_005() { console.log('🔄 Starting APPEND sync: KM 005'); syncSingleEmployee('KM 005', { mode: 'append' }); }
 function syncSingleEmployeeAppend_GŞ_006() { console.log('🔄 Starting APPEND sync: GŞ 006'); syncSingleEmployee('GŞ 006', { mode: 'append' }); }
 
+// === Diagnostics: count rows for a code in T sheets ===
+function debugCountTAggregates(employeeCode) {
+  console.log('🔎 debugCountTAggregates started for', employeeCode);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const tSheets = ['T Randevular', 'T Fırsatlar', 'T Toplantılar'];
+    let msg = `Kod: ${employeeCode}\n`;
+    for (const name of tSheets) {
+      const sh = ss.getSheetByName(name);
+      if (!sh || sh.getLastRow() < 2) { msg += `${name}: 0\n`; continue; }
+      const lastCol = sh.getLastColumn();
+      const headers = sh.getRange(1,1,1,lastCol).getDisplayValues()[0];
+      let codeIdx = headers.indexOf('Temsilci Kodu');
+      if (codeIdx === -1) codeIdx = headers.indexOf('Kod');
+      const companyIdx = headers.indexOf('Company name');
+      const countRange = sh.getRange(2,1,sh.getLastRow()-1,lastCol).getDisplayValues();
+      let count = 0; const samples = [];
+      for (const row of countRange) {
+        if (String(row[codeIdx]) === String(employeeCode)) { count++; if (samples.length < 10) samples.push(row[companyIdx] || ''); }
+      }
+      msg += `${name}: ${count}${samples.length ? ` | örnek: ${samples.join(', ').slice(0,120)}` : ''}\n`;
+    }
+    console.log(msg);
+    SpreadsheetApp.getUi().alert('T Sayfa Sayımları', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('debugCountTAggregates error:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+function debugCountTAggregates_SB_004() { return debugCountTAggregates('SB 004'); }
+
 // ========================================
 // 🚀 INITIALIZATION SYSTEM - SYSTEM STARTUP
 // ========================================
