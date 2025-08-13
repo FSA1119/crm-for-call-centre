@@ -3849,6 +3849,8 @@ function addReportsComparisonMenu(menu) {
   sub.addItem('Günlük', 'openEmployeeMultiSelectReportDaily')
      .addItem('Günlük Seri', 'openEmployeeMultiSelectReportDailySeries')
      .addItem('Haftalık', 'openEmployeeMultiSelectReportWeekly')
+     .addItem('Haftalık Seri', 'generateWeeklyReportSeriesManager')
+     .addItem('Pivot Tabanı (Güncel)', 'generatePivotBaseReportManager')
      .addItem('Aylık', 'openEmployeeMultiSelectReportMonthly');
   menu.addSubMenu(sub);
 }
@@ -4531,6 +4533,73 @@ function generateComparisonSeriesManager(params) {
   }
 }
 
+function generateWeeklyReportSeriesManager(options) {
+  console.log('Function started:', options || {});
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const weeksBack = (options && options.weeks) ? Math.max(1, Math.min(26, Number(options.weeks))) : 8; // default last 8 weeks
+
+    function toKey(d){ return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd.MM.yyyy'); }
+    function startOfWeek(d){ const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const day=dt.getDay(); const diff=(day===0?-6:1-day); dt.setDate(dt.getDate()+diff); dt.setHours(0,0,0,0); return dt; }
+    function endOfWeek(d){ const s=startOfWeek(d); const e=new Date(s); e.setDate(s.getDate()+6); e.setHours(23,59,59,999); return e; }
+    function withinRange(value,a,b){ try{ if(!value) return false; const d=value instanceof Date? value: new Date(String(value)); if(isNaN(d.getTime())) return false; return d>=a && d<=b; }catch(e){return false;} }
+    function extractDateFromLog(logValue){ const s=String(logValue||''); const m=s.match(/(\d{2}\.\d{2}\.\d{4})/); if(m&&m[1]){ const [dd,mm,yy]=m[1].split('.'); const d=new Date(Number(yy),Number(mm)-1,Number(dd)); if(!isNaN(d.getTime())) return d; } return null; }
+    function getActivityDate(headers,row,mainHeader){ const iH=headers.indexOf(mainHeader); if(iH!==-1 && row[iH]) return row[iH]; const iL=headers.indexOf('Log'); if(iL!==-1){ const d=extractDateFromLog(row[iL]); if(d) return d; } return ''; }
+
+    // Prepare target sheet
+    const sheetName = 'Haftalık Seri';
+    let sh = ss.getSheetByName(sheetName); if (!sh) sh = ss.insertSheet(sheetName); else sh.clear();
+    const header = ['Hafta','Randevu Alındı','İleri Tarih Randevu','Yeniden Aranacak','Bilgi Verildi','Fırsat İletildi','İlgilenmiyor','Ulaşılamadı','TOPLAM KONTAK','TOPLAM İŞLEM'];
+    sh.getRange(1,1,1,header.length).setValues([header]).setFontWeight('bold');
+
+    // Data sources (prefer T sheets)
+    const shR = ss.getSheetByName('T Randevular') || ss.getSheetByName('Randevular');
+    const shF = ss.getSheetByName('T Fırsatlar') || ss.getSheetByName('Fırsatlar');
+    const shS = ss.getSheetByName('T Aktivite Özet');
+
+    const weeks = [];
+    const today = new Date(); today.setHours(0,0,0,0);
+    const thisWeekStart = startOfWeek(today);
+    for (let i=0;i<weeksBack;i++){
+      const ws = new Date(thisWeekStart); ws.setDate(thisWeekStart.getDate()-7*i);
+      const we = endOfWeek(ws);
+      weeks.push({ label: `${toKey(ws)} – ${toKey(we)}`, a: ws, b: we });
+    }
+
+    // Helpers to read headers/values once
+    function readSheet(sh){ if(!sh || sh.getLastRow()<=1) return null; const lc=sh.getLastColumn(); return { h: sh.getRange(1,1,1,lc).getValues()[0], v: sh.getRange(2,1,sh.getLastRow()-1,lc).getValues() } }
+    const R = readSheet(shR), F = readSheet(shF), S = readSheet(shS);
+
+    function countBetween(a,b){
+      const c = { 'Randevu Alındı':0,'İleri Tarih Randevu':0,'Randevu Teyitlendi':0,'Randevu Ertelendi':0,'Randevu İptal oldu':0,'Yeniden Aranacak':0,'Bilgi Verildi':0,'Fırsat İletildi':0,'İlgilenmiyor':0,'Ulaşılamadı':0 };
+      // Randevular
+      if (R){ const iStatus=R.h.indexOf('Randevu durumu'); for (const r of R.v){ const d=getActivityDate(R.h,r,'Randevu Tarihi'); if(!withinRange(d,a,b)) continue; const s=String(r[iStatus]||''); if(c.hasOwnProperty(s)) c[s]++; } }
+      // Fırsatlar
+      if (F){ const iStatus=F.h.indexOf('Fırsat Durumu'); for (const r of F.v){ const d=getActivityDate(F.h,r,'Fırsat Tarihi'); if(!withinRange(d,a,b)) continue; const s=String(r[iStatus]||'').toLowerCase(); const norm=s.includes('ilet')? 'Fırsat İletildi': s.includes('bilgi')? 'Bilgi Verildi': s.includes('yeniden')||s.includes('ara')? 'Yeniden Aranacak': ''; if(norm) c[norm]++; } }
+      // Negatifler
+      if (S){ for (const r of S.v){ const d=parseDdMmYyyy(String(r[1]||'')); if(!d) continue; if (d>=a && d<=b){ c['İlgilenmiyor']+=Number(r[2]||0); c['Ulaşılamadı']+=Number(r[3]||0); } } }
+      return c;
+    }
+
+    let rowIdx = 2;
+    for (const w of weeks){
+      const c = countBetween(w.a,w.b);
+      const toplamKontak = c['Randevu Alındı'] + c['İleri Tarih Randevu'] + c['Yeniden Aranacak'] + c['Bilgi Verildi'] + c['Fırsat İletildi'] + c['İlgilenmiyor'];
+      const toplamIslem = toplamKontak + c['Ulaşılamadı'];
+      const row = [w.label, c['Randevu Alındı'], c['İleri Tarih Randevu'], c['Yeniden Aranacak'], c['Bilgi Verildi'], c['Fırsat İletildi'], c['İlgilenmiyor'], c['Ulaşılamadı'], toplamKontak, toplamIslem];
+      sh.getRange(rowIdx,1,1,row.length).setValues([row]);
+      rowIdx++;
+    }
+
+    sh.autoResizeColumns(1, header.length);
+    return { success: true };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
 // Keep 'Satış Yapıldı' rows at top in meetings, then sort by Toplantı Tarihi
 function sortMeetingsSalesTop(sheet) {
   try { sheet.getRange(1,1,1,1).getValues(); } catch(e) { SpreadsheetApp.flush(); }
@@ -4719,5 +4788,105 @@ function runDedupeOnAllTAggregates() {
     SpreadsheetApp.getUi().alert('Tamam', 'T sayfalarında mükerrer kayıtlar temizlendi.', SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (e) {
     SpreadsheetApp.getUi().alert('Hata', String(e && e.message || e), SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+function generatePivotBaseReportManager() {
+  console.log('Function started: generatePivotBaseReportManager');
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const shR = ss.getSheetByName('T Randevular') || ss.getSheetByName('Randevular');
+    const shF = ss.getSheetByName('T Fırsatlar') || ss.getSheetByName('Fırsatlar');
+    const shT = ss.getSheetByName('T Toplantılar') || ss.getSheetByName('Toplantılar');
+    const shS = ss.getSheetByName('T Aktivite Özet');
+
+    function toKey(d){ return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd.MM.yyyy'); }
+    function extractDateFromLog(logValue){ const s=String(logValue||''); const m=s.match(/(\d{2}\.\d{2}\.\d{4})/); if(m&&m[1]){ const [dd,mm,yy]=m[1].split('.'); const d=new Date(Number(yy),Number(mm)-1,Number(dd)); if(!isNaN(d.getTime())) return d; } return null; }
+    function getDate(headers,row,main){ const i=headers.indexOf(main); if(i!==-1 && row[i]) return row[i]; const iL=headers.indexOf('Log'); if(iL!==-1){ const d=extractDateFromLog(row[iL]); if(d) return d; } return null; }
+
+    // Etiket normalizasyonu (etiket eşlemesi)
+    function normStr(s){
+      return String(s||'')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/\s+/g,' ')
+        .trim();
+    }
+    function normalizeLabel(raw, context){
+      const n = normStr(raw);
+      // Negatifler
+      if (/(ulasil|ulasila|ulas|cevap yok|yanit yok|mesgul|erise|eri\u015file)/.test(n)) return 'Ulaşılamadı';
+      if (/(ilgilenm|ilgi yok|ilgi-yok|ilgi bulunm|ilgi duymuyor)/.test(n)) return 'İlgilenmiyor';
+      // Fırsat durumları (pozitifler)
+      if (context === 'firsat') {
+        if (n.includes('ilet')) return 'Fırsat İletildi';
+        if (n.includes('bilgi')) return 'Bilgi Verildi';
+        if (n.includes('yeniden') || n.includes('ara')) return 'Yeniden Aranacak';
+        return '';
+      }
+      // Diğerleri aynen
+      return String(raw||'').trim();
+    }
+
+    function read(sh){ if(!sh || sh.getLastRow()<=1) return null; const lc=sh.getLastColumn(); return { h: sh.getRange(1,1,1,lc).getValues()[0], v: sh.getRange(2,1,sh.getLastRow()-1,lc).getValues() } }
+    const R = read(shR), F = read(shF), Tm = read(shT), S = read(shS);
+
+    const rows = [['Kod','Tarih','Aktivite','Adet']];
+
+    // Randevular: etiketleri normalize et (negatifler dahil)
+    if (R){
+      const iCode=R.h.indexOf('Kod')!==-1? R.h.indexOf('Kod'): R.h.indexOf('Temsilci Kodu');
+      const iStatus=R.h.indexOf('Randevu durumu');
+      for (const r of R.v){
+        const d=getDate(R.h,r,'Randevu Tarihi'); if(!d) continue;
+        const raw = String(r[iStatus]||'').trim(); if(!raw) continue;
+        const s = normalizeLabel(raw, 'randevu'); if(!s) continue;
+        rows.push([String(r[iCode]||'').trim(), toKey(d), s, 1]);
+      }
+    }
+
+    // Fırsatlar: normalize ederek sadece ilgili pozitifleri al
+    if (F){
+      const iCode=F.h.indexOf('Kod')!==-1? F.h.indexOf('Kod'): F.h.indexOf('Temsilci Kodu');
+      const iStatus=F.h.indexOf('Fırsat Durumu');
+      for (const r of F.v){
+        const d=getDate(F.h,r,'Fırsat Tarihi'); if(!d) continue;
+        const s = normalizeLabel(String(r[iStatus]||''), 'firsat'); if(!s) continue;
+        rows.push([String(r[iCode]||'').trim(), toKey(d), s, 1]);
+      }
+    }
+
+    // Toplantılar: olduğu gibi, gerekirse küçük normalizasyon yapılabilir
+    if (Tm){
+      const iCode=Tm.h.indexOf('Kod')!==-1? Tm.h.indexOf('Kod'): Tm.h.indexOf('Temsilci Kodu');
+      const iStatus=Tm.h.indexOf('Toplantı Sonucu');
+      for (const r of Tm.v){
+        const d=getDate(Tm.h,r,'Toplantı Tarihi'); if(!d) continue;
+        const s=String(r[iStatus]||'').trim(); if(!s) continue;
+        rows.push([String(r[iCode]||'').trim(), toKey(d), s, 1]);
+      }
+    }
+
+    // Özet (Format Tablo'dan toplanan negatifler): varsa ekle
+    if (S){
+      for (const r of S.v){
+        const code=String(r[0]||'').trim();
+        const d=parseDdMmYyyy(String(r[1]||''));
+        if(!code || !d) continue;
+        const ilgi=Number(r[2]||0); const ulas=Number(r[3]||0);
+        if (ilgi>0) rows.push([code, toKey(d), 'İlgilenmiyor', ilgi]);
+        if (ulas>0) rows.push([code, toKey(d), 'Ulaşılamadı', ulas]);
+      }
+    }
+
+    let pv = ss.getSheetByName('Pivot Veri'); if (!pv) pv = ss.insertSheet('Pivot Veri'); else pv.clear();
+    pv.getRange(1,1,rows.length,4).setValues(rows);
+    pv.autoResizeColumns(1,4);
+    SpreadsheetApp.getUi().alert('Tamam', 'Pivot tabanı güncellendi (Pivot Veri).', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
   }
 }
