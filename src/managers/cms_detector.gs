@@ -353,6 +353,16 @@ function openCMSDetectionCurrentAgentSelection() {
   }
 }
 
+// Geriye dönük uyumluluk: eski fonksiyon adı
+function detectCMSAltyapisi() {
+  try {
+    return openCMSDetectionCurrentAgentSelection();
+  } catch (e) {
+    try { SpreadsheetApp.getUi().alert('Hata', String(e && e.message || e), SpreadsheetApp.getUi().ButtonSet.OK); } catch(_) {}
+    throw e;
+  }
+}
+
 /**
  * Seçili satırlar için doğruluk odaklı tarama (redirect + derin imza)
  */

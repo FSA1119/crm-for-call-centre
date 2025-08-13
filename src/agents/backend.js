@@ -1,7 +1,7 @@
 // ========================================
 // GOOGLE SHEETS CRM SYSTEM - BACKEND
 // ========================================
-// Version: 4.4
+// Version: 1.0
 // Author: CRM Development Team
 // Date: 2025-07-08
 
@@ -3807,7 +3807,17 @@ function onOpen() {
   } else {
     console.log('Temsilci file detected - creating CRM and ADMIN menus');
     
-
+    // Automatically apply data validation to all sheets
+    try {
+      console.log('Auto-applying data validation to all sheets with extended coverage...');
+      
+      // Directly apply refreshFormatTabloValidation for maximum coverage (silent)
+      refreshFormatTabloValidation({ silent: true });
+      
+      console.log('Extended data validation applied successfully');
+    } catch (error) {
+      console.warn('Auto data validation failed:', error.message);
+    }
     
     // Create admin menu for all sheets
     createAdminMenu();
@@ -3830,11 +3840,25 @@ function onOpen() {
     const crmMenu = ui.createMenu('CRM')
       .addItem('Randevu al', 'showTakeAppointmentDialog')
       .addItem('Fırsat ekle', 'showAddOpportunityDialog')
-      .addItem('Toplantıya Geç', 'showMoveToMeetingDialog');
+      .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
+      .addSeparator()
+      .addItem('📦 Dataset Raporu', 'showDatasetReportDialog');
 
         crmMenu.addToUi();
 
-    console.log('CRM menu created');
+    // Create standalone Sector Helper menu (always visible)
+    try {
+      const existingMenus2 = ui.getMenus();
+      const helperMenu = existingMenus2.find(menu => menu.getName() === 'Sektör Yardımcısı');
+      if (helperMenu) {
+        helperMenu.remove();
+      }
+    } catch (e) {}
+    ui.createMenu('Sektör Yardımcısı')
+      .addItem('Yan Paneli Aç', 'showSectorHelperDialog')
+      .addToUi();
+        
+    console.log('CRM menu and Sector Helper menu created');
   }
 }
 
@@ -4459,6 +4483,52 @@ function testOnEditTrigger() {
   }
 }
 
+function testMonthlyReport() {
+  console.log('Haftalık rapor test başlatılıyor...');
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet();
+    const randevularimSheet = sheet.getSheetByName('Randevularım');
+    
+    if (!randevularimSheet) {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Randevularım sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    // Randevularım verilerini kontrol et
+    const data = randevularimSheet.getDataRange().getValues();
+    const headers = data[0];
+    
+    console.log('Randevularım başlıkları:', headers);
+    console.log('Toplam satır sayısı:', data.length);
+    
+    // İlk 5 satırı göster
+    for (let i = 1; i < Math.min(6, data.length); i++) {
+      console.log(`Satır ${i}:`, data[i]);
+    }
+    
+    // Tarih sütununu bul
+    const tarihColIndex = headers.indexOf('Tarih') !== -1 ? 
+      headers.indexOf('Tarih') : 
+      headers.indexOf('Randevu Tarihi');
+    
+    console.log('Tarih sütun indeksi:', tarihColIndex);
+    
+    if (tarihColIndex !== -1) {
+      // Tarih verilerini kontrol et
+      for (let i = 1; i < Math.min(10, data.length); i++) {
+        const tarih = data[i][tarihColIndex];
+        console.log(`Satır ${i} tarihi:`, tarih, 'Tip:', typeof tarih);
+      }
+    }
+    
+    SpreadsheetApp.getUi().alert('✅ Test Tamamlandı', 'Haftalık rapor test edildi! Console logları kontrol edin.', SpreadsheetApp.getUi().ButtonSet.OK);
+    
+  } catch (error) {
+    console.error('Test hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Test Hatası', 'Test sırasında hata: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
 
 /**
  * Creates admin menu for all sheets
@@ -4479,11 +4549,26 @@ function createAdminMenu() {
     menu.addSeparator();
     menu.addItem('Yeni Tablo oluştur', 'showCreateTableDialog');
     menu.addSeparator();
+    menu.addItem('🧪 Test Data Validation', 'testDataValidation');
+    menu.addSeparator();
+    menu.addItem('🔄 Apply Data Validation to All Sheets', 'applyDataValidationToExistingSheets');
+    menu.addItem('🔄 Refresh Format Tablo Validation', 'refreshFormatTabloValidation');
+    menu.addSeparator();
+    menu.addItem('📝 Update Existing Codes', 'updateExistingCodes');
+    menu.addSeparator();
+    menu.addItem('🧪 Test onEdit Trigger', 'testOnEditTrigger');
+    menu.addItem('🎨 Manuel Renk Uygula', 'applyManualColorCoding');
+    menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
+    menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
 
-    // Sıralama (Referans Sabit) alt menüsü
-    const refSortMenu = SpreadsheetApp.getUi().createMenu('Sıralama (Referans Sabit)')
-      .addItem('Dinamik Sıralama (Seçim)', 'openReferenceSafeSortDialog');
-    menu.addSubMenu(refSortMenu);
+    // CMS Analizi alt menüsü
+    const cmsMenu = SpreadsheetApp.getUi().createMenu('CMS Analizi')
+      .addItem('⚡ Seçili Satırlar', 'openCMSDetectionCurrentAgentSelection')
+      .addItem('🛡️ Seçili Satırlar (Doğruluk)', 'openCMSDetectionCurrentAgentSelectionAccurate')
+      .addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable')
+      .addItem('🧱 CMS Sütunlarını Website Yanına Taşı (Format Tablo)', 'addCmsColumnsNextToWebsiteOnAllFormatTables')
+      .addItem('∞ Tümü (chunk=100)', 'openCMSDetectionCurrentAgentAll');
+    menu.addSubMenu(cmsMenu);
     
     // Bakım alt menüsü
     const bakım = SpreadsheetApp.getUi().createMenu('Bakım')
@@ -4495,10 +4580,7 @@ function createAdminMenu() {
       .addSeparator()
       .addItem('🔎 Mükerrerleri Bul (Firma + Telefon)', 'findDuplicatesInFormatTable')
       .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation')
-      .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm')
-      .addSeparator()
-      .addItem('📱 Telefon Tipi Hesapla (Bu sayfa)', 'upsertPhoneTypeColumnOnActiveSheet')
-      .addItem('📱 Telefon Tipi Sırala (Cep→Sabit→Kurumsal→Sanal)', 'sortByPhoneTypeOrderPreservingReference');
+      .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm');
     
     menu.addSubMenu(bakım);
     
@@ -4509,131 +4591,6 @@ function createAdminMenu() {
     
   } catch (error) {
     console.error('Failed to create admin menu:', error);
-  }
-}
-
-// ========================================
-// 🔠 REFERENCE-SAFE SORTING (DYNAMIC DIALOG)
-// ========================================
-
-function openReferenceSafeSortDialog() {
-  console.log('Function started: openReferenceSafeSortDialog');
-  try {
-    const ui = SpreadsheetApp.getUi();
-    const sheet = SpreadsheetApp.getActiveSheet();
-    if (!isFormatTable(sheet)) {
-      ui.alert('Bu komut sadece "Format Tablo" sayfalarında çalışır.');
-      return;
-    }
-    const lastCol = sheet.getLastColumn();
-    if (lastCol < 1) { ui.alert('Başlıklar yüklenemedi.'); return; }
-    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-    const safeHeaders = headers.filter(h => String(h || '').trim().length > 0);
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <base target="_top">
-  <style>
-    body { font-family: Arial, sans-serif; padding: 12px; }
-    h3 { margin: 0 0 8px 0; }
-    .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-    .hdr { min-width: 220px; }
-    .list { height: 340px; overflow: auto; border: 1px solid #ddd; padding: 8px; }
-    button { margin-top: 12px; }
-    small { color: #555; }
-  </style>
-  <script>
-    const HEADERS = ${JSON.stringify(safeHeaders)};
-    function render() {
-      const list = document.getElementById('list');
-      for (const h of HEADERS) {
-        const row = document.createElement('div');
-        row.className = 'row';
-        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = h;
-        const label = document.createElement('span'); label.textContent = h; label.className = 'hdr';
-        const dir = document.createElement('select');
-        const o1 = document.createElement('option'); o1.value = 'asc'; o1.text = 'A→Z (Artan)';
-        const o2 = document.createElement('option'); o2.value = 'desc'; o2.text = 'Z→A (Azalan)';
-        dir.appendChild(o1); dir.appendChild(o2);
-        row.appendChild(cb); row.appendChild(label); row.appendChild(dir);
-        list.appendChild(row);
-      }
-    }
-    function submitForm() {
-      const rows = Array.from(document.querySelectorAll('#list .row'));
-      const selected = [];
-      for (const r of rows) {
-        const cb = r.querySelector('input[type=\"checkbox\"]');
-        const dir = r.querySelector('select');
-        if (cb && cb.checked) {
-          selected.push({ headerName: cb.value, direction: dir.value });
-        }
-      }
-      if (selected.length === 0) { alert('En az bir sütun seçin.'); return; }
-      const payload = { selections: selected };
-      google.script.run
-        .withSuccessHandler(() => google.script.host.close())
-        .withFailureHandler(err => alert('Hata: ' + err.message))
-        .processReferenceSafeSort(payload);
-    }
-    window.onload = render;
-  </script>
-  </head>
-  <body>
-    <h3>Sıralama (Referans Sabit)</h3>
-    <div class="list" id="list"></div>
-    <small>Not: "CMS Grubu=Referans" satırları en üstte kalır; diğerleri seçtiğiniz sıraya göre sıralanır.</small>
-    <div>
-      <button onclick="submitForm()">Sırala</button>
-      <button onclick="google.script.host.close()">İptal</button>
-    </div>
-  </body>
-</html>`;
-    const output = HtmlService.createHtmlOutput(html).setWidth(500).setHeight(520);
-    ui.showModalDialog(output, 'Sıralama (Referans Sabit)');
-    console.log('Processing complete: dialog opened');
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Error: ' + error.message);
-    throw error;
-  }
-}
-
-function processReferenceSafeSort(parameters) {
-  console.log('Function started:', parameters);
-  try {
-    if (!parameters || !Array.isArray(parameters.selections) || parameters.selections.length === 0) {
-      throw new Error('Invalid input provided');
-    }
-    const ui = SpreadsheetApp.getUi();
-    const sheet = SpreadsheetApp.getActiveSheet();
-    if (!isFormatTable(sheet)) { ui.alert('Bu komut sadece "Format Tablo" sayfalarında çalışır.'); return; }
-    const lastRow = sheet.getLastRow();
-    const lastCol = sheet.getLastColumn();
-    if (lastRow < 2) { ui.alert('Sıralanacak veri bulunamadı.'); return; }
-    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-    const cmsGroupIdx = headers.indexOf('CMS Grubu') + 1;
-    if (cmsGroupIdx < 1) { throw new Error('"CMS Grubu" sütunu bulunamadı.'); }
-    const rankCol = lastCol + 1;
-    sheet.insertColumnAfter(lastCol);
-    sheet.getRange(1, rankCol).setValue('referans_rank_tmp');
-    const cmsGroupValues = sheet.getRange(2, cmsGroupIdx, lastRow - 1, 1).getDisplayValues();
-    const rankValues = cmsGroupValues.map(r => [String(r[0] || '').trim() === 'Referans' ? 0 : 1]);
-    sheet.getRange(2, rankCol, lastRow - 1, 1).setValues(rankValues);
-    const sortSpecs = [{ column: rankCol, ascending: true }];
-    for (const sel of parameters.selections) {
-      const idx = headers.indexOf(sel.headerName) + 1;
-      if (idx > 0) sortSpecs.push({ column: idx, ascending: sel.direction === 'asc' });
-    }
-    const rangeToSort = sheet.getRange(2, 1, lastRow - 1, rankCol);
-    rangeToSort.sort(sortSpecs);
-    sheet.deleteColumn(rankCol);
-    console.log('Processing complete:', { totalRows: lastRow - 1, sortSpecs });
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Error: ' + error.message);
-    throw error;
   }
 }
 
@@ -5142,7 +5099,7 @@ const EMPLOYEE_FILES = {
   'KO 003': '1uLufPJqFSfm1WxqSzcvDOKW_hAv8AMhkQwljeiD51mc',
   'SB 004': '17RWqUrQ_m9h0ktJQ_E_55dt-Ao-RA01O6pUFbZ9DxDs',
   'KM 005': '11veeCnPYRPGEWMzZzpLiwUOSNvPhp8n_qHEiDi7lXlw',
-  'GŞ 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8'
+  'CA 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8'
 };
 
 const MANAGER_FILE_ID = '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A';
@@ -6305,6 +6262,136 @@ function refreshFormatTabloValidation(params) {
  * @param {Object} parameters - Fonksiyon parametreleri
  * @returns {Object} - Sonuç objesi
  */
+function detectCMSAltyapisi(parameters) {
+  console.log('🔍 CMS Altyapısı tespiti başlatılıyor:', parameters);
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const sheetName = sheet.getName();
+    
+    // Sayfa kontrolü - Herhangi bir sayfada çalışabilir
+    console.log('📊 Analiz edilecek sayfa:', sheetName);
+    
+    // Range kontrolü - Seçim yoksa tüm sayfa
+    let startRow = 2; // Başlık satırını atla
+    let endRow = sheet.getLastRow();
+    let rowCount = endRow - startRow + 1;
+    
+    const range = sheet.getActiveRange();
+    if (range) {
+      startRow = range.getRow();
+      endRow = range.getLastRow();
+      rowCount = endRow - startRow + 1;
+      
+      // Başlık satırını kontrol et
+      if (startRow === 1) {
+        startRow = 2;
+        rowCount = endRow - startRow + 1;
+      }
+    }
+    
+    if (rowCount <= 0) {
+      throw new Error('Analiz edilecek satır bulunamadı');
+    }
+    
+    console.log(`📊 ${rowCount} satır analiz edilecek (${startRow}-${endRow})`);
+    
+    // Progress mesajı
+    const ui = SpreadsheetApp.getUi();
+    ui.alert(`${rowCount} satır analiz ediliyor...\nLütfen bekleyin.`);
+    
+    // Website kolonunu bul
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const websiteIndex = headers.findIndex(header => 
+      header && (header.toString().toLowerCase().includes('website') || 
+                header.toString().toLowerCase().includes('site') || 
+                header.toString().toLowerCase().includes('url'))
+    );
+    
+    if (websiteIndex === -1) {
+      throw new Error('Website kolonu bulunamadı. Lütfen Website, Site veya URL kolonu ekleyin.');
+    }
+    
+    // CMS kolonlarını bul veya oluştur
+    let cmsAdiIndex = headers.findIndex(header => header === 'CMS Adı');
+    let cmsGrubuIndex = headers.findIndex(header => header === 'CMS Grubu');
+    
+    if (cmsAdiIndex === -1) {
+      const lastColumn = sheet.getLastColumn();
+      sheet.getRange(1, lastColumn + 1).setValue('CMS Adı');
+      cmsAdiIndex = lastColumn;
+      console.log('✅ CMS Adı kolonu eklendi');
+    }
+    
+    if (cmsGrubuIndex === -1) {
+      const lastColumn = sheet.getLastColumn();
+      sheet.getRange(1, lastColumn + 1).setValue('CMS Grubu');
+      cmsGrubuIndex = lastColumn;
+      console.log('✅ CMS Grubu kolonu eklendi');
+    }
+    
+    // Performans optimizasyonu
+    const BATCH_SIZE = Math.min(25, rowCount); // Daha küçük batch
+    let processedCount = 0;
+    let errorCount = 0;
+    
+    // Her batch için
+    for (let i = 0; i < rowCount; i += BATCH_SIZE) {
+      const batchEnd = Math.min(i + BATCH_SIZE, rowCount);
+      const batchSize = batchEnd - i;
+      
+      console.log(`🔄 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${batchSize} satır işleniyor`);
+      
+      // Batch içindeki her satır için
+      for (let j = 0; j < batchSize; j++) {
+        const currentRow = startRow + i + j;
+        
+        try {
+          const website = sheet.getRange(currentRow, websiteIndex + 1).getValue();
+          
+          if (website && website.toString().trim() !== '') {
+            const cmsResult = analyzeCMS(website.toString());
+            
+            // Sonuçları yaz
+            sheet.getRange(currentRow, cmsAdiIndex + 1).setValue(cmsResult.cmsName);
+            sheet.getRange(currentRow, cmsGrubuIndex + 1).setValue(cmsResult.cmsGroup);
+            
+            processedCount++;
+          }
+          
+        } catch (error) {
+          console.error(`❌ Satır ${currentRow} analiz hatası:`, error);
+          sheet.getRange(currentRow, cmsAdiIndex + 1).setValue('Erişilemiyor');
+          sheet.getRange(currentRow, cmsGrubuIndex + 1).setValue('Erişilemiyor');
+          errorCount++;
+        }
+        
+        // Her 5 satırda bir progress
+        if ((processedCount + errorCount) % 5 === 0) {
+          console.log(`✅ ${processedCount} başarılı, ${errorCount} hatalı`);
+        }
+      }
+      
+      // Batch arası bekleme
+      Utilities.sleep(200);
+    }
+    
+    console.log(`✅ CMS Analizi tamamlandı: ${processedCount} başarılı, ${errorCount} hatalı`);
+    ui.alert(`CMS Analizi tamamlandı!\n✅ ${processedCount} başarılı\n❌ ${errorCount} hatalı`);
+    
+    return {
+      success: true,
+      processedCount: processedCount,
+      errorCount: errorCount,
+      totalRows: rowCount
+    };
+    
+  } catch (error) {
+    console.error('❌ CMS Analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('CMS Analizi sırasında hata oluştu: ' + error.message);
+    throw error;
+  }
+}
 
 /**
  * 🔍 Tekil CMS Analizi - Website Analizi
@@ -6944,7 +7031,9 @@ function analyzeEcommerce(website) {
  * @param {Object} parameters - Fonksiyon parametreleri
  * @returns {Object} - Sonuç objesi
  */
-function runSiteSpeedTest(parameters) {
+function testSiteHizi(parameters) {
+  console.log('⚡ Site Hız Testi başlatılıyor:', parameters);
+  
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     const sheetName = sheet.getName();
@@ -7055,7 +7144,7 @@ function runSiteSpeedTest(parameters) {
       totalRows: rowCount
     };
     
-    } catch (error) {
+  } catch (error) {
     console.error('❌ Hız Testi hatası:', error);
     SpreadsheetApp.getUi().alert('Hız Testi sırasında hata oluştu: ' + error.message);
     throw error;
@@ -7790,3 +7879,4 @@ function refreshAllColors(parameters) {
     throw error;
   }
 }
+

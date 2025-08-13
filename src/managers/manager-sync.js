@@ -1572,7 +1572,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         strictMap.set(sKey, i + 2); // 2-based
         const soKey = softKey(r);
         if (!softMap.has(soKey)) softMap.set(soKey, i + 2);
-        else softMap.set(soKey, -1); // ambiguous
+        else softMap.set(soKey, i + 2); // prefer last occurrence (latest row) for update
       }
 
       const updates = []; // {rowIndex, values}
@@ -1590,7 +1590,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
           continue;
         }
         const soKey = softKey(r);
-        if (softMap.has(soKey) && softMap.get(soKey) > 0) {
+        if (softMap.has(soKey)) {
           const rowIndex = softMap.get(soKey);
           const current = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
           const changed = current.some((v, idx) => String(v) !== String(r[idx]));
