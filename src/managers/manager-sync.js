@@ -3358,17 +3358,14 @@ function generateDailyReportManager(options) {
       }
     }
 
-    // Summary negatives from T Aktivite Özet
-    const shS = ss.getSheetByName('T Aktivite Özet');
-    if (shS && shS.getLastRow() > 1) {
-      const values = shS.getRange(2,1,shS.getLastRow()-1,4).getValues();
-      for (const r of values) {
-        const [kod, tarih, ilgi, ulas] = r;
-        if (scope === 'employee' && filterCode && String(kod) !== String(filterCode)) continue;
-        if (String(tarih) === todayKey) {
-          counts['İlgilenmiyor'] += Number(ilgi || 0);
-          counts['Ulaşılamadı'] += Number(ulas || 0);
-        }
+    // Negatifler: özet ya da fallback
+    const negRowsDaily = getNegativeSummaryRows(scope, filterCode);
+    for (const r of negRowsDaily) {
+      const [kod, tarih, ilgi, ulas] = r;
+      if (scope === 'employee' && filterCode && String(kod) !== String(filterCode)) continue;
+      if (String(tarih) === todayKey) {
+        counts['İlgilenmiyor'] += Number(ilgi || 0);
+        counts['Ulaşılamadı'] += Number(ulas || 0);
       }
     }
 
@@ -3511,6 +3508,36 @@ function collectFormatTableNegativeSummary(employeeFile, employeeCode) {
     return out;
   } catch (error) {
     console.error('Function failed:', error);
+    return [];
+  }
+}
+
+// Format Tablo negatiflerini özet sayfası yoksa dinamik olarak toplayan yardımcı
+function getNegativeSummaryRows(scope, filterCode) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const shS = ss.getSheetByName('T Aktivite Özet');
+    if (shS && shS.getLastRow() > 1) {
+      const rows = shS.getRange(2,1,shS.getLastRow()-1,4).getValues();
+      if (scope === 'employee' && filterCode) {
+        return rows.filter(function(r){ return String(r[0]) === String(filterCode); });
+      }
+      return rows;
+    }
+    // Fallback: çalışan dosyalarından topla
+    const codes = (scope === 'employee' && filterCode) ? [String(filterCode)] : Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    var all = [];
+    for (var i=0;i<codes.length;i++) {
+      var code = codes[i];
+      try {
+        var file = findEmployeeFile(code);
+        var rows = collectFormatTableNegativeSummary(file, code);
+        if (rows && rows.length) all = all.concat(rows);
+      } catch (e) { console.log('⚠️ Negatif özet toplanamadı:', code, e && e.message); }
+    }
+    return all;
+  } catch (err) {
+    console.error('getNegativeSummaryRows failed:', err);
     return [];
   }
 }
@@ -3718,19 +3745,16 @@ function generateWeeklyReportManager(options) {
       }
     }
 
-    // Summary negatives from T Aktivite Özet
-    const shS = ss.getSheetByName('T Aktivite Özet');
-    if (shS && shS.getLastRow() > 1) {
-      const rows = shS.getRange(2,1,shS.getLastRow()-1,4).getValues();
-      for (const r of rows) {
-        const [kod, tarih, ilgi, ulas] = r;
-        if (scope === 'employee' && filterCode && String(kod) !== String(filterCode)) continue;
-        const d = parseDdMmYyyy(tarih);
-        if (!d) continue;
-        if (d >= wkStart && d <= wkEnd) {
-          counts['İlgilenmiyor'] += Number(ilgi || 0);
-          counts['Ulaşılamadı'] += Number(ulas || 0);
-        }
+    // Negatifler: özet ya da fallback
+    const negRows = getNegativeSummaryRows(scope, filterCode);
+    for (const r of negRows) {
+      const [kod, tarih, ilgi, ulas] = r;
+      if (scope === 'employee' && filterCode && String(kod) !== String(filterCode)) continue;
+      const d = parseDdMmYyyy(tarih);
+      if (!d) continue;
+      if (d >= wkStart && d <= wkEnd) {
+        counts['İlgilenmiyor'] += Number(ilgi || 0);
+        counts['Ulaşılamadı'] += Number(ulas || 0);
       }
     }
 
@@ -4042,19 +4066,16 @@ function generateMonthlyReportManager(options) {
       }
     }
 
-    // Summary negatives from T Aktivite Özet
-    const shS = ss.getSheetByName('T Aktivite Özet');
-    if (shS && shS.getLastRow() > 1) {
-      const rows = shS.getRange(2,1,shS.getLastRow()-1,4).getValues();
-      for (const r of rows) {
-        const [kod, tarih, ilgi, ulas] = r;
-        if (scope === 'employee' && filterCode && String(kod) !== String(filterCode)) continue;
-        const d = parseDdMmYyyy(tarih);
-        if (!d) continue;
-        if (d >= mStart && d <= mEnd) {
-          counts['İlgilenmiyor'] += Number(ilgi || 0);
-          counts['Ulaşılamadı'] += Number(ulas || 0);
-        }
+    // Negatifler: özet ya da fallback
+    const negRowsMonthly = getNegativeSummaryRows(scope, filterCode);
+    for (const r of negRowsMonthly) {
+      const [kod, tarih, ilgi, ulas] = r;
+      if (scope === 'employee' && filterCode && String(kod) !== String(filterCode)) continue;
+      const d = parseDdMmYyyy(tarih);
+      if (!d) continue;
+      if (d >= mStart && d <= mEnd) {
+        counts['İlgilenmiyor'] += Number(ilgi || 0);
+        counts['Ulaşılamadı'] += Number(ulas || 0);
       }
     }
 
