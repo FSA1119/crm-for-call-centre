@@ -771,6 +771,18 @@ function syncSingleEmployee(employeeCode, options) {
 
     totalStats.employeeStats[employeeCode] = employeeStats;
     totalStats.totalRecords += employeeStats.totalRecords;
+
+    // Append modunda ilgili T sayfasına otomatik geçiş yap
+    if (mode === 'append') {
+      try {
+        const prefer = ['T Toplantılar', 'T Fırsatlar', 'T Randevular'];
+        for (const name of prefer) {
+          const sh = managerFile.getSheetByName(name);
+          if (sh && sh.getLastRow() > 1) { managerFile.setActiveSheet(sh); break; }
+        }
+      } catch (_) {}
+    }
+
     showSyncResults(totalStats);
     // Removed global recoloring/validation to avoid O(N) cost across all sheets
     return totalStats;
