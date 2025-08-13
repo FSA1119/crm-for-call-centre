@@ -1605,6 +1605,17 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         if (softMap.has(soKey)) {
           const rowIndex = softMap.get(soKey);
           const current = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
+          // Eğer tarih farklıysa bu yeni bir aktivite kabul edilir -> ekle
+          if (idxDate >= 0) {
+            const existingDate = canonicalDate(current[idxDate]);
+            const incomingDate = canonicalDate(r[idxDate]);
+            if (existingDate && incomingDate && existingDate !== incomingDate) {
+              rowsToAppend.push(r);
+              opStats.newCount++;
+              continue;
+            }
+          }
+          // Aksi halde aynı gün/aynı kayıt -> güncelle
           const changed = current.some((v, idx) => String(v) !== String(r[idx]));
           if (changed) { updates.push({ rowIndex, values: r }); opStats.updateCount++; }
           else { opStats.sameCount++; }
