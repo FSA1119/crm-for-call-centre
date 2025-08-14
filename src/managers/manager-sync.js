@@ -3599,17 +3599,29 @@ function updateManagerActivitySummary(managerFile, rows, employeeCode, mode) {
 
 function refreshActivitySummaryAll() {
   console.log('Function started:', { action: 'refreshActivitySummaryAll' });
+  const ui = SpreadsheetApp.getUi();
+  const lock = LockService.getDocumentLock();
   try {
+    if (!lock.tryLock(30000)) {
+      ui.alert('Meşgul', 'Önceki işlem bitmedi. Lütfen biraz sonra tekrar deneyin.', ui.ButtonSet.OK);
+      return { success: false, reason: 'locked' };
+    }
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    for (const code of Object.keys(CRM_CONFIG.EMPLOYEE_CODES)) {
+    const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    for (const code of codes) {
       const employeeFile = findEmployeeFile(code);
       const rows = collectFormatTableNegativeSummary(employeeFile, code);
       updateManagerActivitySummary(managerFile, rows, code, 'replace');
     }
-    SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'T Aktivite Özet güncellendi', SpreadsheetApp.getUi().ButtonSet.OK);
+    console.log('Processing complete:', { updatedEmployees: codes.length });
+    ui.alert('✅ Tamamlandı', 'T Aktivite Özet güncellendi', ui.ButtonSet.OK);
+    return { success: true, updated: codes.length };
   } catch (error) {
     console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('❌ Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    ui.alert('❌ Hata', String(error && error.message || error), ui.ButtonSet.OK);
+    throw error;
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
   }
 }
 
