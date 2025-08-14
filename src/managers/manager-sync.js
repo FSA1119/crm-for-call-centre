@@ -4304,6 +4304,10 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
       const idxStatus = headers.indexOf('Randevu durumu');
       const idxLog = headers.indexOf('Log');
       
+      console.log(`  📋 T Randevular headers:`, headers);
+      console.log(`  🔍 Log kolonu index: ${idxLog}`);
+      console.log(`  📅 Randevu Tarihi index: ${headers.indexOf('Randevu Tarihi')}`);
+      
       for (const row of values) {
         if (idxCode !== -1 && String(row[idxCode]) !== String(employeeCode)) continue;
         
@@ -4311,9 +4315,11 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
         let processDate = null;
         if (idxLog !== -1 && row[idxLog]) {
           const logText = String(row[idxLog]);
+          console.log(`  📝 Log text: "${logText}"`);
           const dateMatch = logText.match(/(\d{2}\.\d{2}\.\d{4})/);
           if (dateMatch) {
             processDate = parseDdMmYyyy(dateMatch[1]);
+            console.log(`  ✅ Log'dan tarih çıkarıldı: ${dateMatch[1]} → ${processDate}`);
           }
         }
         
@@ -4322,6 +4328,7 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
           const idxDate = headers.indexOf('Randevu Tarihi');
           if (idxDate !== -1) {
             processDate = row[idxDate];
+            console.log(`  ⚠️ Log bulunamadı, Randevu Tarihi kullanıldı: ${processDate}`);
           }
         }
         
