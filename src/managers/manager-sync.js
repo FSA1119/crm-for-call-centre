@@ -4138,11 +4138,11 @@ function generateComparisonWeeklySeriesManager(params) {
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // Son 8 hafta için haftalık veri topla
+    // Son 8 hafta için haftalık veri topla (eskiden yeniye doğru)
     const weeks = [];
     const today = new Date();
     
-    for (let i = 0; i < 8; i++) {
+    for (let i = 7; i >= 0; i--) { // 7'den 0'a doğru (eskiden yeniye)
       const weekStart = new Date(today);
       weekStart.setDate(today.getDate() - (today.getDay() + 7 * i));
       weekStart.setHours(0, 0, 0, 0);
@@ -4151,10 +4151,13 @@ function generateComparisonWeeklySeriesManager(params) {
       weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
       
+      // Yılın kaçıncı haftası olduğunu hesapla
+      const weekNumber = Math.ceil((weekStart.getTime() - new Date(weekStart.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+      
       weeks.push({
         start: weekStart,
         end: weekEnd,
-        label: `${Utilities.formatDate(weekStart, Session.getScriptTimeZone(), 'dd.MM.yyyy')} – ${Utilities.formatDate(weekEnd, Session.getScriptTimeZone(), 'dd.MM.yyyy')}`
+        label: `Hafta ${weekNumber} (${Utilities.formatDate(weekStart, Session.getScriptTimeZone(), 'dd.MM.yyyy')} - ${Utilities.formatDate(weekEnd, Session.getScriptTimeZone(), 'dd.MM.yyyy')})`
       });
     }
 
@@ -4176,10 +4179,30 @@ function generateComparisonWeeklySeriesManager(params) {
       }
     }
     
+    // DEBUG: Mevcut Log verilerini kontrol et
+    console.log('\n=== DEBUG: Mevcut Log verilerini kontrol et ===');
+    const shR = ss.getSheetByName('T Randevular');
+    if (shR && shR.getLastRow() > 1) {
+      const headers = shR.getRange(1, 1, 1, shR.getLastColumn()).getValues()[0];
+      const values = shR.getRange(2, 1, Math.min(10, shR.getLastRow() - 1), shR.getLastColumn()).getValues();
+      const idxCode = headers.indexOf('Kod') !== -1 ? headers.indexOf('Kod') : headers.indexOf('Temsilci Kodu');
+      const idxLog = headers.indexOf('Log');
+      
+      console.log('Headers:', headers);
+      console.log('Log column index:', idxLog);
+      console.log('Sample Log data:');
+      for (let i = 0; i < Math.min(5, values.length); i++) {
+        const row = values[i];
+        if (idxCode !== -1 && idxLog !== -1) {
+          console.log(`Row ${i+1}: Code=${row[idxCode]}, Log="${row[idxLog]}"`);
+        }
+      }
+    }
+    
     console.log('\n=== FINAL EMPLOYEE DATA ===');
     console.log(JSON.stringify(employeeData, null, 2));
 
-    // Rapor sayfasını oluştur
+    // Rapor sayfasını oluştur - Tablo format
     const sheetName = 'Haftalık Seri Karşılaştırma';
     let sheet = ss.getSheetByName(sheetName);
     if (sheet) {
@@ -4188,65 +4211,91 @@ function generateComparisonWeeklySeriesManager(params) {
       sheet = ss.insertSheet(sheetName);
     }
 
-    // Başlık satırları - Kompakt format
-    const headers = ['Hafta'];
+    // Activity türleri - Ertelenen ve İptal dahil
     const activityTypes = [
       'Randevu Alındı',
+      'Ertelendi',
+      'İptal',
+      'Aktif Randevu', // Randevu Alındı - Ertelendi - İptal
       'İleri Tarih Randevu', 
       'Yeniden Aranacak',
       'Bilgi Verildi',
       'Fırsat İletildi',
       'İlgilenmiyor',
-      'Ulaşılamadı',
-      'TOPLAM KONTAK',
-      'TOPLAM İŞLEM'
+      'Ulaşılamadı'
     ];
-    
-    // Her çalışan için aktivite türlerini ekle
-    for (const code of codes) {
-      for (const activity of activityTypes) {
-        headers.push(`${code} - ${activity}`);
-      }
-    }
-    
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
 
-    // Veri satırları - Kompakt format
+    // Veri satırları - Tablo format
     const dataRows = [];
-    console.log('Building data rows...');
-    console.log('Employee data structure:', employeeData);
+    console.log('Building data rows in table format...');
     
     for (const week of weeks) {
-      const row = [week.label];
-      console.log(`Processing week: ${week.label}`);
+      // Hafta başlığı
+      dataRows.push([week.label]);
+      console.log(`Added week header: ${week.label}`);
       
+      // Activity başlıkları
+      const headerRow = ['Çalışan'];
+      for (const activity of activityTypes) {
+        headerRow.push(activity);
+      }
+      dataRows.push(headerRow);
+      
+      // Her çalışan için veri satırı
       for (const code of codes) {
         const weekData = employeeData[code][week.label] || {};
         console.log(`  ${code} week data:`, weekData);
         
+        const dataRow = [code];
         for (const activity of activityTypes) {
           const value = weekData[activity] || 0;
-          row.push(value);
-          console.log(`    ${activity}: ${value}`);
+          dataRow.push(value);
+        }
+        dataRows.push(dataRow);
+        console.log(`    Added data row for ${code}:`, dataRow);
+      }
+      
+      // Haftalar arası boşluk - 8 sütunlu boş satır
+      const emptyRow = new Array(1 + activityTypes.length).fill('');
+      dataRows.push(emptyRow);
+    }
+
+    console.log('Final dataRows count:', dataRows.length);
+    
+    // DEBUG: Her satırın sütun sayısını kontrol et
+    console.log('DEBUG: Checking column counts for each row:');
+    for (let i = 0; i < Math.min(5, dataRows.length); i++) {
+      console.log(`Row ${i}: ${dataRows[i].length} columns - [${dataRows[i].join(', ')}]`);
+    }
+
+    if (dataRows.length > 0) {
+      // Sütun sayısını hesapla (Çalışan + Activity türleri)
+      const columnCount = 1 + activityTypes.length; // 1 (Çalışan) + 7 (Activity türleri) = 8
+      console.log('Expected column count:', columnCount);
+      
+      // Her satırın doğru sütun sayısında olduğundan emin ol
+      for (let i = 0; i < dataRows.length; i++) {
+        if (dataRows[i].length !== columnCount) {
+          console.log(`WARNING: Row ${i} has ${dataRows[i].length} columns, expected ${columnCount}`);
+          // Eksik sütunları doldur
+          while (dataRows[i].length < columnCount) {
+            dataRows[i].push('');
+          }
+          // Fazla sütunları kes
+          if (dataRows[i].length > columnCount) {
+            dataRows[i] = dataRows[i].slice(0, columnCount);
+          }
         }
       }
       
-      dataRows.push(row);
-      console.log(`Row ${dataRows.length}:`, row);
-    }
-
-    console.log('Final dataRows:', dataRows);
-    console.log('Headers length:', headers.length);
-    console.log('DataRows length:', dataRows.length);
-
-    if (dataRows.length > 0) {
-      sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
+      sheet.getRange(1, 1, dataRows.length, columnCount).setValues(dataRows);
       console.log('Data written to sheet successfully');
+      console.log('Column count:', columnCount, 'Data rows:', dataRows.length);
     } else {
       console.log('No data rows to write');
     }
 
-    sheet.autoResizeColumns(1, headers.length);
+    sheet.autoResizeColumns(1, activityTypes.length + 1); // Çalışan + Activity sütunları
     
     SpreadsheetApp.getUi().alert('Tamam', 'Haftalık Seri Karşılaştırma raporu oluşturuldu.', SpreadsheetApp.getUi().ButtonSet.OK);
     
@@ -4287,6 +4336,9 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
 
     const counts = {
       'Randevu Alındı': 0,
+      'Ertelendi': 0,
+      'İptal': 0,
+      'Aktif Randevu': 0, // Hesaplanacak
       'İleri Tarih Randevu': 0,
       'Yeniden Aranacak': 0,
       'Bilgi Verildi': 0,
@@ -4334,7 +4386,15 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
         
         if (!withinRange(processDate, startDate, endDate)) continue;
         const status = idxStatus !== -1 ? String(row[idxStatus] || '') : '';
-        if (counts.hasOwnProperty(status)) counts[status]++;
+        
+        // Randevu durumlarını kontrol et
+        if (status.toLowerCase().includes('ertelen') || status.toLowerCase().includes('ertelendi')) {
+          counts['Ertelendi']++;
+        } else if (status.toLowerCase().includes('iptal') || status.toLowerCase().includes('iptal edildi')) {
+          counts['İptal']++;
+        } else if (counts.hasOwnProperty(status)) {
+          counts[status]++;
+        }
       }
     }
 
@@ -4406,6 +4466,9 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
       }
     }
 
+    // Aktif Randevu sayısını hesapla (Randevu Alındı - Ertelendi - İptal)
+    counts['Aktif Randevu'] = Math.max(0, counts['Randevu Alındı'] - counts['Ertelendi'] - counts['İptal']);
+    
     // Toplamları hesapla
     counts['TOPLAM KONTAK'] = counts['Randevu Alındı'] + counts['İleri Tarih Randevu'] + counts['Yeniden Aranacak'] + counts['Bilgi Verildi'] + counts['Fırsat İletildi'] + counts['İlgilenmiyor'];
     counts['TOPLAM İŞLEM'] = counts['TOPLAM KONTAK'] + counts['Ulaşılamadı'];
