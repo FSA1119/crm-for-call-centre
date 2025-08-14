@@ -5322,13 +5322,20 @@ function generatePivotBaseReportManager() {
             d = ds;
             console.log('Date object found:', { original: ds, parsed: d, toKey: toKey(d) });
           } else if (typeof ds === 'string') {
-            // String format - dd.MM.yyyy
-            const m = ds.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-            if (m) {
-              d = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
-              console.log('Date parsed from string:', { original: ds, parsed: d, toKey: toKey(d) });
+            // Önce dd.MM.yyyy formatını dene
+            const m1 = ds.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (m1) {
+              d = new Date(Number(m1[3]), Number(m1[2])-1, Number(m1[1]));
+              console.log('Date parsed from dd.MM.yyyy:', { original: ds, parsed: d, toKey: toKey(d) });
             } else {
-              console.log('Date parsing failed for string:', ds);
+              // Sonra Date.parse() ile dene (Thu Aug 07 2025 formatı için)
+              const parsed = Date.parse(ds);
+              if (!isNaN(parsed)) {
+                d = new Date(parsed);
+                console.log('Date parsed from Date.parse():', { original: ds, parsed: d, toKey: toKey(d) });
+              } else {
+                console.log('Date parsing failed for string:', ds);
+              }
             }
           }
         }
