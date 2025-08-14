@@ -4179,38 +4179,39 @@ function generateComparisonWeeklySeriesManager(params) {
       sheet = ss.insertSheet(sheetName);
     }
 
-    // Başlık satırı
+    // Başlık satırları - Kompakt format
     const headers = ['Hafta'];
+    const activityTypes = [
+      'Randevu Alındı',
+      'İleri Tarih Randevu', 
+      'Yeniden Aranacak',
+      'Bilgi Verildi',
+      'Fırsat İletildi',
+      'İlgilenmiyor',
+      'Ulaşılamadı',
+      'TOPLAM KONTAK',
+      'TOPLAM İŞLEM'
+    ];
+    
+    // Her çalışan için aktivite türlerini ekle
     for (const code of codes) {
-      headers.push(`${code} - Randevu Alındı`);
-      headers.push(`${code} - İleri Tarih Randevu`);
-      headers.push(`${code} - Yeniden Aranacak`);
-      headers.push(`${code} - Bilgi Verildi`);
-      headers.push(`${code} - Fırsat İletildi`);
-      headers.push(`${code} - İlgilenmiyor`);
-      headers.push(`${code} - Ulaşılamadı`);
-      headers.push(`${code} - TOPLAM KONTAK`);
-      headers.push(`${code} - TOPLAM İŞLEM`);
+      for (const activity of activityTypes) {
+        headers.push(`${code} - ${activity}`);
+      }
     }
     
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
 
-    // Veri satırları
+    // Veri satırları - Kompakt format
     const dataRows = [];
     for (const week of weeks) {
       const row = [week.label];
       
       for (const code of codes) {
         const weekData = employeeData[code][week.label] || {};
-        row.push(weekData['Randevu Alındı'] || 0);
-        row.push(weekData['İleri Tarih Randevu'] || 0);
-        row.push(weekData['Yeniden Aranacak'] || 0);
-        row.push(weekData['Bilgi Verildi'] || 0);
-        row.push(weekData['Fırsat İletildi'] || 0);
-        row.push(weekData['İlgilenmiyor'] || 0);
-        row.push(weekData['Ulaşılamadı'] || 0);
-        row.push(weekData['TOPLAM KONTAK'] || 0);
-        row.push(weekData['TOPLAM İŞLEM'] || 0);
+        for (const activity of activityTypes) {
+          row.push(weekData[activity] || 0);
+        }
       }
       
       dataRows.push(row);
