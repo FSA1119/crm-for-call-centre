@@ -5313,7 +5313,7 @@ function generatePivotBaseReportManager() {
     }
     const R = read(shR), F = read(shF), Tm = read(shT), S = read(shS);
 
-    const rows = [['Kod','Tarih','Aktivite','Adet']];
+    let rows = [['Kod','Tarih','Aktivite','Adet']];
     const activityMap = new Map(); // key: "Kod|Tarih|Aktivite" -> count
 
     // Helper function to add/update activity count
