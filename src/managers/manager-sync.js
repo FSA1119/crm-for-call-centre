@@ -3479,17 +3479,17 @@ function collectFormatTableNegativeSummary(employeeFile, employeeCode) {
       const isToplSheet    = findHeaderIdx(headers, ['Toplantı durumu','Toplanti durumu']) !== -1;
       if (isRandevuSheet || isFirsatSheet || isToplSheet) continue;
 
-      // Detect Format Tablo by headers (name-agnostic): must have Aktivite and (Aktivite Tarihi or Log)
-      const idxAktivite = findHeaderIdx(headers, ['Aktivite']);
-      const idxTarih = findHeaderIdx(headers, ['Aktivite Tarihi']);
-      const idxLog = findHeaderIdx(headers, ['Log']);
+      // Detect Format Tablo by headers (name-agnostic): must have Aktivite and (Aktivite Tarihi/Tarih or Log)
+      const idxAktivite = findHeaderIdx(headers, ['Aktivite','Aktivite Durumu','Durum']);
+      const idxTarih = findHeaderIdx(headers, ['Aktivite Tarihi','Aktivite tarihi','Tarih']);
+      const idxLog = findHeaderIdx(headers, ['Log','Günlük']);
       if (idxAktivite === -1 || (idxTarih === -1 && idxLog === -1)) continue;
 
       const values = sh.getRange(2,1,lastRow-1,lastCol).getValues();
       for (const row of values) {
         const actNorm = norm(row[idxAktivite]);
-        const isIlgi = actNorm.includes('ilgilenm') || actNorm.includes('ilgi yok') || actNorm.includes('ilg yok');
-        const isUlas = actNorm.includes('ulasilam') || actNorm.includes('ulasam') || actNorm.includes('ulas') || actNorm.includes('ulasilamadi') || actNorm.includes('cevap yok') || actNorm.includes('mesgul') || actNorm.includes('erisile') || actNorm.includes('erise');
+        const isIlgi = /\bilgilenm/i.test(actNorm) || /\bilgi yok/i.test(actNorm) || /\bilg yok/i.test(actNorm);
+        const isUlas = /(ulasilam|ulasam|ulasilamadi|^ulas| cevap yok|mesgul|erisile|erise|yanit yok|a\u00E7ilmadi|acilmadi)/i.test(actNorm);
         if (!isIlgi && !isUlas) continue;
         let dateKey = '';
         // Prefer current cell date first; fallback to Log
