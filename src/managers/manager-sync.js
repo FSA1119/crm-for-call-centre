@@ -5281,8 +5281,19 @@ function generatePivotBaseReportManager() {
     const R = read(shR), F = read(shF), Tm = read(shT), S = read(shS);
 
     const rows = [['Kod','Tarih','Aktivite','Adet']];
+    const activityMap = new Map(); // key: "Kod|Tarih|Aktivite" -> count
 
-    // Randevular: etiketleri normalize et (negatifler dahil)
+    // Helper function to add/update activity count
+    function addActivity(code, date, activity, count = 1) {
+      const key = `${code}|${date}|${activity}`;
+      if (activityMap.has(key)) {
+        activityMap.set(key, activityMap.get(key) + count);
+      } else {
+        activityMap.set(key, count);
+      }
+    }
+
+    // Randevular: etiketleri normalize et ve topla
     if (R){
       const iCode=R.h.indexOf('Kod')!==-1? R.h.indexOf('Kod'): R.h.indexOf('Temsilci Kodu');
       const iStatus=R.h.indexOf('Randevu durumu');
@@ -5290,29 +5301,29 @@ function generatePivotBaseReportManager() {
         const d=getDate(R.h,r,'Randevu Tarihi'); if(!d) continue;
         const raw = String(r[iStatus]||'').trim(); if(!raw) continue;
         const s = normalizeLabel(raw, 'randevu'); if(!s) continue;
-        rows.push([String(r[iCode]||'').trim(), toKey(d), s, 1]);
+        addActivity(String(r[iCode]||'').trim(), toKey(d), s, 1);
       }
     }
 
-    // Fırsatlar: normalize ederek sadece ilgili pozitifleri al
+    // Fırsatlar: normalize ederek sadece ilgili pozitifleri al ve topla
     if (F){
       const iCode=F.h.indexOf('Kod')!==-1? F.h.indexOf('Kod'): F.h.indexOf('Temsilci Kodu');
       const iStatus=F.h.indexOf('Fırsat Durumu');
       for (const r of F.v){
         const d=getDate(F.h,r,'Fırsat Tarihi'); if(!d) continue;
         const s = normalizeLabel(String(r[iStatus]||''), 'firsat'); if(!s) continue;
-        rows.push([String(r[iCode]||'').trim(), toKey(d), s, 1]);
+        addActivity(String(r[iCode]||'').trim(), toKey(d), s, 1);
       }
     }
 
-    // Toplantılar: olduğu gibi, gerekirse küçük normalizasyon yapılabilir
+    // Toplantılar: olduğu gibi, gerekirse küçük normalizasyon yapılabilir ve topla
     if (Tm){
       const iCode=Tm.h.indexOf('Kod')!==-1? Tm.h.indexOf('Kod'): Tm.h.indexOf('Temsilci Kodu');
       const iStatus=Tm.h.indexOf('Toplantı Sonucu');
       for (const r of Tm.v){
         const d=getDate(Tm.h,r,'Toplantı Tarihi'); if(!d) continue;
         const s=String(r[iStatus]||'').trim(); if(!s) continue;
-        rows.push([String(r[iCode]||'').trim(), toKey(d), s, 1]);
+        addActivity(String(r[iCode]||'').trim(), toKey(d), s, 1);
       }
     }
 
@@ -5364,16 +5375,15 @@ function generatePivotBaseReportManager() {
         console.log('Valid row found:', { code, date: toKey(d), ilgi, ulas });
         
         if (ilgi>0) {
-          rows.push([code, toKey(d), 'İlgilenmiyor', ilgi]);
-          console.log('Added İlgilenmiyor row:', [code, toKey(d), 'İlgilenmiyor', ilgi]);
+          addActivity(code, toKey(d), 'İlgilenmiyor', ilgi);
+          console.log('Added İlgilenmiyor:', code, toKey(d), 'İlgilenmiyor', ilgi);
         }
         if (ulas>0) {
-          rows.push([code, toKey(d), 'Ulaşılamadı', ulas]);
-          console.log('Added Ulaşılamadı row:', [code, toKey(d), 'Ulaşılamadı', ulas]);
+          addActivity(code, toKey(d), 'Ulaşılamadı', ulas);
+          console.log('Added Ulaşılamadı:', code, toKey(d), 'Ulaşılamadı', ulas);
         }
       }
-      console.log('T Aktivite Özet processing complete. Total rows in final result:', rows.length - 1);
-      console.log('Final rows structure:', rows.slice(0, 5));
+      console.log('T Aktivite Özet processing complete.');
     } else {
       console.log('T Aktivite Özet sheet is null or empty. Sheet object:', shS);
       if (shS) {
@@ -5386,6 +5396,29 @@ function generatePivotBaseReportManager() {
         }
       }
     }
+
+    // Convert activityMap to rows and sort by date
+    console.log('Converting activityMap to rows...');
+    for (const [key, count] of activityMap.entries()) {
+      const [code, date, activity] = key.split('|');
+      rows.push([code, date, activity, count]);
+    }
+
+    // Sort rows by date (skip header row)
+    console.log('Sorting rows by date...');
+    const headerRow = rows[0];
+    const dataRows = rows.slice(1);
+    
+    dataRows.sort((a, b) => {
+      const dateA = new Date(a[1].split('.').reverse().join('-'));
+      const dateB = new Date(b[1].split('.').reverse().join('-'));
+      return dateA - dateB;
+    });
+    
+    rows = [headerRow, ...dataRows];
+    
+    console.log('Final rows structure (first 10):', rows.slice(0, 10));
+    console.log('Total rows:', rows.length);
 
     let pv = ss.getSheetByName('Pivot Veri'); if (!pv) pv = ss.insertSheet('Pivot Veri'); else pv.clear();
     pv.getRange(1,1,rows.length,4).setValues(rows);
