@@ -4897,7 +4897,28 @@ function generateWeeklyReportSeriesManager(options) {
       // Fırsatlar
       if (F){ const iStatus=F.h.indexOf('Fırsat Durumu'); for (const r of F.v){ const d=getActivityDate(F.h,r,'Fırsat Tarihi'); if(!withinRange(d,a,b)) continue; const s=String(r[iStatus]||'').toLowerCase(); const norm=s.includes('ilet')? 'Fırsat İletildi': s.includes('bilgi')? 'Bilgi Verildi': s.includes('yeniden')||s.includes('ara')? 'Yeniden Aranacak': ''; if(norm) c[norm]++; } }
       // Negatifler
-      if (S){ for (const r of S.v){ const d=parseDdMmYyyy(String(r[1]||'')); if(!d) continue; if (d>=a && d<=b){ c['İlgilenmiyor']+=Number(r[2]||0); c['Ulaşılamadı']+=Number(r[3]||0); } } }
+      if (S){ 
+        for (const r of S.v){ 
+          let d = null;
+          const dateValue = r[1];
+          
+          // Date objesi mi string mi kontrol et
+          if (dateValue instanceof Date) {
+            d = dateValue;
+          } else if (typeof dateValue === 'string') {
+            const m = dateValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (m) {
+              d = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+            }
+          }
+          
+          if(!d || isNaN(d.getTime())) continue; 
+          if (d>=a && d<=b){ 
+            c['İlgilenmiyor']+=Number(r[2]||0); 
+            c['Ulaşılamadı']+=Number(r[3]||0); 
+          } 
+        } 
+      }
       return c;
     }
 
