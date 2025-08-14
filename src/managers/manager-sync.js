@@ -4204,21 +4204,37 @@ function generateComparisonWeeklySeriesManager(params) {
 
     // Veri satırları - Kompakt format
     const dataRows = [];
+    console.log('Building data rows...');
+    console.log('Employee data structure:', employeeData);
+    
     for (const week of weeks) {
       const row = [week.label];
+      console.log(`Processing week: ${week.label}`);
       
       for (const code of codes) {
         const weekData = employeeData[code][week.label] || {};
+        console.log(`  ${code} week data:`, weekData);
+        
         for (const activity of activityTypes) {
-          row.push(weekData[activity] || 0);
+          const value = weekData[activity] || 0;
+          row.push(value);
+          console.log(`    ${activity}: ${value}`);
         }
       }
       
       dataRows.push(row);
+      console.log(`Row ${dataRows.length}:`, row);
     }
+
+    console.log('Final dataRows:', dataRows);
+    console.log('Headers length:', headers.length);
+    console.log('DataRows length:', dataRows.length);
 
     if (dataRows.length > 0) {
       sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
+      console.log('Data written to sheet successfully');
+    } else {
+      console.log('No data rows to write');
     }
 
     sheet.autoResizeColumns(1, headers.length);
