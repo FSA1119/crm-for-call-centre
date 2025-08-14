@@ -3488,8 +3488,8 @@ function collectFormatTableNegativeSummary(employeeFile, employeeCode) {
       const values = sh.getRange(2,1,lastRow-1,lastCol).getValues();
       for (const row of values) {
         const actNorm = norm(row[idxAktivite]);
-        const isIlgi = actNorm.includes('ilgilenmiyor');
-        const isUlas = actNorm.includes('ulasilam') || actNorm.includes('ulas') || actNorm.includes('ulasilamadi');
+        const isIlgi = actNorm.includes('ilgilenm') || actNorm.includes('ilgi yok') || actNorm.includes('ilg yok');
+        const isUlas = actNorm.includes('ulasilam') || actNorm.includes('ulasam') || actNorm.includes('ulas') || actNorm.includes('ulasilamadi') || actNorm.includes('cevap yok') || actNorm.includes('mesgul') || actNorm.includes('erisile') || actNorm.includes('erise');
         if (!isIlgi && !isUlas) continue;
         let dateKey = '';
         // Prefer current cell date first; fallback to Log
