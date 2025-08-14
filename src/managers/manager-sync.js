@@ -3320,8 +3320,8 @@ function generateDailyReportManager(options) {
       'Ulaşılamadı': 0
     };
 
-    // Randevular
-    const shR = ss.getSheetByName('Randevular') || ss.getSheetByName('T Randevular');
+    // Randevular (pozitifler)
+    const shR = ss.getSheetByName('T Randevular') || ss.getSheetByName('Randevular');
     if (shR && shR.getLastRow() > 1) {
       const lastCol = shR.getLastColumn();
       const headers = shR.getRange(1,1,1,lastCol).getValues()[0];
@@ -3358,7 +3358,7 @@ function generateDailyReportManager(options) {
       }
     }
 
-    // Negatifler: özet ya da fallback
+    // Negatifler: yalnızca T Aktivite Özet
     const negRowsDaily = getNegativeSummaryRows(scope, filterCode);
     for (const r of negRowsDaily) {
       const [kod, tarih, ilgi, ulas] = r;
@@ -3512,30 +3512,17 @@ function collectFormatTableNegativeSummary(employeeFile, employeeCode) {
   }
 }
 
-// Format Tablo negatiflerini özet sayfası yoksa dinamik olarak toplayan yardımcı
+// Negatif aktiviteleri yalnızca 'T Aktivite Özet'ten okuyan yardımcı (fallback yok)
 function getNegativeSummaryRows(scope, filterCode) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const shS = ss.getSheetByName('T Aktivite Özet');
-    if (shS && shS.getLastRow() > 1) {
-      const rows = shS.getRange(2,1,shS.getLastRow()-1,4).getValues();
-      if (scope === 'employee' && filterCode) {
-        return rows.filter(function(r){ return String(r[0]) === String(filterCode); });
-      }
-      return rows;
+    if (!shS || shS.getLastRow() <= 1) return [];
+    const rows = shS.getRange(2,1,shS.getLastRow()-1,4).getValues();
+    if (scope === 'employee' && filterCode) {
+      return rows.filter(function(r){ return String(r[0]) === String(filterCode); });
     }
-    // Fallback: çalışan dosyalarından topla
-    const codes = (scope === 'employee' && filterCode) ? [String(filterCode)] : Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
-    var all = [];
-    for (var i=0;i<codes.length;i++) {
-      var code = codes[i];
-      try {
-        var file = findEmployeeFile(code);
-        var rows = collectFormatTableNegativeSummary(file, code);
-        if (rows && rows.length) all = all.concat(rows);
-      } catch (e) { console.log('⚠️ Negatif özet toplanamadı:', code, e && e.message); }
-    }
-    return all;
+    return rows;
   } catch (err) {
     console.error('getNegativeSummaryRows failed:', err);
     return [];

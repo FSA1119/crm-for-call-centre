@@ -53,20 +53,18 @@ Yönetici dosyası, temsilcilerden gelen verileri konsolide eder.
 
 ## 📊 Raporlama Mantığı
 
-Kaynak Sayfalar:  
-- Randevu Alındı, İleri Tarih Randevu → `Randevularım`  
-- Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi → `Fırsatlarım`  
-- İlgilenmiyor, Ulaşılamadı → `Format Tablo`
+Kaynak Sayfalar (sabit mimari):  
+- T Randevular → Randevu aktiviteleri (Randevu Alındı, İleri Tarih Randevu)  
+- T Fırsatlar → Fırsat aktiviteleri (Bilgi Verildi, Fırsat İletildi, Yeniden Aranacak)  
+- T Toplantılar → Toplantı sonuçları  
+- T Aktivite Özet → Negatif aktiviteler (İlgilenmiyor, Ulaşılamadı)
 
-Günlük Rapor: Bugün yapılan işlemleri sayar (oluşturma/güncelleme günü)  
-Haftalık Rapor: Aktivite tarihine göre sayar (Randevu Tarihi / Fırsat Tarihi / Aktivite Tarihi)
+Notlar:  
+- Negatif sayım yalnızca T Aktivite Özet’ten yapılır. T Randevular’dan veya Format Tablo’dan doğrudan negatif sayılmaz.  
+- T Aktivite Özet, Format Tablo’dan bir kez derlenir; raporlar sadece bu dört T kaynaktan okunur. Format Tablo silinse bile raporlar etkilenmez.  
+- Tarih hesapları: Hücrede tarih varsa o kullanılır; yoksa `Log` içindeki dd.MM.yyyy yakalanır.
 
-Toplamlar:  
-- TOPLAM KONTAK = Ana aktiviteler (1-6)  
-- TOPLAM İŞLEM = TOPLAM KONTAK + Ulaşılamadı  
-- Sayılmayanlar: Randevu Teyitlendi, Ertelendi, İptal (alt kategoriler)
-
-Detay ve örnekler: `docs/archive/sistem_semasi-2025-08-09.md`
+Günlük/Haftalık/Aylık ve Karşılaştırma/Pivot raporları bu dört kaynaktan hesaplanır.
 
 ---
 
