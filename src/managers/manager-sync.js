@@ -5211,15 +5211,22 @@ function generatePivotBaseReportManager() {
         const ds=String(r[1]||'');
         console.log('Processing row:', { code, date: ds, ilgi: r[2], ulas: r[3] });
         
-        // Daha esnek tarih parsing - dd.MM.yyyy formatını destekle
+        // Daha esnek tarih parsing - hem Date objesi hem string formatını destekle
         let d = null;
-        if (ds && typeof ds === 'string') {
-          const m = ds.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-          if (m) {
-            d = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
-            console.log('Date parsed successfully:', { original: ds, parsed: d, toKey: toKey(d) });
-          } else {
-            console.log('Date parsing failed for:', ds);
+        if (ds) {
+          if (ds instanceof Date) {
+            // Zaten Date objesi
+            d = ds;
+            console.log('Date object found:', { original: ds, parsed: d, toKey: toKey(d) });
+          } else if (typeof ds === 'string') {
+            // String format - dd.MM.yyyy
+            const m = ds.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (m) {
+              d = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+              console.log('Date parsed from string:', { original: ds, parsed: d, toKey: toKey(d) });
+            } else {
+              console.log('Date parsing failed for string:', ds);
+            }
           }
         }
         
