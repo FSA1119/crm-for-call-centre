@@ -4161,14 +4161,23 @@ function generateComparisonWeeklySeriesManager(params) {
     // Her çalışan için haftalık veri topla
     const employeeData = {};
     
+    console.log('Starting to collect data for employees:', codes);
+    console.log('Week ranges:', weeks.map(w => ({ label: w.label, start: w.start, end: w.end })));
+    
     for (const code of codes) {
       employeeData[code] = {};
+      console.log(`\n=== Processing employee: ${code} ===`);
       
       for (const week of weeks) {
+        console.log(`\n--- Week: ${week.label} (${week.start.toDateString()} to ${week.end.toDateString()}) ---`);
         const weekData = countActivitiesForPeriod(code, week.start, week.end);
+        console.log(`Week data for ${code}:`, weekData);
         employeeData[code][week.label] = weekData;
       }
     }
+    
+    console.log('\n=== FINAL EMPLOYEE DATA ===');
+    console.log(JSON.stringify(employeeData, null, 2));
 
     // Rapor sayfasını oluştur
     const sheetName = 'Haftalık Seri Karşılaştırma';
@@ -4254,6 +4263,7 @@ function generateComparisonWeeklySeriesManager(params) {
  * Belirli bir dönem için aktivite sayımlarını hesapla
  */
 function countActivitiesForPeriod(employeeCode, startDate, endDate) {
+  console.log(`\n🔍 countActivitiesForPeriod called for ${employeeCode} from ${startDate.toDateString()} to ${endDate.toDateString()}`);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
