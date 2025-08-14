@@ -4285,37 +4285,73 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
       'Ulaşılamadı': 0
     };
 
-    // Randevular
+    // Randevular - Log kolonundan işlem tarihini çıkar
     const shR = ss.getSheetByName('T Randevular');
     if (shR && shR.getLastRow() > 1) {
       const headers = shR.getRange(1, 1, 1, shR.getLastColumn()).getValues()[0];
       const values = shR.getRange(2, 1, shR.getLastRow() - 1, shR.getLastColumn()).getValues();
       const idxCode = headers.indexOf('Kod') !== -1 ? headers.indexOf('Kod') : headers.indexOf('Temsilci Kodu');
       const idxStatus = headers.indexOf('Randevu durumu');
-      const idxDate = headers.indexOf('Randevu Tarihi');
+      const idxLog = headers.indexOf('Log');
       
       for (const row of values) {
         if (idxCode !== -1 && String(row[idxCode]) !== String(employeeCode)) continue;
-        const date = idxDate !== -1 ? row[idxDate] : null;
-        if (!withinRange(date, startDate, endDate)) continue;
+        
+        // Log kolonundan işlem tarihini çıkar
+        let processDate = null;
+        if (idxLog !== -1 && row[idxLog]) {
+          const logText = String(row[idxLog]);
+          const dateMatch = logText.match(/(\d{2}\.\d{2}\.\d{4})/);
+          if (dateMatch) {
+            processDate = parseDdMmYyyy(dateMatch[1]);
+          }
+        }
+        
+        // Eğer Log'dan tarih çıkarılamazsa, Randevu Tarihi'ni kullan
+        if (!processDate) {
+          const idxDate = headers.indexOf('Randevu Tarihi');
+          if (idxDate !== -1) {
+            processDate = row[idxDate];
+          }
+        }
+        
+        if (!withinRange(processDate, startDate, endDate)) continue;
         const status = idxStatus !== -1 ? String(row[idxStatus] || '') : '';
         if (counts.hasOwnProperty(status)) counts[status]++;
       }
     }
 
-    // Fırsatlar
+    // Fırsatlar - Log kolonundan işlem tarihini çıkar
     const shF = ss.getSheetByName('T Fırsatlar');
     if (shF && shF.getLastRow() > 1) {
       const headers = shF.getRange(1, 1, 1, shF.getLastColumn()).getValues()[0];
       const values = shF.getRange(2, 1, shF.getLastRow() - 1, shF.getLastColumn()).getValues();
       const idxCode = headers.indexOf('Kod') !== -1 ? headers.indexOf('Kod') : headers.indexOf('Temsilci Kodu');
       const idxStatus = headers.indexOf('Fırsat Durumu');
-      const idxDate = headers.indexOf('Fırsat Tarihi');
+      const idxLog = headers.indexOf('Log');
       
       for (const row of values) {
         if (idxCode !== -1 && String(row[idxCode]) !== String(employeeCode)) continue;
-        const date = idxDate !== -1 ? row[idxDate] : null;
-        if (!withinRange(date, startDate, endDate)) continue;
+        
+        // Log kolonundan işlem tarihini çıkar
+        let processDate = null;
+        if (idxLog !== -1 && row[idxLog]) {
+          const logText = String(row[idxLog]);
+          const dateMatch = logText.match(/(\d{2}\.\d{2}\.\d{4})/);
+          if (dateMatch) {
+            processDate = parseDdMmYyyy(dateMatch[1]);
+          }
+        }
+        
+        // Eğer Log'dan tarih çıkarılamazsa, Fırsat Tarihi'ni kullan
+        if (!processDate) {
+          const idxDate = headers.indexOf('Fırsat Tarihi');
+          if (idxDate !== -1) {
+            processDate = row[idxDate];
+          }
+        }
+        
+        if (!withinRange(processDate, startDate, endDate)) continue;
         const status = idxStatus !== -1 ? String(row[idxStatus] || '') : '';
         const s = status.toLowerCase();
         const norm = s.includes('ilet') ? 'Fırsat İletildi' : s.includes('bilgi') ? 'Bilgi Verildi' : s.includes('yeniden') || s.includes('ara') ? 'Yeniden Aranacak' : '';
