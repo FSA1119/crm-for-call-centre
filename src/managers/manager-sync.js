@@ -4017,7 +4017,31 @@ function generateComparisonReportManager(params) {
       }
       // Negatifler
       const shS = ss.getSheetByName('T Aktivite Özet');
-      if (shS && shS.getLastRow()>1){ const v=shS.getRange(2,1,shS.getLastRow()-1,4).getValues(); for (const r of v){ if (String(r[0])!==String(code)) continue; const d=parseDdMmYyyy(String(r[1])); if(!d) continue; if (d>=rangeStart && d<=rangeEnd){ out['İlgilenmiyor']+=Number(r[2]||0); out['Ulaşılamadı']+=Number(r[3]||0);} } }
+      if (shS && shS.getLastRow()>1){ 
+        const v=shS.getRange(2,1,shS.getLastRow()-1,4).getValues(); 
+        for (const r of v){ 
+          if (String(r[0])!==String(code)) continue; 
+          
+          let d = null;
+          const dateValue = r[1];
+          
+          // Date objesi mi string mi kontrol et
+          if (dateValue instanceof Date) {
+            d = dateValue;
+          } else if (typeof dateValue === 'string') {
+            const m = dateValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (m) {
+              d = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+            }
+          }
+          
+          if(!d || isNaN(d.getTime())) continue; 
+          if (d>=rangeStart && d<=rangeEnd){ 
+            out['İlgilenmiyor']+=Number(r[2]||0); 
+            out['Ulaşılamadı']+=Number(r[3]||0);
+          } 
+        } 
+      }
       return out;
     }
 
@@ -4243,8 +4267,20 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
       
       for (const row of values) {
         if (String(row[0]) !== String(employeeCode)) continue;
-        const date = parseDdMmYyyy(String(row[1]));
-        if (!date || !withinRange(date, startDate, endDate)) continue;
+        let date = null;
+        const dateValue = row[1];
+        
+        // Date objesi mi string mi kontrol et
+        if (dateValue instanceof Date) {
+          date = dateValue;
+        } else if (typeof dateValue === 'string') {
+          const m = dateValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+          if (m) {
+            date = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+          }
+        }
+        
+        if (!date || isNaN(date.getTime()) || !withinRange(date, startDate, endDate)) continue;
         
         const ilgi = Number(row[2] || 0);
         const ulas = Number(row[3] || 0);
@@ -4369,8 +4405,17 @@ function generateMonthlyReportManager(options) {
     for (const r of negRowsMonthly) {
       const [kod, tarih, ilgi, ulas] = r;
       if (scope === 'employee' && filterCode && String(kod) !== String(filterCode)) continue;
-      const d = parseDdMmYyyy(tarih);
-      if (!d) continue;
+      let d = null;
+      if (tarih instanceof Date) {
+        d = tarih;
+      } else if (typeof tarih === 'string') {
+        const m = tarih.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (m) {
+          d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+        }
+      }
+      
+      if (!d || isNaN(d.getTime())) continue;
       if (d >= mStart && d <= mEnd) {
         counts['İlgilenmiyor'] += Number(ilgi || 0);
         counts['Ulaşılamadı'] += Number(ulas || 0);
@@ -4432,7 +4477,15 @@ function generateDailyReportSeriesManager(options) {
 
     // Helper
     function toKey(d){ return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd.MM.yyyy'); }
-    function extractDateFromLog(logValue){ const s=String(logValue||''); const m=s.match(/(\d{2}\.\d{2}\.\d{4})/); if(m&&m[1]) return parseDdMmYyyy(m[1]); return null; }
+    function extractDateFromLog(logValue){ 
+      const s=String(logValue||''); 
+      const m=s.match(/(\d{2}\.\d{2}\.\d{4})/); 
+      if(m&&m[1]) {
+        const [dd, mm, yy] = m[1].split('.');
+        return new Date(Number(yy), Number(mm) - 1, Number(dd));
+      }
+      return null; 
+    }
     function getActionDate(headers,row,mainHeader){ const iMain=headers.indexOf(mainHeader); if(iMain!==-1 && row[iMain]) return row[iMain]; const iLog=headers.indexOf('Log'); if(iLog!==-1){ const d=extractDateFromLog(row[iLog]); if(d) return d; } return null; }
 
     // Prepare target sheet
@@ -4453,7 +4506,14 @@ function generateDailyReportSeriesManager(options) {
     // Count function for a date key
     function countForDateKey(key){
       const counts = { 'Randevu Alındı':0,'İleri Tarih Randevu':0,'Randevu Teyitlendi':0,'Randevu Ertelendi':0,'Randevu İptal oldu':0,'Yeniden Aranacak':0,'Bilgi Verildi':0,'Fırsat İletildi':0,'İlgilenmiyor':0,'Ulaşılamadı':0 };
-      const keyStart = parseDdMmYyyy(key); if (!keyStart) return counts;
+      const keyStart = (() => {
+        const m = key.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (m) {
+          return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+        }
+        return null;
+      })();
+      if (!keyStart) return counts;
       const a = new Date(keyStart.getFullYear(), keyStart.getMonth(), keyStart.getDate(), 0,0,0,0);
       const b = new Date(keyStart.getFullYear(), keyStart.getMonth(), keyStart.getDate(), 23,59,59,999);
 
@@ -4465,7 +4525,29 @@ function generateDailyReportSeriesManager(options) {
       if (shF && shF.getLastRow()>1){ const lc=shF.getLastColumn(); const h=shF.getRange(1,1,1,lc).getValues()[0]; const v=shF.getRange(2,1,shF.getLastRow()-1,lc).getValues(); const iStatus=h.indexOf('Fırsat Durumu'); for (const r of v){ const d=getActionDate(h,r,'Fırsat Tarihi'); if(!d) continue; if (d>=a && d<=b){ const s=String(r[iStatus]||'').toLowerCase(); const norm=s.includes('ilet')? 'Fırsat İletildi': s.includes('bilgi')? 'Bilgi Verildi': s.includes('yeniden')||s.includes('ara')? 'Yeniden Aranacak': ''; if(norm) counts[norm]++; } } }
       // Negatifler
       const shS = ss.getSheetByName('T Aktivite Özet');
-      if (shS && shS.getLastRow()>1){ const v=shS.getRange(2,1,shS.getLastRow()-1,4).getValues(); for (const r of v){ const d=parseDdMmYyyy(String(r[1])); if(!d) continue; if (toKey(d)===key){ counts['İlgilenmiyor']+=Number(r[2]||0); counts['Ulaşılamadı']+=Number(r[3]||0);} } }
+      if (shS && shS.getLastRow()>1){ 
+        const v=shS.getRange(2,1,shS.getLastRow()-1,4).getValues(); 
+        for (const r of v){ 
+          let d = null;
+          const dateValue = r[1];
+          
+          // Date objesi mi string mi kontrol et
+          if (dateValue instanceof Date) {
+            d = dateValue;
+          } else if (typeof dateValue === 'string') {
+            const m = dateValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (m) {
+              d = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+            }
+          }
+          
+          if(!d || isNaN(d.getTime())) continue; 
+          if (toKey(d)===key){ 
+            counts['İlgilenmiyor']+=Number(r[2]||0); 
+            counts['Ulaşılamadı']+=Number(r[3]||0);
+          } 
+        } 
+      }
       return counts;
     }
 
