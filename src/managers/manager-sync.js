@@ -5149,7 +5149,19 @@ function generatePivotBaseReportManager() {
       return String(raw||'').trim();
     }
 
-    function read(sh){ if(!sh || sh.getLastRow()<=1) return null; const lc=sh.getLastColumn(); return { h: sh.getRange(1,1,1,lc).getValues()[0], v: sh.getRange(2,1,sh.getLastRow()-1,lc).getValues() } }
+    function read(sh){ 
+      console.log('read() function called with sheet:', sh ? sh.getName() : 'null');
+      if(!sh || sh.getLastRow()<=1) {
+        console.log('Sheet is null or has <=1 row. Last row:', sh ? sh.getLastRow() : 'N/A');
+        return null; 
+      }
+      const lc=sh.getLastColumn();
+      console.log('Sheet dimensions:', { lastRow: sh.getLastRow(), lastCol: lc });
+      const headers = sh.getRange(1,1,1,lc).getValues()[0];
+      const values = sh.getRange(2,1,sh.getLastRow()-1,lc).getValues();
+      console.log('Read data:', { headers: headers, valueCount: values.length });
+      return { h: headers, v: values }; 
+    }
     const R = read(shR), F = read(shF), Tm = read(shT), S = read(shS);
 
     const rows = [['Kod','Tarih','Aktivite','Adet']];
@@ -5192,6 +5204,7 @@ function generatePivotBaseReportManager() {
     if (S){
       console.log('Processing T Aktivite Özet data:', S.v.length, 'rows');
       console.log('Sample data from T Aktivite Özet:', S.v.slice(0, 3));
+      console.log('Headers from T Aktivite Özet:', S.h);
       
       for (const r of S.v){
         const code=String(r[0]||'').trim();
@@ -5231,6 +5244,17 @@ function generatePivotBaseReportManager() {
       }
       console.log('T Aktivite Özet processing complete. Total rows in final result:', rows.length - 1);
       console.log('Final rows structure:', rows.slice(0, 5));
+    } else {
+      console.log('T Aktivite Özet sheet is null or empty. Sheet object:', shS);
+      if (shS) {
+        console.log('Sheet exists but read() returned null. Last row:', shS.getLastRow());
+        console.log('Sheet name:', shS.getName());
+        if (shS.getLastRow() > 1) {
+          console.log('First few rows of T Aktivite Özet:');
+          const sampleData = shS.getRange(1, 1, Math.min(5, shS.getLastRow()), shS.getLastColumn()).getValues();
+          console.log(sampleData);
+        }
+      }
     }
 
     let pv = ss.getSheetByName('Pivot Veri'); if (!pv) pv = ss.insertSheet('Pivot Veri'); else pv.clear();
