@@ -3957,6 +3957,7 @@ function addReportsComparisonMenu(menu) {
      .addItem('Günlük Seri', 'openEmployeeMultiSelectReportDailySeries')
      .addItem('Haftalık', 'openEmployeeMultiSelectReportWeekly')
      .addItem('Haftalık Seri', 'generateWeeklyReportSeriesManager')
+     .addItem('Haftalık Seri (Karşılaştırma)', 'openEmployeeMultiSelectReportWeeklySeries')
      .addItem('Pivot Tabanı (Güncel)', 'generatePivotBaseReportManager')
      .addItem('Aylık', 'openEmployeeMultiSelectReportMonthly');
   menu.addSubMenu(sub);
@@ -3969,6 +3970,9 @@ function openEmployeeMultiSelectReportMonthly(){ openEmployeeMultiSelectReport('
 function generateComparisonReportManager(params) {
   if (params && params.period === 'daily-series') {
     return generateComparisonSeriesManager(params);
+  }
+  if (params && params.period === 'weekly-series') {
+    return generateComparisonWeeklySeriesManager(params);
   }
   console.log('Function started:', params || {});
   try {
@@ -4293,6 +4297,7 @@ function createManagerMenu_v2_deprecated() {
 }
 
 function openEmployeeMultiSelectReportDailySeries(){ openEmployeeMultiSelectReport('daily-series'); }
+function openEmployeeMultiSelectReportWeeklySeries(){ openEmployeeMultiSelectReport('weekly-series'); }
 
 function generateComparisonSeriesManager(params) {
   console.log('Function started:', params || {});
