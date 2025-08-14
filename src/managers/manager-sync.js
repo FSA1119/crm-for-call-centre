@@ -3625,6 +3625,87 @@ function refreshActivitySummaryAll() {
   }
 }
 
+// Tek temsilci için hızlı özet güncelleme
+function refreshActivitySummaryForCode(code) {
+  console.log('Function started:', { action: 'refreshActivitySummaryForCode', code: code });
+  try {
+    if (!code) throw new Error('Temsilci kodu boş');
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    const employeeFile = findEmployeeFile(String(code));
+    const rows = collectFormatTableNegativeSummary(employeeFile, String(code));
+    updateManagerActivitySummary(managerFile, rows, String(code), 'replace');
+    SpreadsheetApp.getUi().alert('Tamam', `${code} için T Aktivite Özet güncellendi (${rows.length} satır).`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: true, updated: rows.length };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+function refreshActivitySummaryForCodePrompt() {
+  console.log('Function started:', { action: 'refreshActivitySummaryForCodePrompt' });
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const resp = ui.prompt('Temsilci Kodu', 'Örn: KM 005', ui.ButtonSet.OK_CANCEL);
+    if (resp.getSelectedButton() !== ui.Button.OK) return;
+    const code = (resp.getResponseText()||'').trim();
+    if (!code) { ui.alert('Hata', 'Kod boş olamaz', ui.ButtonSet.OK); return; }
+    return refreshActivitySummaryForCode(code);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+// 6 dk limitini aşmamak için partiler halinde çalışır. Her çağrıda küçük bir grup işler.
+function refreshActivitySummaryAllFast() {
+  console.log('Function started:', { action: 'refreshActivitySummaryAllFast' });
+  const ui = SpreadsheetApp.getUi();
+  const lock = LockService.getDocumentLock();
+  const props = PropertiesService.getDocumentProperties();
+  try {
+    if (!lock.tryLock(30000)) {
+      ui.alert('Meşgul', 'Önceki işlem bitmedi. Lütfen biraz sonra tekrar deneyin.', ui.ButtonSet.OK);
+      return { success: false, reason: 'locked' };
+    }
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    const batchSize = Number(props.getProperty('NEG_SUMMARY_BATCH_SIZE') || '2');
+    let offset = Number(props.getProperty('NEG_SUMMARY_NEXT_INDEX') || '0');
+    if (offset < 0 || offset >= codes.length) offset = 0;
+
+    const end = Math.min(offset + batchSize, codes.length);
+    let updated = 0;
+    for (let i = offset; i < end; i++) {
+      const code = codes[i];
+      const employeeFile = findEmployeeFile(code);
+      const rows = collectFormatTableNegativeSummary(employeeFile, code);
+      updateManagerActivitySummary(managerFile, rows, code, 'replace');
+      updated++;
+    }
+
+    if (end >= codes.length) {
+      props.deleteProperty('NEG_SUMMARY_NEXT_INDEX');
+      ui.alert('Tamam', `T Aktivite Özet tamamlandı. (Güncellenen temsilci: ${updated}, Toplam: ${codes.length})`, ui.ButtonSet.OK);
+      console.log('Processing complete:', { updatedEmployees: codes.length });
+      return { success: true, done: true };
+    } else {
+      props.setProperty('NEG_SUMMARY_NEXT_INDEX', String(end));
+      ui.alert('Devam Edin', `Ara güncelleme bitti. Şimdi komutu tekrar çalıştırın. (İlerleme: ${end}/${codes.length})`, ui.ButtonSet.OK);
+      console.log('Partial complete:', { progress: `${end}/${codes.length}` });
+      return { success: true, done: false, nextIndex: end };
+    }
+  } catch (error) {
+    console.error('Function failed:', error);
+    ui.alert('Hata', String(error && error.message || error), ui.ButtonSet.OK);
+    throw error;
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 function generateWeeklyReportManager(options) {
   console.log('Function started:', options || {});
   try {
