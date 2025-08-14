@@ -3930,14 +3930,27 @@ function openEmployeeMultiSelectReport(period) {
             }
           })();
           function submitSel(){
+            console.log('submitSel() called');
             const codes = Array.from(document.querySelectorAll('input[name="emp"]:checked')).map(function(i){return i.value;});
+            console.log('Selected codes:', codes);
             if (codes.length===0){ alert('En az bir temsilci seçiniz'); return; }
             var payload = { period: '${period}', codes: codes };
+            console.log('Payload:', payload);
             if ('${period}'==='daily-series'){
               var sd = document.getElementById('startDate').value || '';
               payload.startDate = sd;
             }
-            google.script.run.withSuccessHandler(function(){google.script.host.close();}).generateComparisonReportManager(payload);
+            console.log('Calling generateComparisonReportManager with payload:', payload);
+            google.script.run
+              .withSuccessHandler(function(result){
+                console.log('Success:', result);
+                google.script.host.close();
+              })
+              .withFailureHandler(function(error){
+                console.error('Error:', error);
+                alert('Hata: ' + error.message);
+              })
+              .generateComparisonReportManager(payload);
           }
         </script>
       </body>
