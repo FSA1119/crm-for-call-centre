@@ -4055,6 +4055,217 @@ function generateComparisonReportManager(params) {
   }
 }
 
+/**
+ * Haftalık Seri Karşılaştırma Raporu - Çalışan bazında haftalık karşılaştırma
+ */
+function generateComparisonWeeklySeriesManager(params) {
+  console.log('Function started:', { action: 'generateComparisonWeeklySeriesManager', params });
+  try {
+    const codes = (params && params.codes) || [];
+    if (!codes || codes.length === 0) {
+      throw new Error('Temsilci kodu seçilmedi');
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Son 8 hafta için haftalık veri topla
+    const weeks = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 8; i++) {
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - (today.getDay() + 7 * i));
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      weeks.push({
+        start: weekStart,
+        end: weekEnd,
+        label: `${Utilities.formatDate(weekStart, Session.getScriptTimeZone(), 'dd.MM.yyyy')} – ${Utilities.formatDate(weekEnd, Session.getScriptTimeZone(), 'dd.MM.yyyy')}`
+      });
+    }
+
+    // Her çalışan için haftalık veri topla
+    const employeeData = {};
+    
+    for (const code of codes) {
+      employeeData[code] = {};
+      
+      for (const week of weeks) {
+        const weekData = countActivitiesForPeriod(code, week.start, week.end);
+        employeeData[code][week.label] = weekData;
+      }
+    }
+
+    // Rapor sayfasını oluştur
+    const sheetName = 'Haftalık Seri Karşılaştırma';
+    let sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      sheet.clear();
+    } else {
+      sheet = ss.insertSheet(sheetName);
+    }
+
+    // Başlık satırı
+    const headers = ['Hafta'];
+    for (const code of codes) {
+      headers.push(`${code} - Randevu Alındı`);
+      headers.push(`${code} - İleri Tarih Randevu`);
+      headers.push(`${code} - Yeniden Aranacak`);
+      headers.push(`${code} - Bilgi Verildi`);
+      headers.push(`${code} - Fırsat İletildi`);
+      headers.push(`${code} - İlgilenmiyor`);
+      headers.push(`${code} - Ulaşılamadı`);
+      headers.push(`${code} - TOPLAM KONTAK`);
+      headers.push(`${code} - TOPLAM İŞLEM`);
+    }
+    
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+
+    // Veri satırları
+    const dataRows = [];
+    for (const week of weeks) {
+      const row = [week.label];
+      
+      for (const code of codes) {
+        const weekData = employeeData[code][week.label] || {};
+        row.push(weekData['Randevu Alındı'] || 0);
+        row.push(weekData['İleri Tarih Randevu'] || 0);
+        row.push(weekData['Yeniden Aranacak'] || 0);
+        row.push(weekData['Bilgi Verildi'] || 0);
+        row.push(weekData['Fırsat İletildi'] || 0);
+        row.push(weekData['İlgilenmiyor'] || 0);
+        row.push(weekData['Ulaşılamadı'] || 0);
+        row.push(weekData['TOPLAM KONTAK'] || 0);
+        row.push(weekData['TOPLAM İŞLEM'] || 0);
+      }
+      
+      dataRows.push(row);
+    }
+
+    if (dataRows.length > 0) {
+      sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
+    }
+
+    sheet.autoResizeColumns(1, headers.length);
+    
+    SpreadsheetApp.getUi().alert('Tamam', 'Haftalık Seri Karşılaştırma raporu oluşturuldu.', SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    return { success: true, weeks: weeks.length, employees: codes.length };
+
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * Belirli bir dönem için aktivite sayımlarını hesapla
+ */
+function countActivitiesForPeriod(employeeCode, startDate, endDate) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    function withinRange(value, start, end) {
+      try {
+        if (!value) return false;
+        const d = value instanceof Date ? value : new Date(String(value));
+        if (isNaN(d.getTime())) return false;
+        return d >= start && d <= end;
+      } catch (e) { return false; }
+    }
+
+    function parseDdMmYyyy(dateStr) {
+      if (!dateStr) return null;
+      const m = String(dateStr).match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (m) {
+        return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+      }
+      return null;
+    }
+
+    const counts = {
+      'Randevu Alındı': 0,
+      'İleri Tarih Randevu': 0,
+      'Yeniden Aranacak': 0,
+      'Bilgi Verildi': 0,
+      'Fırsat İletildi': 0,
+      'İlgilenmiyor': 0,
+      'Ulaşılamadı': 0
+    };
+
+    // Randevular
+    const shR = ss.getSheetByName('T Randevular');
+    if (shR && shR.getLastRow() > 1) {
+      const headers = shR.getRange(1, 1, 1, shR.getLastColumn()).getValues()[0];
+      const values = shR.getRange(2, 1, shR.getLastRow() - 1, shR.getLastColumn()).getValues();
+      const idxCode = headers.indexOf('Kod') !== -1 ? headers.indexOf('Kod') : headers.indexOf('Temsilci Kodu');
+      const idxStatus = headers.indexOf('Randevu durumu');
+      const idxDate = headers.indexOf('Randevu Tarihi');
+      
+      for (const row of values) {
+        if (idxCode !== -1 && String(row[idxCode]) !== String(employeeCode)) continue;
+        const date = idxDate !== -1 ? row[idxDate] : null;
+        if (!withinRange(date, startDate, endDate)) continue;
+        const status = idxStatus !== -1 ? String(row[idxStatus] || '') : '';
+        if (counts.hasOwnProperty(status)) counts[status]++;
+      }
+    }
+
+    // Fırsatlar
+    const shF = ss.getSheetByName('T Fırsatlar');
+    if (shF && shF.getLastRow() > 1) {
+      const headers = shF.getRange(1, 1, 1, shF.getLastColumn()).getValues()[0];
+      const values = shF.getRange(2, 1, shF.getLastRow() - 1, shF.getLastColumn()).getValues();
+      const idxCode = headers.indexOf('Kod') !== -1 ? headers.indexOf('Kod') : headers.indexOf('Temsilci Kodu');
+      const idxStatus = headers.indexOf('Fırsat Durumu');
+      const idxDate = headers.indexOf('Fırsat Tarihi');
+      
+      for (const row of values) {
+        if (idxCode !== -1 && String(row[idxCode]) !== String(employeeCode)) continue;
+        const date = idxDate !== -1 ? row[idxDate] : null;
+        if (!withinRange(date, startDate, endDate)) continue;
+        const status = idxStatus !== -1 ? String(row[idxStatus] || '') : '';
+        const s = status.toLowerCase();
+        const norm = s.includes('ilet') ? 'Fırsat İletildi' : s.includes('bilgi') ? 'Bilgi Verildi' : s.includes('yeniden') || s.includes('ara') ? 'Yeniden Aranacak' : '';
+        if (norm && counts.hasOwnProperty(norm)) counts[norm]++;
+      }
+    }
+
+    // Negatifler - T Aktivite Özet'ten
+    const shS = ss.getSheetByName('T Aktivite Özet');
+    if (shS && shS.getLastRow() > 1) {
+      const values = shS.getRange(2, 1, shS.getLastRow() - 1, 4).getValues();
+      
+      for (const row of values) {
+        if (String(row[0]) !== String(employeeCode)) continue;
+        const date = parseDdMmYyyy(String(row[1]));
+        if (!date || !withinRange(date, startDate, endDate)) continue;
+        
+        const ilgi = Number(row[2] || 0);
+        const ulas = Number(row[3] || 0);
+        
+        if (ilgi > 0) counts['İlgilenmiyor'] += ilgi;
+        if (ulas > 0) counts['Ulaşılamadı'] += ulas;
+      }
+    }
+
+    // Toplamları hesapla
+    counts['TOPLAM KONTAK'] = counts['Randevu Alındı'] + counts['İleri Tarih Randevu'] + counts['Yeniden Aranacak'] + counts['Bilgi Verildi'] + counts['Fırsat İletildi'] + counts['İlgilenmiyor'];
+    counts['TOPLAM İŞLEM'] = counts['TOPLAM KONTAK'] + counts['Ulaşılamadı'];
+
+    return counts;
+
+  } catch (error) {
+    console.error('countActivitiesForPeriod failed:', error);
+    return {};
+  }
+}
+
 function generateMonthlyReportManager(options) {
   console.log('Function started:', options || {});
   try {
@@ -4979,14 +5190,47 @@ function generatePivotBaseReportManager() {
 
     // Özet (Format Tablo'dan toplanan negatifler): varsa ekle
     if (S){
+      console.log('Processing T Aktivite Özet data:', S.v.length, 'rows');
+      console.log('Sample data from T Aktivite Özet:', S.v.slice(0, 3));
+      
       for (const r of S.v){
         const code=String(r[0]||'').trim();
-        const d=parseDdMmYyyy(String(r[1]||''));
-        if(!code || !d) continue;
-        const ilgi=Number(r[2]||0); const ulas=Number(r[3]||0);
-        if (ilgi>0) rows.push([code, toKey(d), 'İlgilenmiyor', ilgi]);
-        if (ulas>0) rows.push([code, toKey(d), 'Ulaşılamadı', ulas]);
+        const ds=String(r[1]||'');
+        console.log('Processing row:', { code, date: ds, ilgi: r[2], ulas: r[3] });
+        
+        // Daha esnek tarih parsing - dd.MM.yyyy formatını destekle
+        let d = null;
+        if (ds && typeof ds === 'string') {
+          const m = ds.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+          if (m) {
+            d = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+            console.log('Date parsed successfully:', { original: ds, parsed: d, toKey: toKey(d) });
+          } else {
+            console.log('Date parsing failed for:', ds);
+          }
+        }
+        
+        if(!code || !d || isNaN(d.getTime())) {
+          console.log('Skipping invalid row:', { code, date: ds, parsed: d, isValid: !isNaN(d?.getTime()) });
+          continue;
+        }
+        
+        const ilgi=Number(r[2]||0); 
+        const ulas=Number(r[3]||0);
+        
+        console.log('Valid row found:', { code, date: toKey(d), ilgi, ulas });
+        
+        if (ilgi>0) {
+          rows.push([code, toKey(d), 'İlgilenmiyor', ilgi]);
+          console.log('Added İlgilenmiyor row:', [code, toKey(d), 'İlgilenmiyor', ilgi]);
+        }
+        if (ulas>0) {
+          rows.push([code, toKey(d), 'Ulaşılamadı', ulas]);
+          console.log('Added Ulaşılamadı row:', [code, toKey(d), 'Ulaşılamadı', ulas]);
+        }
       }
+      console.log('T Aktivite Özet processing complete. Total rows in final result:', rows.length - 1);
+      console.log('Final rows structure:', rows.slice(0, 5));
     }
 
     let pv = ss.getSheetByName('Pivot Veri'); if (!pv) pv = ss.insertSheet('Pivot Veri'); else pv.clear();
