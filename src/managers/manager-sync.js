@@ -606,7 +606,10 @@ function createManagerMenu() {
                .addItem('🎨 (Yönetici) Bu Sayfayı Yenile', 'applyManualManagerColorCoding')
                .addSeparator()
                .addItem('🎨 (Temsilci) Renkleri Yenile – Tümü', 'refreshAgentColorCodingAll')
-               .addItem('🎨 (Temsilci) Renkleri Yenile – Seçili Kod', 'refreshAgentColorCodingPrompt');
+               .addItem('🎨 (Temsilci) Renkleri Yenile – Seçili Kod', 'refreshAgentColorCodingPrompt')
+               .addSeparator()
+               .addItem('📊 Özet (Tek Kod)', 'refreshActivitySummaryForCodePrompt')
+               .addItem('📊 Özet (Hızlı Parti)', 'refreshActivitySummaryAllFast');
     menu.addSubMenu(maintenance)
         .addSeparator();
     
