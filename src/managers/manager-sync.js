@@ -978,6 +978,14 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
     
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     
+    // Serbest metin kolonlarındaki eski validasyonları temizle (ör. Kaynak)
+    try {
+      const idxKaynak = headers.indexOf('Kaynak');
+      if (idxKaynak !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxKaynak + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+    } catch (e) { console.log('Kaynak validation clear skipped:', e && e.message); }
+    
     // Apply validation based on sheet type
     switch (sheetName) {
       case 'Randevular':
