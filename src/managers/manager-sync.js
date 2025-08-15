@@ -1460,7 +1460,7 @@ function collectSheetData(sheet, employeeCode) {
       targetColumns = [
         'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
         'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Fırsat Durumu', 'Fırsat Tarihi',
-        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+        'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
         'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
         'Rating count', 'Review', 'Maplink'
       ];
@@ -1818,7 +1818,7 @@ function createManagerSheetHeaders(sheet, sheetName) {
         headers = [
           'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
           'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Fırsat Durumu', 'Fırsat Tarihi',
-          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+          'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
           'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
           'Rating count', 'Review', 'Maplink'
         ];
