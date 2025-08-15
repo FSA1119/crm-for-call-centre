@@ -3835,6 +3835,47 @@ function updateManagerActivitySummary(managerFile, rows, employeeCode, mode) {
   }
 }
 
+function applySourcesToMainActivitySummary(managerFile, dataObj, employeeCode) {
+  console.log('Function started:', { action: 'applySourcesToMainActivitySummary', employeeCode });
+  try {
+    if (!managerFile || !dataObj) return;
+    const sheetName = 'T Aktivite Özet';
+    const sh = managerFile.getSheetByName(sheetName);
+    if (!sh || sh.getLastRow() <= 1) return;
+
+    // Ensure header has 5th column "Kaynaklar"
+    const lastCol = sh.getLastColumn();
+    const headers = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    let idxKaynak = headers.indexOf('Kaynaklar');
+    if (idxKaynak === -1) {
+      sh.insertColumnAfter(Math.max(4, lastCol));
+      const newIdx = Math.max(4, lastCol) + 1; // 1-based
+      sh.getRange(1, newIdx).setValue('Kaynaklar');
+      idxKaynak = newIdx - 1; // zero-based
+    }
+
+    const sourcesMap = dataObj.sources || new Map();
+    const dateToCsv = new Map();
+    if (sourcesMap && sourcesMap.entries) {
+      for (const [dateKey, setVal] of sourcesMap.entries()) {
+        const csv = Array.from(setVal).join(', ');
+        dateToCsv.set(String(dateKey), csv);
+      }
+    }
+
+    const lastRow = sh.getLastRow();
+    for (let r = 2; r <= lastRow; r++) {
+      const code = String(sh.getRange(r, 1).getDisplayValue() || '');
+      const dateKey = String(sh.getRange(r, 2).getDisplayValue() || '');
+      if (code !== String(employeeCode)) continue;
+      const csv = dateToCsv.get(dateKey) || '';
+      sh.getRange(r, idxKaynak + 1).setValue(csv);
+    }
+  } catch (error) {
+    console.error('Function failed:', error);
+  }
+}
+
 function refreshActivitySummaryAll() {
   console.log('Function started:', { action: 'refreshActivitySummaryAll' });
   const ui = SpreadsheetApp.getUi();
@@ -3850,10 +3891,9 @@ function refreshActivitySummaryAll() {
       const employeeFile = findEmployeeFile(code);
       const rows = collectFormatTableNegativeSummary(employeeFile, code);
       updateManagerActivitySummary(managerFile, rows, code, 'replace');
-      // Kaynaklı detay sayfasını isteğe bağlı üret
       try {
         const withSrc = collectFormatTableNegativeSummaryWithSources(employeeFile, code);
-        updateManagerActivitySummaryWithSources(managerFile, withSrc, code);
+        applySourcesToMainActivitySummary(managerFile, withSrc, code);
       } catch (_) {}
     }
     console.log('Processing complete:', { updatedEmployees: codes.length });
