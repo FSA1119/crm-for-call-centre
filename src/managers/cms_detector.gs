@@ -60,8 +60,8 @@ function detectCMSForUrl(rawUrl) {
   } catch (error) {
     console.error('Function failed:', error);
     try { SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK); } catch(_) {}
-    // Hata durumunda lead potansiyelini kaybetmemek adına "Düşük Kalite" döndürmek mantıklı olabilir
-    return 'Düşük Kalite';
+    // Hata durumunda algoritmik tespit başarısızlığı olarak dön
+    return 'Tespit Edilemedi';
   }
 }
 
@@ -116,7 +116,7 @@ function detectCMSBatch(urls) {
     return out;
   } catch (error) {
     console.error('Function failed:', error);
-    return urls.map(_ => 'Düşük Kalite');
+    return urls.map(_ => 'Tespit Edilemedi');
   }
 }
 
@@ -140,19 +140,21 @@ function detectCMSBatchFast(urls) {
         const known = detectKnownCMS(signals);
         out.push(known || classifyCustomQuality(signals));
       } catch (e) {
-        out.push('Düşük Kalite');
+        out.push('Tespit Edilemedi');
       }
     }
     return out;
   } catch (error) {
     console.error('Function failed:', error);
-    return urls.map(_ => 'Düşük Kalite');
+    return urls.map(_ => 'Tespit Edilemedi');
   }
 }
 
 function mapCmsGroup(name) {
   const n = String(name||'').toLowerCase();
   if (!n) return '';
+  // Tespit edilemedi -> grup yazma
+  if (n.indexOf('tespit edilemedi') !== -1) return '';
   // Özel etiketler
   if (['ticimax','t-soft','ikas'].some(k=>n.indexOf(k)!==-1)) return 'Rakip';
   if (['ideasoft'].some(k=>n.indexOf(k)!==-1)) return 'Bizim';
