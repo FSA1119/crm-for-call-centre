@@ -1687,8 +1687,13 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       optimizeColumnWidths(sheet, baseTypeForHeaders);
             applyManagerSheetDataValidation(sheet, baseTypeForHeaders);
 
-      // Deduplicate by [Kod+Company name+Tarih] to avoid repeated rows on subsequent appends
-      try { removeDuplicatesInAggregateSheet(sheet, baseTypeForHeaders); } catch (_) {}
+      // Deduplicate only for Toplantılar to avoid collapsing distinct opportunity/appointment actions
+      try {
+        const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
+        if (lowerBase.includes('toplant')) {
+          removeDuplicatesInAggregateSheet(sheet, baseTypeForHeaders);
+        }
+      } catch (_) {}
 
       // Sorting for appended aggregate sheets
       try {
