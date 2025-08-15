@@ -1348,10 +1348,14 @@ function collectAllData() {
           }
         }
         
-        // Collect negatives from Format Tablo as summary counts
+        // Collect negatives and update summary + sources
         const employeeFile = findEmployeeFile(employeeCode);
         const negRows = collectFormatTableNegativeSummary(employeeFile, employeeCode);
         updateManagerActivitySummary(managerFile, negRows, employeeCode, 'replace');
+        try {
+          const withSrc = collectFormatTableNegativeSummaryWithSources(employeeFile, employeeCode);
+          applySourcesToMainActivitySummary(managerFile, withSrc, employeeCode);
+        } catch(_) {}
         
         totalStats.employeeStats[employeeCode] = employeeStats;
         totalStats.totalRecords += employeeStats.totalRecords;
@@ -1736,25 +1740,73 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
           if (lowerBase.includes('randevu')) {
             const dateIdx = findIdx(['Randevu Tarihi','Tarih']);
             const timeIdx = findIdx(['Saat']);
-            if (dateIdx >= 0) {
-              const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
-              const values = rng.getValues();
-              function parseTime(v){
-                if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
-                const s = String(v || '').trim();
-                const m = s.match(/^(\d{1,2}):(\d{2})/);
-                if (m) return Number(m[1])*60 + Number(m[2]);
-                return 0;
+            const logIdx = findIdx(['Log']);
+            const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+            const values = rng.getValues();
+            function parseDd(s){
+              const v = String(s||'').trim();
+              const m = v.match(/(\d{2}\.\d{2}\.\d{4})/);
+              if (m) {
+                const [dd,mm,yy] = m[1].split('.');
+                const d = new Date(Number(yy), Number(mm)-1, Number(dd));
+                if (!isNaN(d.getTime())) return d;
               }
-              values.sort(function(a,b){
-                const da = parseDdMmYyyy(a[dateIdx]) || new Date('2100-12-31');
-                const db = parseDdMmYyyy(b[dateIdx]) || new Date('2100-12-31');
-                if (da.getTime() !== db.getTime()) return da - db;
-                if (timeIdx >= 0) return parseTime(a[timeIdx]) - parseTime(b[timeIdx]);
-                return 0;
-              });
-              rng.setValues(values);
+              return null;
             }
+            function getActDate(row){
+              const dLog = logIdx>=0 ? parseDd(row[logIdx]) : null;
+              if (dLog) return dLog;
+              if (dateIdx>=0) {
+                const d = parseDdMmYyyy(row[dateIdx]);
+                if (d) return d;
+              }
+              return new Date('2100-12-31');
+            }
+            function parseTime(v){
+              if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
+              const s = String(v || '').trim();
+              const m = s.match(/^(\d{1,2}):(\d{2})/);
+              if (m) return Number(m[1])*60 + Number(m[2]);
+              return 0;
+            }
+            values.sort(function(a,b){
+              const da = getActDate(a);
+              const db = getActDate(b);
+              if (da.getTime() !== db.getTime()) return da - db;
+              if (timeIdx >= 0) return parseTime(a[timeIdx]) - parseTime(b[timeIdx]);
+              return 0;
+            });
+            rng.setValues(values);
+          } else if (lowerBase.includes('fırsat') || lowerBase.includes('firsat')) {
+            const dateIdx = findIdx(['Fırsat Tarihi','Firsat Tarihi','Tarih']);
+            const logIdx = findIdx(['Log']);
+            const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+            const values = rng.getValues();
+            function parseDd2(s){
+              const v = String(s||'').trim();
+              const m = v.match(/(\d{2}\.\d{2}\.\d{4})/);
+              if (m) {
+                const [dd,mm,yy] = m[1].split('.');
+                const d = new Date(Number(yy), Number(mm)-1, Number(dd));
+                if (!isNaN(d.getTime())) return d;
+              }
+              return null;
+            }
+            function getDate(row){
+              const dLog = logIdx>=0 ? parseDd2(row[logIdx]) : null;
+              if (dLog) return dLog;
+              if (dateIdx>=0) {
+                const d = parseDdMmYyyy(row[dateIdx]);
+                if (d) return d;
+              }
+              return new Date('2100-12-31');
+            }
+            values.sort(function(a,b){
+              const da = getDate(a);
+              const db = getDate(b);
+              return da - db;
+            });
+            rng.setValues(values);
           } else if (lowerBase.includes('toplant')) {
             // Sadece T Toplantılar için çalıştır
             if (!/^T\s/i.test(sheet.getName())) {
