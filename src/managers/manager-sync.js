@@ -3568,6 +3568,150 @@ function getNegativeSummaryRows(scope, filterCode) {
   }
 }
 
+function collectFormatTableNegativeSummaryWithSources(employeeFile, employeeCode) {
+  console.log('Function started:', { action: 'collectFormatTableNegativeSummaryWithSources', employeeCode });
+  try {
+    if (!employeeFile || !employeeCode) return { rows: [], sources: new Map() };
+    const sheets = employeeFile.getSheets();
+    const resultMap = new Map(); // dateKey -> { ilgi, ulas }
+    const sourceMap = new Map(); // dateKey -> Set(sourceNames)
+
+    function pushCount(dateKey, type, sourceName) {
+      if (!dateKey) return;
+      if (!resultMap.has(dateKey)) resultMap.set(dateKey, { ilgi: 0, ulas: 0 });
+      const obj = resultMap.get(dateKey);
+      if (type === 'İlgilenmiyor') obj.ilgi++;
+      else if (type === 'Ulaşılamadı') obj.ulas++;
+      if (!sourceMap.has(dateKey)) sourceMap.set(dateKey, new Set());
+      if (sourceName) sourceMap.get(dateKey).add(sourceName);
+    }
+
+    function extractDateFromLog(logValue) {
+      const s = String(logValue || '');
+      const m = s.match(/(\d{2}\.\d{2}\.\d{4})/);
+      if (m && m[1]) return m[1];
+      return '';
+    }
+
+    function toDdMmYyyy(value) {
+      if (!value) return '';
+      if (value instanceof Date && !isNaN(value.getTime())) {
+        const d = ('0' + value.getDate()).slice(-2);
+        const m = ('0' + (value.getMonth() + 1)).slice(-2);
+        const y = value.getFullYear();
+        return `${d}.${m}.${y}`;
+      }
+      const s = String(value).trim();
+      if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return s;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return toDdMmYyyy(d);
+      return '';
+    }
+
+    function norm(s) {
+      return String(s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    }
+
+    function findHeaderIdx(headers, candidates) {
+      const lower = headers.map(h => norm(h));
+      for (const cand of candidates) {
+        const i = lower.indexOf(norm(cand));
+        if (i !== -1) return i;
+      }
+      return -1;
+    }
+
+    for (const sh of sheets) {
+      const lastRow = sh.getLastRow();
+      if (lastRow <= 1) continue;
+      const lastCol = sh.getLastColumn();
+      const headers = sh.getRange(1,1,1,lastCol).getValues()[0];
+      const sheetName = sh.getName();
+
+      // Skip consolidated sheets
+      const isRandevuSheet = findHeaderIdx(headers, ['Randevu durumu']) !== -1;
+      const isFirsatSheet  = findHeaderIdx(headers, ['Fırsat Durumu','Firsat Durumu']) !== -1;
+      const isToplSheet    = findHeaderIdx(headers, ['Toplantı durumu','Toplanti durumu']) !== -1;
+      if (isRandevuSheet || isFirsatSheet || isToplSheet) continue;
+
+      // Detect Format Tablo-ish sheets
+      const idxAktivite = findHeaderIdx(headers, ['Aktivite','Aktivite Durumu','Durum']);
+      const idxTarih = findHeaderIdx(headers, ['Aktivite Tarihi','Aktivite tarihi','Tarih']);
+      const idxLog = findHeaderIdx(headers, ['Log','Günlük']);
+      if (idxAktivite === -1 || (idxTarih === -1 && idxLog === -1)) continue;
+
+      const values = sh.getRange(2,1,lastRow-1,lastCol).getValues();
+      for (const row of values) {
+        const actNorm = norm(row[idxAktivite]);
+        const isIlgi = /\bilgilenm/i.test(actNorm) || /\bilgi yok/i.test(actNorm) || /\bilg yok/i.test(actNorm);
+        const isUlas = /(ulasilam|ulasam|ulasilamadi|^ulas| cevap yok|mesgul|erisile|erise|yanit yok|a\u00E7ilmadi|acilmadi)/i.test(actNorm);
+        if (!isIlgi && !isUlas) continue;
+        let dateKey = '';
+        if (idxTarih !== -1) dateKey = toDdMmYyyy(row[idxTarih]);
+        if (!dateKey && idxLog !== -1) dateKey = extractDateFromLog(row[idxLog]);
+        if (!dateKey) continue;
+        pushCount(dateKey, isIlgi ? 'İlgilenmiyor' : 'Ulaşılamadı', sheetName);
+      }
+    }
+
+    const out = [];
+    for (const [dateKey, obj] of resultMap.entries()) {
+      out.push([employeeCode, dateKey, obj.ilgi, obj.ulas]);
+    }
+    // sort by date asc
+    out.sort((a,b)=>{
+      const [ad,am,ay] = String(a[1]||'').split('.');
+      const [bd,bm,by] = String(b[1]||'').split('.');
+      const da = new Date(Number(ay), Number(am)-1, Number(ad));
+      const db = new Date(Number(by), Number(bm)-1, Number(bd));
+      return da - db;
+    });
+
+    console.log('Processing complete:', { rows: out.length, sources: sourceMap.size });
+    return { rows: out, sources: sourceMap };
+  } catch (error) {
+    console.error('Function failed:', error);
+    return { rows: [], sources: new Map() };
+  }
+}
+
+function updateManagerActivitySummaryWithSources(managerFile, dataObj, employeeCode) {
+  console.log('Function started:', { action: 'updateManagerActivitySummaryWithSources', employeeCode });
+  try {
+    if (!managerFile || !employeeCode || !dataObj) return;
+    const sheetName = 'T Aktivite Özet (Kaynak)';
+    let sheet = managerFile.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = managerFile.insertSheet(sheetName);
+      sheet.getRange(1,1,1,5).setValues([[
+        'Kod','Tarih','İlgilenmiyor','Ulaşılamadı','Kaynak Sayfalar'
+      ]]);
+      applyHeaderStyling(sheet, sheetName);
+    }
+    const rows = dataObj.rows || [];
+    const sourcesMap = dataObj.sources || new Map();
+
+    // Clear previous rows of this employee
+    const data = sheet.getLastRow() > 1 ? sheet.getRange(2,1,sheet.getLastRow()-1, sheet.getLastColumn()).getValues() : [];
+    const idxCode = 0;
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (String(data[i][idxCode]) === String(employeeCode)) sheet.deleteRow(i + 2);
+    }
+
+    if (rows.length === 0) return;
+
+    const enriched = rows.map(r => {
+      const srcSet = sourcesMap.get(r[1]) || new Set();
+      const src = Array.from(srcSet).join(', ');
+      return [...r, src];
+    });
+
+    sheet.getRange(sheet.getLastRow()+1, 1, enriched.length, 5).setValues(enriched);
+  } catch (error) {
+    console.error('Function failed:', error);
+  }
+}
+
 function updateManagerActivitySummary(managerFile, rows, employeeCode, mode) {
   console.log('Function started:', { action: 'updateManagerActivitySummary', rows: rows ? rows.length : 0, employeeCode, mode });
   try {
@@ -3706,6 +3850,11 @@ function refreshActivitySummaryAll() {
       const employeeFile = findEmployeeFile(code);
       const rows = collectFormatTableNegativeSummary(employeeFile, code);
       updateManagerActivitySummary(managerFile, rows, code, 'replace');
+      // Kaynaklı detay sayfasını isteğe bağlı üret
+      try {
+        const withSrc = collectFormatTableNegativeSummaryWithSources(employeeFile, code);
+        updateManagerActivitySummaryWithSources(managerFile, withSrc, code);
+      } catch (_) {}
     }
     console.log('Processing complete:', { updatedEmployees: codes.length });
     ui.alert('✅ Tamamlandı', 'T Aktivite Özet güncellendi', ui.ButtonSet.OK);
