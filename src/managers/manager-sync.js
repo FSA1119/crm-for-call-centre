@@ -1549,9 +1549,13 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       createManagerSheetHeaders(sheet, baseTypeForHeaders);
     }
 
-    // Replace mode: clear previous rows of this employee (within the target sheet)
+    // Replace mode: Randevular'da yöneticinin girdiği alanları korumak için satırları silme
     if (effectiveMode !== 'append') {
-      clearEmployeeData(sheet, employeeCode);
+      const baseLower = String(baseTypeForHeaders || '').toLowerCase();
+      const isRandevuBase = baseLower.includes('randevu') && String(targetSheetName) === 'Randevular';
+      if (!isRandevuBase) {
+        clearEmployeeData(sheet, employeeCode);
+      }
     }
 
     const opStats = { totalIncoming: data.length, sameCount: 0, updateCount: 0, newCount: 0 };
@@ -1677,6 +1681,16 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
 
       // Apply updates
       for (const u of updates) {
+        // Randevular ana sayfasında (yönetici) kullanıcı tarafından girilen alanları koru
+        const baseLower = String(baseTypeForHeaders || '').toLowerCase();
+        const isManagerRandevular = baseLower.includes('randevu') && String(targetSheetName) === 'Randevular';
+        if (isManagerRandevular) {
+          const headersNow = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+          const protectCols = ['Toplantı Sonucu','Teklif Detayı','Satış Potansiyeli','Toplantı Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan','Yönetici Not'];
+          const protectedIdx = protectCols.map(n => headersNow.indexOf(n)).filter(i => i >= 0);
+          const currentRow = sheet.getRange(u.rowIndex, 1, 1, lastCol).getValues()[0];
+          protectedIdx.forEach(i => { u.values[i] = currentRow[i]; });
+        }
         sheet.getRange(u.rowIndex, 1, 1, lastCol).setValues([u.values]);
         if (getOnlyColorTouchedRowsFlag()) {
           applyColorCodingToManagerData(sheet, sheet.getName(), u.rowIndex, 1);
