@@ -2149,7 +2149,7 @@ function showSyncResults(totalStats) {
           if (maxDate && (!overallMax || maxDate > overallMax)) overallMax = maxDate;
 
           const breakdownCounts = (typeof recordInfo === 'object')
-            ? ` (Yeni: ${recordInfo.newCount || 0}, Güncellendi: ${recordInfo.updateCount || 0}, Aynı: ${recordInfo.sameCount || 0})`
+            ? ` (Eklendi: ${recordInfo.newCount || 0}, Güncellendi: ${recordInfo.updateCount || 0}, Aynı: ${recordInfo.sameCount || 0})`
             : '';
 
           if (minDate && maxDate) {
