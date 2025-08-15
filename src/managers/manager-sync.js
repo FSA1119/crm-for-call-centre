@@ -1639,7 +1639,15 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         if (softMap.has(soKey)) {
           const rowIndex = softMap.get(soKey);
           const current = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
-          // Eğer tarih farklıysa bu yeni bir aktivite kabul edilir -> ekle
+          // Fırsatlar ve Randevular: tarih/statu değişimi olsa dahi append etme, mevcut satırı güncelle
+          const baseLower = String(baseTypeForHeaders || '').toLowerCase();
+          if (baseLower.includes('fırsat') || baseLower.includes('firsat') || baseLower.includes('randevu')) {
+            const changed = current.some((v, idx) => String(v) !== String(r[idx]));
+            if (changed) { updates.push({ rowIndex, values: r }); opStats.updateCount++; }
+            else { opStats.sameCount++; }
+            continue;
+          }
+          // Diğer sayfalar: tarih farklıysa yeni aktivite olarak ekle
           if (idxDate >= 0) {
             const existingDate = canonicalDate(current[idxDate]);
             const incomingDate = canonicalDate(r[idxDate]);
@@ -1649,7 +1657,6 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
               continue;
             }
           }
-          // Aksi halde aynı gün/aynı kayıt -> güncelle
           const changed = current.some((v, idx) => String(v) !== String(r[idx]));
           if (changed) { updates.push({ rowIndex, values: r }); opStats.updateCount++; }
           else { opStats.sameCount++; }
