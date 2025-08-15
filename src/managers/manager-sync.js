@@ -1686,8 +1686,9 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         const isManagerRandevular = baseLower.includes('randevu') && String(targetSheetName) === 'Randevular';
         if (isManagerRandevular) {
           const headersNow = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-          const protectCols = ['Toplantı Sonucu','Teklif Detayı','Satış Potansiyeli','Toplantı Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan','Yönetici Not'];
-          const protectedIdx = protectCols.map(n => headersNow.indexOf(n)).filter(i => i >= 0);
+          const lowered = headersNow.map(h => String(h||'').toLowerCase());
+          const protectCols = ['Toplantı Sonucu','Toplanti Sonucu','Toplantı sonucu','Toplanti sonucu','Teklif Detayı','Teklif Detayi','Satış Potansiyeli','Satis Potansiyeli','Toplantı Tarihi','Toplanti Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan','Toplantiyi Yapan','Yönetici Not','Yonetici Not'];
+          const protectedIdx = protectCols.map(n => lowered.indexOf(String(n).toLowerCase())).filter(i => i >= 0);
           const currentRow = sheet.getRange(u.rowIndex, 1, 1, lastCol).getValues()[0];
           protectedIdx.forEach(i => { u.values[i] = currentRow[i]; });
         }
