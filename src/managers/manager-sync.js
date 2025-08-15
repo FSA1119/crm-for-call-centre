@@ -1649,7 +1649,8 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
           const current = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
           // Fırsatlar ve Randevular: tarih/statu değişimi olsa dahi append etme, mevcut satırı güncelle
           const baseLower = String(baseTypeForHeaders || '').toLowerCase();
-          if (baseLower.includes('fırsat') || baseLower.includes('firsat') || baseLower.includes('randevu')) {
+          // Randevular: tarih/durum değişse bile mevcut satırı güncelle, append etme
+          if (baseLower.includes('randevu')) {
             const changed = current.some((v, idx) => String(v) !== String(r[idx]));
             if (changed) { updates.push({ rowIndex, values: r }); opStats.updateCount++; }
             else { opStats.sameCount++; }
