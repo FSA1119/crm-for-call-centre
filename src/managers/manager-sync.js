@@ -3630,6 +3630,61 @@ function updateManagerActivitySummary(managerFile, rows, employeeCode, mode) {
     if (appends.length > 0) {
       sheet.getRange(sheet.getLastRow() + 1, 1, appends.length, appends[0].length).setValues(appends);
     }
+    // DEDUPE + SORT: Kod+Tarih bazında tekilleştir ve kronolojik sırala
+    try {
+      const lastRowAll = sheet.getLastRow();
+      if (lastRowAll > 1) {
+        const rng = sheet.getRange(2, 1, lastRowAll - 1, 4).getValues(); // [Kod, Tarih, İlgilenmiyor, Ulaşılamadı]
+        function normDate(val){
+          if (!val) return '';
+          if (val instanceof Date && !isNaN(val.getTime())) {
+            const d = ('0'+val.getDate()).slice(-2);
+            const m = ('0'+(val.getMonth()+1)).slice(-2);
+            const y = val.getFullYear();
+            return `${d}.${m}.${y}`;
+          }
+          const s = String(val).trim();
+          const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+          if (m) {
+            const d = ('0'+Number(m[1])).slice(-2);
+            const mm = ('0'+Number(m[2])).slice(-2);
+            const y = m[3];
+            return `${d}.${mm}.${y}`;
+          }
+          const parsed = Date.parse(s);
+          if (!isNaN(parsed)) {
+            const dt = new Date(parsed);
+            const d = ('0'+dt.getDate()).slice(-2);
+            const mm = ('0'+(dt.getMonth()+1)).slice(-2);
+            const y = dt.getFullYear();
+            return `${d}.${mm}.${y}`;
+          }
+          return s;
+        }
+        const map = new Map();
+        for (const r of rng){
+          const kod = String(r[0]||'').trim();
+          const dt = normDate(r[1]);
+          if (!kod || !dt) continue;
+          const key = `${kod}||${dt}`;
+          const ilgi = Number(r[2]||0);
+          const ulas = Number(r[3]||0);
+          if (!map.has(key)) map.set(key, [kod, dt, 0, 0]);
+          const arr = map.get(key);
+          arr[2] += isNaN(ilgi)? 0 : ilgi;
+          arr[3] += isNaN(ulas)? 0 : ulas;
+        }
+        const out = Array.from(map.values());
+        // sort by Kod asc, then Tarih asc
+        function toDate(s){ const [d,m,y] = s.split('.'); return new Date(Number(y), Number(m)-1, Number(d)); }
+        out.sort((a,b)=> a[0]===b[0] ? (toDate(a[1]) - toDate(b[1])) : (String(a[0]).localeCompare(String(b[0]))));
+        // rewrite
+        const targetRows = out.length;
+        // Clear old
+        if (lastRowAll > 1) sheet.getRange(2,1,lastRowAll-1,4).clearContent();
+        if (targetRows>0) sheet.getRange(2,1,targetRows,4).setValues(out);
+      }
+    } catch (e) { console.log('T Aktivite Özet dedupe/sort skipped:', e && e.message); }
     console.log('Processing complete:', { appended: appends.length });
   } catch (error) {
     console.error('Function failed:', error);
