@@ -984,7 +984,15 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
       if (idxKaynak !== -1 && sheet.getLastRow() > 1) {
         sheet.getRange(2, idxKaynak + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
       }
-    } catch (e) { console.log('Kaynak validation clear skipped:', e && e.message); }
+      const idxLocation = headers.indexOf('Location');
+      if (idxLocation !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxLocation + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+      const idxKeyword = headers.indexOf('Keyword');
+      if (idxKeyword !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxKeyword + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+    } catch (e) { console.log('Validation clear skipped:', e && e.message); }
     
     // Apply validation based on sheet type
     switch (sheetName) {
