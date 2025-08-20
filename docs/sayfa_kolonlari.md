@@ -4,6 +4,7 @@ Eski tam sürüm: `docs/archive/sayfa_kolonlari-2025-08-09.md`.
 Bu dosya sadece kolonları ve dropdown seçeneklerini tanımlar. Rapor mantığı ve renkler için ilgili dosyalara bakın.
 
 - Tarih formatı: DD.MM.YYYY
+- Genel tarih kuralı: Raporlamada tarih için `Log` içindeki dd.MM.yyyy önceliklidir; yoksa ilgili ana tarih kolonu kullanılır
 - Sadece bu dosyada yazılı kolonlar kullanılabilir
 - Dropdown değerleri burada tanımlandığı gibi doğrulanır
 - Renk kodları ayrı dosyada tutulur
@@ -177,3 +178,30 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 Toplantı Sonucu (dropdown): Satış Yapıldı, Teklif iletildi, Beklemede, Satış İptal  
 Teklif Detayı (multiselect): Custom, Elite, Platinium Plus, Platinium, Entegre, Digifirst Custom, Digifirst Plus, Digifirst, Digifirst Setup  
 Satış Potansiyeli (dropdown): Yerinde Satış, Sıcak, Orta, Soğuk 
+
+## T Aktivite (Tümü)
+| Kolon | Tip |
+|---|---|
+| Kod | input |
+| Tarih | date |
+| Kaynak | input |
+| Randevu Alındı | number |
+| İleri Tarih Randevu | number |
+| Randevu Teyitlendi | number |
+| Randevu Ertelendi | number |
+| Randevu İptal oldu | number |
+| Aktif Randevu | number |
+| Fırsat İletildi | number |
+| Bilgi Verildi | number |
+| Yeniden Aranacak | number |
+| Aktif Fırsat | number |
+| İlgilenmiyor | number |
+| TOPLAM KONTAK | number |
+| Ulaşılamadı | number |
+| TOPLAM İŞLEM | number |
+
+Kurallar (kısa):
+- Aktif Randevu = Randevu Alındı + Randevu Teyitlendi (satır bazlı, bağımsız)
+- Aktif Fırsat = Fırsat İletildi + Bilgi Verildi + Yeniden Aranacak
+- TOPLAM KONTAK = Randevu Alındı + İleri Tarih Randevu + Randevu Teyitlendi + Randevu Ertelendi + Randevu İptal oldu + Fırsat İletildi + Bilgi Verildi + Yeniden Aranacak + İlgilenmiyor
+- TOPLAM İŞLEM = TOPLAM KONTAK + Ulaşılamadı 

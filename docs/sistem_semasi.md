@@ -62,7 +62,7 @@ Kaynak Sayfalar (sabit mimari):
 Notlar:  
 - Negatif sayım yalnızca T Aktivite Özet’ten yapılır. T Randevular’dan veya Format Tablo’dan doğrudan negatif sayılmaz.  
 - T Aktivite Özet, Format Tablo’dan bir kez derlenir; raporlar sadece bu dört T kaynaktan okunur. Format Tablo silinse bile raporlar etkilenmez.  
-- Tarih hesapları: Hücrede tarih varsa o kullanılır; yoksa `Log` içindeki dd.MM.yyyy yakalanır.
+- Tarih hesapları: Öncelik `Log` içindeki dd.MM.yyyy; yoksa hücredeki ilgili ana tarih kullanılır.
 
 Günlük/Haftalık/Aylık ve Karşılaştırma/Pivot raporları bu dört kaynaktan hesaplanır.
 
@@ -86,3 +86,13 @@ Bağlantılar:
 - Kolonlar: `docs/sayfa_kolonlari.md`  
 - Renkler: `docs/RENK_KODLARI.md`  
 - Teknik detaylar: `docs/technical-specification.md` 
+
+## 📊 T Aktivite (Tümü) – Günlük Konsolide Özet
+- Kaynaklar: T Randevular, T Fırsatlar, T Aktivite Özet (negatifler)
+- Kolonlar: Kod, Tarih, Kaynak, Randevu Alındı, İleri Tarih Randevu, Randevu Teyitlendi, Randevu Ertelendi, Randevu İptal oldu, Aktif Randevu, Fırsat İletildi, Bilgi Verildi, Yeniden Aranacak, Aktif Fırsat, İlgilenmiyor, TOPLAM KONTAK, Ulaşılamadı, TOPLAM İŞLEM
+- Tarih: Öncelik Log içindeki tarih; yoksa ilgili ana tarih kolonu
+- Kurallar:
+  - Aktif Randevu = Randevu Alındı + Randevu Teyitlendi (satır bazlı, bağımsız)
+  - Aktif Fırsat = Fırsat İletildi + Bilgi Verildi + Yeniden Aranacak
+  - TOPLAM KONTAK = Randevu Alındı + İleri Tarih Randevu + Randevu Teyitlendi + Randevu Ertelendi + Randevu İptal oldu + Fırsat İletildi + Bilgi Verildi + Yeniden Aranacak + İlgilenmiyor
+  - TOPLAM İŞLEM = TOPLAM KONTAK + Ulaşılamadı 

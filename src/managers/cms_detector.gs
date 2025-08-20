@@ -29,7 +29,7 @@ function detectCMSForUrl(rawUrl) {
     }
 
     const fetched = fetchSiteWithRedirects(url);
-    if (fetched && (fetched.unreachable || (fetched.statusCode && fetched.statusCode >= 400))) {
+    if (fetched && fetched.unreachable) {
       return 'Erişilemedi';
     }
     const signals = buildSignals(fetched);
@@ -52,6 +52,11 @@ function detectCMSForUrl(rawUrl) {
     if (known) {
       console.log('Deep probe matched:', known, { url: fetched.finalUrl });
       return known;
+    }
+
+    // Eğer e‑ticaret sinyali var ama CMS bulunamadıysa, kalite etiketi yerine 'Tespit Edilemedi' döndür
+    if (/sepette|sepet|üye ol|giriş yap|odeme|payment|kategori|ürün/i.test(signals.html)) {
+      return 'Tespit Edilemedi';
     }
 
     const quality = classifyCustomQuality(signals);
@@ -625,9 +630,9 @@ function fetchSiteWithRedirects(url) {
       try {
         resp = UrlFetchApp.fetch(current, {
           muteHttpExceptions: true,
-          followRedirects: false,
+          followRedirects: true,
           validateHttpsCertificates: true,
-          headers: { 'User-Agent': 'Mozilla/5.0 (LeadBot; CRM-Detector)' }
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36' }
         });
       } catch (e) {
         resp = null; // DNS/SSL/timeout -> sonraki varyasyon
@@ -651,7 +656,7 @@ function fetchSiteWithRedirects(url) {
   if (!lastResp) {
     return { finalUrl: current, html: '', headers: {}, unreachable: true };
   }
-  const finalUrl = current;
+  const finalUrl = lastResp.getHeaders && lastResp.getHeaders()['Location'] ? resolveUrl(current, String(lastResp.getHeaders()['Location'])) : current;
   const text = (lastResp && lastResp.getContentText()) || '';
   const headers = (lastResp && lastResp.getAllHeaders()) || {};
   const statusCode = (lastResp && lastResp.getResponseCode && lastResp.getResponseCode()) || 0;
@@ -742,7 +747,7 @@ const CMS_SIGNATURES = (function buildCMS() {
   sig.push({ name: 'Zen Cart', html: [/zencart/i] });
   sig.push({ name: 'NopCommerce', html: [/nopcommerce/i] });
   // Footer attribution / metin tabanlı imzalar (TR sağlayıcılar)
-  sig.push({ name: 'IdeaSoft', html: [/ideasoft/i, /content=["']?IdeaSoft/i, /ideacdn/i, /ideasoftstatic/i] });
+  sig.push({ name: 'IdeaSoft', html: [/ideasoft/i, /content=["']?IdeaSoft/i, /ideacdn/i, /ideasoftstatic/i, /ak[ıi]ll[ıi]\s*e[-\s]?ticaret[^<]{0,160}haz[ıi]rlanm[ıi][şs]t[ıi]r/i] });
   sig.push({ name: 'T-Soft', html: [/T-Soft\s+E-?Ticaret\s+Sistemleri/i, /TEKROM\s+Teknoloji/i] });
   sig.push({ name: 'Ticimax', html: [/ticimax/i] });
   sig.push({ name: 'İkas', html: [/\bikas\b/i] });
@@ -767,19 +772,19 @@ function detectKnownCMS(signals) {
   const headerPairs = Object.entries(headers || {});
 
   // 0) Meta generator
-  const genMatch = /<meta[^>]+name=["']generator["'][^>]+content=["']([^"']+)["']/i.exec(html || '');
-  if (genMatch && genMatch[1]) {
-    const g = genMatch[1].toLowerCase();
-    if (/wordpress|woocommerce/.test(g)) return /woocommerce/.test(g) ? 'WooCommerce' : 'WordPress';
-    if (/shopify/.test(g)) return 'Shopify';
-    if (/squarespace/.test(g)) return 'Squarespace';
-    if (/prestashop/.test(g)) return 'PrestaShop';
-    if (/opencart/.test(g)) return 'OpenCart';
-    if (/magento/.test(g)) return 'Magento';
-    if (/shopware/.test(g)) return 'Shopware';
-    if (/t-?soft/.test(g)) return 'T-Soft';
-    if (/ideasoft/.test(g)) return 'IdeaSoft';
-  }
+  const genMatch = /<meta[^>]+name=["']generator["'][^>]+content=["']([^"']+)["']/i.exec(html || '') || /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']generator["']/i.exec(html || '');
+      if (genMatch && genMatch[1]) {
+      const g = genMatch[1].toLowerCase();
+      if (/wordpress|woocommerce/.test(g)) return /woocommerce/.test(g) ? 'WooCommerce' : 'WordPress';
+      if (/shopify/.test(g)) return 'Shopify';
+      if (/squarespace/.test(g)) return 'Squarespace';
+      if (/prestashop/.test(g)) return 'PrestaShop';
+      if (/opencart/.test(g)) return 'OpenCart';
+      if (/magento/.test(g)) return 'Magento';
+      if (/shopware/.test(g)) return 'Shopware';
+      if (/t-?soft/.test(g)) return 'T-Soft';
+      if (/ideasoft|akilli\s*e[-\s]?ticaret/.test(g)) return 'IdeaSoft';
+    }
 
   // 1) Varlık URL parmak izleri (cdn, asset ve final domain)
   for (const s of CMS_SIGNATURES) {
@@ -884,43 +889,11 @@ function runCmsDetectorTests() {
 
 // === UI helpers for standalone usage ===
 function addCmsMenuToUi() {
-  console.log('Adding CMS menu to UI');
-  try {
-    const ui = SpreadsheetApp.getUi();
-    // Top-level CMS Analizi menüsü (çakışmaları önlemek için tek başına)
-    ui.createMenu('CMS Analizi')
-      .addItem('⚡ Seçili Satırlar', 'openCMSDetectionCurrentAgentSelection')
-      .addItem('🛡️ Seçili Satırlar (Doğruluk)', 'openCMSDetectionCurrentAgentSelectionAccurate')
-      .addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable')
-      .addItem('∞ Tümü (chunk=100)', 'openCMSDetectionCurrentAgentAll')
-      .addToUi();
-    console.log('CMS menu added');
-  } catch (error) {
-    console.error('Failed to add CMS menu:', error);
-    try { SpreadsheetApp.getUi().alert('Hata: CMS menüsü eklenemedi — ' + error.message); } catch(_) {}
-  }
+  // removed: CMS menüsü artık yalnızca Admin altındadır
+  console.log('CMS top-level menu disabled; use Admin > CMS Analizi');
 }
 
 function installCmsMenuOnOpenTrigger() {
-  console.log('Installing onOpen trigger for CMS menu');
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const triggers = ScriptApp.getProjectTriggers();
-    const exists = triggers.some(t => t.getHandlerFunction && t.getHandlerFunction() === 'addCmsMenuToUi');
-    if (!exists) {
-      ScriptApp.newTrigger('addCmsMenuToUi')
-        .forSpreadsheet(ss)
-        .onOpen()
-        .create();
-      console.log('onOpen trigger created');
-    } else {
-      console.log('onOpen trigger already exists');
-    }
-    // Menü anında yüklensin
-    addCmsMenuToUi();
-  } catch (error) {
-    console.error('Failed to install trigger:', error);
-    try { SpreadsheetApp.getUi().alert('Hata: Trigger kurulamadı — ' + error.message); } catch(_) {}
-    throw error;
-  }
+  // removed: top-level CMS menu trigger disabled
+  console.log('CMS top-level menu trigger disabled');
 }

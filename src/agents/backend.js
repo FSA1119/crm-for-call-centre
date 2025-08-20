@@ -1483,16 +1483,27 @@ function applyAppointmentColorCoding(sheet, rowNumber) {
       return;
     }
     
-    // Get the status from the Randevu Durumu column
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const randevuDurumuIndex = headers.indexOf('Randevu Durumu');
+    // Get the status from the Randevu Durumu column (display values, case-insensitive)
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    const lowered = headers.map(h => String(h||'').toLowerCase());
+    let randevuDurumuIndex = lowered.indexOf('randevu durumu');
+    if (randevuDurumuIndex === -1) randevuDurumuIndex = lowered.indexOf('randevu durumu'.toLowerCase());
     
     if (randevuDurumuIndex === -1) {
       console.error('❌ Randevu Durumu column not found');
       return;
     }
     
-    const status = sheet.getRange(rowNumber, randevuDurumuIndex + 1).getValue();
+    const rawStatus = sheet.getRange(rowNumber, randevuDurumuIndex + 1).getDisplayValue();
+    const norm = String(rawStatus || '').toLowerCase();
+    let status = '';
+    if (norm.includes('iptal')) status = 'Randevu İptal oldu';
+    else if (norm.includes('erte')) status = 'Randevu Ertelendi';
+    else if (norm.includes('teyit')) status = 'Randevu Teyitlendi';
+    else if (norm.includes('ileri')) status = 'İleri Tarih Randevu';
+    else if (norm.includes('alınd') || norm.includes('alindi') || norm.includes('alın') || norm === 'randevu alındı') status = 'Randevu Alındı';
+    else status = String(rawStatus || '').trim();
+    
     console.log('📋 Status found:', status, 'in row:', rowNumber);
     
     let color = 'rgb(255, 255, 255)'; // Default white
@@ -3846,19 +3857,9 @@ function onOpen() {
 
         crmMenu.addToUi();
 
-    // Create standalone Sector Helper menu (always visible)
-    try {
-      const existingMenus2 = ui.getMenus();
-      const helperMenu = existingMenus2.find(menu => menu.getName() === 'Sektör Yardımcısı');
-      if (helperMenu) {
-        helperMenu.remove();
-      }
-    } catch (e) {}
-    ui.createMenu('Sektör Yardımcısı')
-      .addItem('Yan Paneli Aç', 'showSectorHelperDialog')
-      .addToUi();
+    
         
-    console.log('CRM menu and Sector Helper menu created');
+    console.log('CRM menu created');
   }
 }
 
@@ -4170,6 +4171,15 @@ function onEdit(e) {
     if (sheetName === 'Randevularım') {
       console.log('Randevularım sheet detected, calling handleRandevularimStatusChange');
       handleRandevularimStatusChange(e, sheet);
+      // Force recolor on the edited row to reflect status immediately
+      try {
+        const headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getDisplayValues()[0];
+        const durumIdx = headers.map(h=>String(h||'').toLowerCase()).indexOf('randevu durumu');
+        if (durumIdx !== -1) {
+          const status = sheet.getRange(e.range.getRow(), durumIdx + 1).getDisplayValue();
+          updateRandevularimRowColor(sheet, e.range.getRow(), status);
+        }
+      } catch (_) {}
       return;
     }
     
@@ -4177,14 +4187,21 @@ function onEdit(e) {
     if (isFormatTable(sheet)) {
       console.log('Format Tablo sheet detected, checking for activity changes');
       
-      // Check if the edited cell is in the Aktivite column
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      const aktiviteIndex = headers.indexOf('Aktivite');
-      const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi');
+      // Check if the edited cell is in the Aktivite column (robust header detection)
+      const headersDisp = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, ' ').trim();
+      const idxOf = (cands) => {
+        const lowered = headersDisp.map(h => norm(h));
+        for (const c of cands) { const i = lowered.indexOf(norm(c)); if (i !== -1) return i; }
+        return -1;
+      };
+      const aktiviteIndex = idxOf(['Aktivite','Aktivite Durumu','Durum']);
+      const aktiviteTarihiIndex = idxOf(['Aktivite Tarihi','Aktivite tarihi','Tarih']);
+      const logIndexResolved = idxOf(['Log','Günlük','Gunluk']);
       
       if (aktiviteIndex !== -1 && col === aktiviteIndex + 1 && row > 1) {
         console.log('🔍 onEdit - Activity cell edited in row:', row);
-        const newActivity = range.getValue();
+        const newActivity = range.getDisplayValue();
         console.log('🔍 onEdit - New activity value:', newActivity);
         
         // Apply color coding based on new activity
@@ -4192,20 +4209,22 @@ function onEdit(e) {
         console.log('🔍 onEdit - Color coding applied for activity:', newActivity);
         
         // Auto-update Aktivite Tarihi and Log when activity is selected
-        if (aktiviteTarihiIndex !== -1 && newActivity && newActivity.trim() !== '') {
-          const today = new Date();
-          const todayFormatted = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
+        if (newActivity && String(newActivity).trim() !== '') {
+          const now = new Date();
+          const todayFormatted = Utilities.formatDate(now, 'Europe/Istanbul', 'dd.MM.yyyy');
+          const timeStr = Utilities.formatDate(now, 'Europe/Istanbul', 'HH:mm:ss');
           
-          // Update Aktivite Tarihi
-          const tarihRange = sheet.getRange(row, aktiviteTarihiIndex + 1);
-          tarihRange.setValue(todayFormatted);
-          console.log('🔍 onEdit - Aktivite Tarihi updated to:', todayFormatted);
+          // Update Aktivite Tarihi (if column exists)
+          if (aktiviteTarihiIndex !== -1) {
+            const tarihRange = sheet.getRange(row, aktiviteTarihiIndex + 1);
+            tarihRange.setValue(todayFormatted);
+            console.log('🔍 onEdit - Aktivite Tarihi updated to:', todayFormatted);
+          }
           
-          // Update Log with new activity
-          const logIndex = headers.indexOf('Log');
-          if (logIndex !== -1) {
-            const logRange = sheet.getRange(row, logIndex + 1);
-            const newLogValue = `${newActivity} - ${todayFormatted} ${today.toLocaleTimeString('tr-TR')}`;
+          // Update Log with new activity (if column exists)
+          if (logIndexResolved !== -1) {
+            const logRange = sheet.getRange(row, logIndexResolved + 1);
+            const newLogValue = `${newActivity} - ${todayFormatted} ${timeStr}`;
             logRange.setValue(newLogValue);
             console.log('🔍 onEdit - Log updated to:', newLogValue);
           }
@@ -4226,18 +4245,39 @@ function onEdit(e) {
     if (sheetName === 'Fırsatlarım') {
       console.log('Fırsatlarım sheet detected, checking for status changes');
       
-      // Check if the edited cell is in the Fırsat Durumu column
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+      // Robust header detection
+      const headersDisp = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, ' ').trim();
+      const idxOf = (cands) => {
+        const lowered = headersDisp.map(h => norm(h));
+        for (const c of cands) { const i = lowered.indexOf(norm(c)); if (i !== -1) return i; }
+        return -1;
+      };
+      const firsatDurumuIndex = idxOf(['Fırsat Durumu','Firsat Durumu','Aktivite','Durum']);
+      const firsatTarihiIndex = idxOf(['Fırsat Tarihi','Firsat Tarihi','Tarih']);
+      const logIdx = idxOf(['Log','Günlük','Gunluk']);
       
       if (firsatDurumuIndex !== -1 && col === firsatDurumuIndex + 1 && row > 1) {
         console.log('Fırsat Durumu cell edited in row:', row);
-        const newStatus = range.getValue();
+        const newStatus = range.getDisplayValue();
         console.log('New Fırsat Durumu value:', newStatus);
         
         // Apply color coding based on new status
         applyOpportunityColorCoding(sheet, row);
         console.log('Color coding applied for Fırsat Durumu:', newStatus);
+        
+        // Ensure date + log update for negatives/positives alike
+        if (newStatus && String(newStatus).trim() !== '') {
+          const now = new Date();
+          const dStr = Utilities.formatDate(now, 'Europe/Istanbul', 'dd.MM.yyyy');
+          const tStr = Utilities.formatDate(now, 'Europe/Istanbul', 'HH:mm:ss');
+          if (firsatTarihiIndex !== -1) {
+            sheet.getRange(row, firsatTarihiIndex + 1).setValue(dStr);
+          }
+          if (logIdx !== -1) {
+            sheet.getRange(row, logIdx + 1).setValue(`${newStatus} - ${dStr} ${tStr}`);
+          }
+        }
       }
       
       return;
@@ -4543,9 +4583,8 @@ function createAdminMenu() {
     const menu = ui.createMenu('Admin');
     
     // Add menu items
-    menu.addItem('🔍 CMS ALTYAPI', 'detectCMSAltyapisi');
-    menu.addItem('🛒 E-TİCARET İZİ', 'detectEcommerceIzi');
-    menu.addItem('⚡ HIZ TESTİ', 'testSiteHizi');
+
+
     menu.addSeparator();
     menu.addItem('Yeni Tablo oluştur', 'showCreateTableDialog');
     menu.addSeparator();
@@ -4563,24 +4602,23 @@ function createAdminMenu() {
 
     // CMS Analizi alt menüsü
     const cmsMenu = SpreadsheetApp.getUi().createMenu('CMS Analizi')
-      .addItem('⚡ Seçili Satırlar', 'openCMSDetectionCurrentAgentSelection')
       .addItem('🛡️ Seçili Satırlar (Doğruluk)', 'openCMSDetectionCurrentAgentSelectionAccurate')
       .addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable')
-      .addItem('🧱 CMS Sütunlarını Website Yanına Taşı (Format Tablo)', 'addCmsColumnsNextToWebsiteOnAllFormatTables')
-      .addItem('∞ Tümü (chunk=100)', 'openCMSDetectionCurrentAgentAll');
+      .addItem('🧱 CMS Sütunlarını Website Yanına Taşı (Format Tablo)', 'addCmsColumnsNextToWebsiteOnAllFormatTables');
     menu.addSubMenu(cmsMenu);
     
     // Bakım alt menüsü
-    const bakım = SpreadsheetApp.getUi().createMenu('Bakım')
-      .addItem('🎨 Renkleri Yenile (Bu sayfa)', 'refreshColorsOnActiveSheet')
-      .addItem('🎨 Renkleri Yenile (Tüm sayfalar)', 'refreshAllColors')
-      .addSeparator()
-      .addItem('📵 Telefonu olmayanları sil', 'deleteRowsWithoutPhone')
-      .addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite')
-      .addSeparator()
-      .addItem('🔎 Mükerrerleri Bul (Firma + Telefon)', 'findDuplicatesInFormatTable')
-      .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation')
-      .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm');
+          const bakım = SpreadsheetApp.getUi().createMenu('Bakım')
+        .addItem('🎨 Renkleri Yenile (Bu sayfa)', 'refreshColorsOnActiveSheet')
+        .addItem('🎨 Renkleri Yenile (Tüm sayfalar)', 'refreshAllColors')
+        .addSeparator()
+        .addItem('📵 Telefonu olmayanları sil', 'deleteRowsWithoutPhone')
+        .addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite')
+        .addSeparator()
+        .addItem('🔎 Mükerrerleri Bul (Firma + Telefon)', 'findDuplicatesInFormatTable')
+        .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation')
+        .addItem('🔗 Aynı Websiteyi Vurgula', 'highlightDuplicateWebsites')
+        .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm');
     
     menu.addSubMenu(bakım);
     
@@ -4701,92 +4739,14 @@ function sortActiveSheetByLocation(parameters) {
   }
 }
 
-/**
- * 🧰 Sektör Yardımcısı – aktif satırdaki Category için referansları gösterir
- */
-function showSectorHelperDialog(parameters) {
-  console.log('Function started:', parameters);
-  try {
-    if (!validateInput(parameters || {})) {
-      throw new Error('Invalid input provided');
-    }
-    const sheet = SpreadsheetApp.getActiveSheet();
-    // Format Tablo değilse uyarı
-    if (!isFormatTable(sheet)) {
-      SpreadsheetApp.getUi().alert('Bilgi', 'Sektör Yardımcısı sadece Format Tablo sayfalarında kullanılabilir.', SpreadsheetApp.getUi().ButtonSet.OK);
-      return { success: false };
-    }
-    // Dataset anahtarını sayfa adı olarak kullan
-    const datasetKey = sheet.getName();
-    const refs = getSectorReferences(datasetKey);
-    const tmpl = HtmlService.createTemplateFromFile('helperDialog');
-    tmpl.category = datasetKey;
-    tmpl.references = refs;
-    const html = tmpl.evaluate().setWidth(360).setHeight(420);
-    SpreadsheetApp.getUi().showSidebar(html);
-    return { success: true };
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
-    throw error;
-  }
-}
+/* Sektör Yardımcısı kaldırıldı */
+// function showSectorHelperDialog(parameters) { /* removed */ }
 
-function ensureSectorReferenceSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetName = 'Config - Sektör Referans';
-  let s = ss.getSheetByName(sheetName);
-  if (!s) {
-    s = ss.insertSheet(sheetName);
-    s.getRange(1, 1, 1, 3).setValues([[
-      'Dataset',
-      'Referanslar (satır içi; \n ile ayrılmış)',
-      'Notlar'
-    ]]);
-    s.setFrozenRows(1);
-  }
-  return s;
-}
+/* removed: ensureSectorReferenceSheet */
 
-function getSectorReferences(datasetKey) {
-  const s = ensureSectorReferenceSheet();
-  const lastRow = s.getLastRow();
-  if (lastRow <= 1) return { category: datasetKey || '', references: [], notes: '' };
-  const vals = s.getRange(2, 1, lastRow - 1, 3).getValues();
-  for (const row of vals) {
-    if ((row[0] || '').toString().trim().toLowerCase() === (datasetKey || '').toString().trim().toLowerCase()) {
-      const refs = (row[1] || '').toString().split('\n').filter(Boolean);
-      return { category: datasetKey, references: refs, notes: (row[2] || '').toString() };
-    }
-  }
-  return { category: datasetKey || '', references: [], notes: '' };
-}
+/* removed: getSectorReferences */
 
-function saveSectorReferences(payload) {
-  console.log('Saving sector references:', payload);
-  try {
-    const s = ensureSectorReferenceSheet();
-    const lastRow = s.getLastRow();
-    const vals = lastRow > 1 ? s.getRange(2, 1, lastRow - 1, 3).getValues() : [];
-    const target = (payload.category || '').toString().trim().toLowerCase();
-    let found = false;
-    for (let i = 0; i < vals.length; i++) {
-      const key = (vals[i][0] || '').toString().trim().toLowerCase();
-      if (key === target) {
-        s.getRange(i + 2, 1, 1, 3).setValues([[payload.category || '', (payload.references || []).join('\n'), payload.notes || '']]);
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      s.getRange(lastRow + 1, 1, 1, 3).setValues([[payload.category || '', (payload.references || []).join('\n'), payload.notes || '']]);
-    }
-    return { success: true };
-  } catch (error) {
-    console.error('Save failed:', error);
-    throw error;
-  }
-}
+/* removed: saveSectorReferences */
 
 /**
  * 📦 Dataset Raporu
@@ -6262,10 +6222,8 @@ function refreshFormatTabloValidation(params) {
  * @param {Object} parameters - Fonksiyon parametreleri
  * @returns {Object} - Sonuç objesi
  */
-function detectCMSAltyapisi(parameters) {
-  console.log('🔍 CMS Altyapısı tespiti başlatılıyor:', parameters);
-  
-  try {
+// Eski CMS ALTYAPI menü işlevi kaldırıldı
+/*
     const sheet = SpreadsheetApp.getActiveSheet();
     const sheetName = sheet.getName();
     
@@ -6391,7 +6349,7 @@ function detectCMSAltyapisi(parameters) {
     SpreadsheetApp.getUi().alert('CMS Analizi sırasında hata oluştu: ' + error.message);
     throw error;
   }
-}
+*/
 
 /**
  * 🔍 Tekil CMS Analizi - Website Analizi
@@ -6735,7 +6693,7 @@ function analyzeCMS(website) {
  * @param {Object} parameters - Fonksiyon parametreleri
  * @returns {Object} - Sonuç objesi
  */
-function detectEcommerceIzi(parameters) {
+/* function detectEcommerceIzi(parameters) {  // removed old menu item
   console.log('🛒 E-ticaret İzi tespiti başlatılıyor:', parameters);
   
   try {
@@ -6873,7 +6831,7 @@ function detectEcommerceIzi(parameters) {
     SpreadsheetApp.getUi().alert('E-ticaret Analizi sırasında hata oluştu: ' + error.message);
     throw error;
   }
-}
+*/
 
 /**
  * 🛒 Tekil E-ticaret Analizi - Güven Skoru
@@ -7031,7 +6989,7 @@ function analyzeEcommerce(website) {
  * @param {Object} parameters - Fonksiyon parametreleri
  * @returns {Object} - Sonuç objesi
  */
-function testSiteHizi(parameters) {
+/* function testSiteHizi(parameters) {  // removed old menu item (disabled)
   console.log('⚡ Site Hız Testi başlatılıyor:', parameters);
   
   try {
@@ -7149,7 +7107,7 @@ function testSiteHizi(parameters) {
     SpreadsheetApp.getUi().alert('Hız Testi sırasında hata oluştu: ' + error.message);
     throw error;
   }
-}
+*/
 
 /**
  * ⚡ Tekil Site Hız Ölçümü - Basit Metrik
