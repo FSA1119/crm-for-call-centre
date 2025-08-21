@@ -6304,7 +6304,7 @@ function sortMeetingsSalesTop(sheet) {
     for (let i = 0; i < Math.min(5, sortedRows.length); i++) {
       const resultText = idxResult !== -1 ? sortedRows[i][idxResult] : "N/A";
       const potentialText = idxPotential !== -1 ? sortedRows[i][idxPotential] : "N/A";
-      console.log("📌 Satır " + (i+2) + ": Sonuç=\"" + resultText + "\", Potansiyel=\"" + potentialText + "\"");
+      console.log("📌 Satır " + (i+2) + " - Sonuç: \"" + resultText + "\", Potansiyel: \"" + potentialText + "\"");
     }
   } catch (err) {
     console.error("❌ sortMeetingsSalesTop hatası:", err);
