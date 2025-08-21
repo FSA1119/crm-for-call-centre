@@ -4600,16 +4600,15 @@ function createAdminMenu() {
     menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
     menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
 
-    // Seçili Satırlar (Doğruluk) alt menüsü
-    const secilidogrulukMenu = SpreadsheetApp.getUi().createMenu('🛡️ Seçili Satırlar (Doğruluk)')
-      .addItem('🔍 CMS Analizi (Seçili)', 'openCMSDetectionCurrentAgentSelectionAccurate')
-      .addItem('🌐 URL Analizi (Seçili)', 'analyzeSelectedWebsites')
-      .addItem('🛒 E-ticaret İzi Tespiti (Seçili)', 'detectEcommerceSelectedRows')
-      .addItem('⚡ Hız Testi (Seçili)', 'speedTestSelectedRows')
-      .addSeparator()
-      .addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable')
-      .addItem('🧱 CMS Sütunlarını Website Yanına Taşı (Format Tablo)', 'addCmsColumnsNextToWebsiteOnAllFormatTables');
-    menu.addSubMenu(secilidogrulukMenu);
+    // CMS Analizi fonksiyonları doğrudan Admin menüsüne ekleniyor
+    menu.addSeparator();
+    menu.addItem('🔍 CMS Analizi (Seçili)', 'openCMSDetectionCurrentAgentSelectionAccurate');
+    menu.addItem('🌐 URL Analizi (Seçili)', 'analyzeSelectedWebsites');
+    menu.addItem('🛒 E-ticaret İzi Tespiti (Seçili)', 'detectEcommerceSelectedRows');
+    menu.addItem('⚡ Hız Testi (Seçili)', 'speedTestSelectedRows');
+    menu.addSeparator();
+    menu.addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable');
+    menu.addItem('🧱 CMS Sütunlarını Website Yanına Taşı (Format Tablo)', 'addCmsColumnsNextToWebsiteOnAllFormatTables');
     
     // Bakım alt menüsü
           const bakım = SpreadsheetApp.getUi().createMenu('Bakım')
