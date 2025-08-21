@@ -43,7 +43,10 @@ const CRM_CONFIG = {
     'Toplantı Teklif': 'rgb(165, 214, 167)',      // Darker Green
     'Toplantı Beklemede': 'rgb(255, 243, 224)',   // Soft Orange
     'Toplantı İptal': 'rgb(255, 235, 238)',       // Light Red
-    'Satış Yapıldı': 'rgb(187, 222, 251)'        // Light Blue
+    'Satış Yapıldı': 'rgb(187, 222, 251)',        // Light Blue
+    'Potansiyel Sıcak': '#FFE0B2',                // Light Orange
+    'Potansiyel Orta': '#E1F5FE',                 // Light Blue
+    'Potansiyel Soğuk': '#ECEFF1'                 // Light Gray
   },
   
   // 🎨 Manager Sheet Header Colors - Visual Hierarchy
@@ -484,12 +487,26 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           const isSale = (rv === 'satış yapıldı' || rv === 'satis yapildi');
           const isOffer = (!isSale && rv.indexOf('teklif') !== -1);
           const isCancel = (!isSale && rv.indexOf('iptal') !== -1);
+          // Potansiyel rengi oku (Satış/Teklif/İptal değilse)
+          let potentialColor = '';
+          try {
+            const potIdx = headers.indexOf('Satış Potansiyeli');
+            if (potIdx !== -1) {
+              const pot = String(sheet.getRange(rowNumber, potIdx + 1).getDisplayValue() || '').toLowerCase();
+              if (pot === 'sıcak' || pot === 'sicak') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Sıcak'];
+              else if (pot === 'orta') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Orta'];
+              else if (pot === 'soğuk' || pot === 'soguk') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Soğuk'];
+            }
+          } catch(_) {}
           if (isSale) {
             color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
           } else if (isOffer) {
-            color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
+            // Teklif: potansiyele göre renklendir (varsa), yoksa koyu yeşil
+            color = potentialColor || CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
           } else if (isCancel) {
             color = CRM_CONFIG.COLOR_CODES['Toplantı İptal'];
+          } else if (potentialColor) {
+            color = potentialColor;
           } else {
             color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
           }
@@ -645,7 +662,7 @@ function getEmployeeColor(employeeCode) {
     'KO 003': 'rgb(255, 165, 0)',      // Orange
     'SB 004': 'rgb(221, 160, 221)',    // Plum
     'KM 005': 'rgb(255, 182, 193)',    // Light Red
-    'GŞ 006': 'rgb(255, 192, 203)'     // Light Pink
+    'GŞ 006': 'rgb(178, 235, 242)'     // Light Cyan (distinct from KM 005)
   };
   
   console.log(`🎨 getEmployeeColor("${employeeCode}") called, returning: ${employeeColors[employeeCode] || 'null'}`);
@@ -774,6 +791,7 @@ function createManagerMenu() {
     const maintenance = ui.createMenu('🧼 Bakım');
     maintenance.addItem('🎨 (Yönetici) Renk Kodlaması – Tüm Sayfalar', 'forceRefreshManagerColorCoding')
                .addItem('🎨 (Yönetici) Bu Sayfayı Yenile', 'applyManualManagerColorCoding')
+               .addItem('🧭 Sadece Sırala (Toplantılar)', 'sortMeetingsManual')
                .addSeparator()
                .addItem('🎨 (Temsilci) Renkleri Yenile – Tümü', 'refreshAgentColorCodingAll')
                .addItem('🎨 (Temsilci) Renkleri Yenile – Seçili Kod', 'refreshAgentColorCodingPrompt')
@@ -1500,7 +1518,8 @@ function applyManualManagerColorCoding() {
       const lastRow = sheet.getLastRow();
       if (lastRow > 1) {
         applyColorCodingToManagerData(sheet, sheetName, 2, lastRow - 1);
-        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Toplantılar renk kodlaması uygulandı', SpreadsheetApp.getUi().ButtonSet.OK);
+        try { sortMeetingsSalesTop(sheet); } catch (e) { console.log('⚠️ sortMeetingsSalesTop skipped:', e && e.message); }
+        SpreadsheetApp.getUi().alert('✅ Tamamlandı', 'Toplantılar renk + sıralama uygulandı', SpreadsheetApp.getUi().ButtonSet.OK);
       }
     } else if (String(sheetName || '').toLowerCase().includes('aktivite')) {
       console.log('Applying color coding to Aktivite sayfaları');
@@ -2195,16 +2214,32 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
             if (!/^T\s/i.test(sheet.getName())) {
               // Yönetici ana Toplantılar sayfasında sıralama yapma
             }
-            // Toplantılar (append): 'Satış Yapıldı' en üstte, ardından Toplantı Tarihi
+            // Toplantılar (append): Öncelik: Satış Yapıldı > Yerinde Satış > Sıcak > Orta > Soğuk > Tarih
             const resultIdx = findIdx(['Toplantı Sonucu']);
             const dateIdx = findIdx(['Toplantı Tarihi']);
+            const potIdx = findIdx(['Satış Potansiyeli']);
             if (resultIdx >= 0 && dateIdx >= 0) {
               const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
               const values = rng.getValues();
+              function potRank(v){
+                const s = String(v||'').toLowerCase();
+                if (s === 'yerinde satış' || s === 'yerinde satis') return 1; // satıştan hemen sonra
+                if (s === 'sıcak' || s === 'sicak') return 2;
+                if (s === 'orta') return 3;
+                if (s === 'soğuk' || s === 'soguk') return 4;
+                return 9;
+              }
               values.sort(function(a,b){
-                const aSale = String(a[resultIdx]||'') === 'Satış Yapıldı' ? -1 : 0;
-                const bSale = String(b[resultIdx]||'') === 'Satış Yapıldı' ? -1 : 0;
-                if (aSale !== bSale) return bSale - aSale; // satış yapılanlar en üstte
+                const aRes = String(a[resultIdx]||'');
+                const bRes = String(b[resultIdx]||'');
+                const aSale = aRes === 'Satış Yapıldı' ? 0 : 1;
+                const bSale = bRes === 'Satış Yapıldı' ? 0 : 1;
+                if (aSale !== bSale) return aSale - bSale; // Satış Yapıldı en üstte
+                if (potIdx >= 0) {
+                  const ar = potRank(a[potIdx]);
+                  const br = potRank(b[potIdx]);
+                  if (ar !== br) return ar - br;
+                }
                 const da = parseDdMmYyyy(a[dateIdx]) || new Date('2100-12-31');
                 const db = parseDdMmYyyy(b[dateIdx]) || new Date('2100-12-31');
                 return da - db;
@@ -2263,7 +2298,7 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
           'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
           'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-                    'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Toplantıyı Yapan'
+                    'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
          ];
          break;
       case 'Fırsatlar':
@@ -3110,13 +3145,14 @@ function moveSelectedRandevuToMeeting() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getActiveSheet();
-    if (!sheet || sheet.getName() !== 'Randevular') {
-      SpreadsheetApp.getUi().alert('Bilgi', 'Lütfen Randevular sayfasında bir satır seçin.', SpreadsheetApp.getUi().ButtonSet.OK);
+    const nameLower = String(sheet && sheet.getName ? sheet.getName() : '').toLowerCase();
+    if (!sheet || !nameLower.includes('randevu')) {
+      SpreadsheetApp.getUi().alert('Bilgi', 'Lütfen Randevular veya T Randevular sayfasında bir satır seçin.', SpreadsheetApp.getUi().ButtonSet.OK);
       return;
     }
     const range = sheet.getActiveRange();
-    if (!range || range.getNumRows() !== 1) {
-      SpreadsheetApp.getUi().alert('Bilgi', 'Lütfen tek bir satır seçin.', SpreadsheetApp.getUi().ButtonSet.OK);
+    if (!range || range.getNumRows() !== 1 || range.getRow() <= 1) {
+      SpreadsheetApp.getUi().alert('Bilgi', 'Lütfen başlık dışında tek bir veri satırı seçin.', SpreadsheetApp.getUi().ButtonSet.OK);
       return;
     }
     const rowIndex = range.getRow();
@@ -6532,5 +6568,29 @@ function generatePivotBaseReportManager() {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
     throw error;
+  }
+}
+/**
+ * Toplantılar sayfasını manuel olarak sıralar
+ * Satış Yapıldı > Yerinde Satış > Sıcak > Orta > Soğuk > Toplantı Tarihi
+ */
+function sortMeetingsManual() {
+  console.log('Manuel toplantı sıralama başlatıldı');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+    
+    if (sheet.getName() === 'Toplantılar' || sheet.getName() === 'T Toplantılar') {
+      console.log('Toplantılar sayfası tespit edildi: ' + sheet.getName());
+      sortMeetingsSalesTop(sheet);
+      SpreadsheetApp.getUi().alert('Toplantılar başarıyla sıralandı.');
+    } else {
+      console.log('Uygun olmayan sayfa: ' + sheet.getName());
+      SpreadsheetApp.getUi().alert('Lütfen Toplantılar veya T Toplantılar sayfasında çalışırken bu fonksiyonu kullanın.');
+    }
+  } catch (error) {
+    console.error('Toplantı sıralama hatası:', error);
+    SpreadsheetApp.getUi().alert('Sıralama sırasında bir hata oluştu: ' + error.message);
   }
 }
