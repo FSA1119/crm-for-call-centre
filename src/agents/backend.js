@@ -4600,12 +4600,16 @@ function createAdminMenu() {
     menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
     menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
 
-    // CMS Analizi alt menüsü
-    const cmsMenu = SpreadsheetApp.getUi().createMenu('CMS Analizi')
-      .addItem('🛡️ Seçili Satırlar (Doğruluk)', 'openCMSDetectionCurrentAgentSelectionAccurate')
+    // Seçili Satırlar (Doğruluk) alt menüsü
+    const secilidogrulukMenu = SpreadsheetApp.getUi().createMenu('🛡️ Seçili Satırlar (Doğruluk)')
+      .addItem('🔍 CMS Analizi (Seçili)', 'openCMSDetectionCurrentAgentSelectionAccurate')
+      .addItem('🌐 URL Analizi (Seçili)', 'analyzeSelectedWebsites')
+      .addItem('🛒 E-ticaret İzi Tespiti (Seçili)', 'detectEcommerceSelectedRows')
+      .addItem('⚡ Hız Testi (Seçili)', 'speedTestSelectedRows')
+      .addSeparator()
       .addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable')
       .addItem('🧱 CMS Sütunlarını Website Yanına Taşı (Format Tablo)', 'addCmsColumnsNextToWebsiteOnAllFormatTables');
-    menu.addSubMenu(cmsMenu);
+    menu.addSubMenu(secilidogrulukMenu);
     
     // Bakım alt menüsü
           const bakım = SpreadsheetApp.getUi().createMenu('Bakım')
@@ -7308,6 +7312,30 @@ console.log('🔍 Website Analiz Sistemi yüklendi');
 console.log('📊 CMS Altyapısı fonksiyonları hazır');
 console.log('🛒 E-ticaret İzi fonksiyonları hazır');
 console.log('⚡ Hız Testi fonksiyonları hazır');
+
+/**
+ * 🌐 URL Analizi (Seçili Satırlar)
+ */
+function analyzeSelectedWebsites(parameters) {
+  console.log('🌐 URL Analizi başlatılıyor:', parameters);
+  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
+}
+
+/**
+ * 🛒 E-ticaret İzi Tespiti (Seçili Satırlar)  
+ */
+function detectEcommerceSelectedRows(parameters) {
+  console.log('🛒 E-ticaret İzi Tespiti başlatılıyor:', parameters);
+  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
+}
+
+/**
+ * ⚡ Hız Testi (Seçili Satırlar)
+ */
+function speedTestSelectedRows(parameters) {
+  console.log('⚡ Hız Testi başlatılıyor:', parameters);
+  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
+}
 
 /**
  * 🧪 Test function to manually test date sorting
