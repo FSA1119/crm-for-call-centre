@@ -6443,41 +6443,48 @@ function analyzeCMS(website) {
       return { cmsName: '404 Sayfa Bulunamadı', cmsGroup: 'Erişilemiyor' };
     }
     
-    // Site kalitesi kontrolü - Genişletilmiş özellik
+    // Site kalitesi kontrolü - Daha esnek yaklaşım
     let siteQuality = 'Normal';
     let qualityIssues = [];
     let siteSegment = 'Normal';
     
-    // 404 linkleri kontrolü
+    // 404 linkleri kontrolü - Daha esnek
     const brokenLinks = (lowerHtml.match(/404/g) || []).length;
-    if (brokenLinks > 5) {
+    if (brokenLinks > 10) { // Eşiği yükselttim
       qualityIssues.push(`${brokenLinks} adet 404 link`);
     }
     
-    // Hata mesajları kontrolü
+    // Hata mesajları kontrolü - Daha esnek
     const errorMessages = [
-      'error', 'hata', 'sorun', 'problem', 'broken', 'kırık'
+      'broken', 'kırık', 'sorun', 'problem'
     ];
     let errorCount = 0;
     errorMessages.forEach(msg => {
       if (lowerHtml.includes(msg)) errorCount++;
     });
     
-    if (errorCount > 3) {
-      qualityIssues.push(`${errorCount} adet hata mesajı`);
-    }
+    // Modern e-ticaret siteleri için kalite yükseltme
+    const modernFeatures = [
+      'responsive', 'mobile-friendly', 'seo', 'meta', 'viewport',
+      'css3', 'html5', 'modern', 'professional', 'clean'
+    ];
     
-    // Site kalitesi belirleme
-    if (qualityIssues.length > 0) {
+    let modernFeatureCount = 0;
+    modernFeatures.forEach(feature => {
+      if (lowerHtml.includes(feature)) modernFeatureCount++;
+    });
+    
+    // Site kalitesi belirleme - Modern özellikler dikkate alınır
+    if (qualityIssues.length > 0 && modernFeatureCount < 2) {
       siteQuality = 'Kritik Eksikler';
+    } else if (modernFeatureCount >= 3) {
+      siteQuality = 'Modern';
     }
     
-    // Site segmenti belirleme
+    // Site segmenti belirleme - Daha esnek yaklaşım
     const lowQualityPatterns = [
-      'table', 'td', 'tr', 'font', 'center', 'marquee', 'blink',
-      'bgcolor', 'align', 'valign', 'width', 'height',
-      'javascript:void(0)', 'onclick', 'onload',
-      '<!--', '-->', '&nbsp;', '&amp;', '&lt;', '&gt;'
+      'marquee', 'blink', 'javascript:void(0)',
+      'onclick', 'onload', 'onerror'
     ];
     
     let lowQualityCount = 0;
@@ -6485,7 +6492,26 @@ function analyzeCMS(website) {
       if (lowerHtml.includes(pattern)) lowQualityCount++;
     });
     
-    if (lowQualityCount > 10) {
+    // Modern e-ticaret siteleri için daha esnek kurallar
+    const modernEcommercePatterns = [
+      'sepet', 'cart', 'basket', 'shopping cart',
+      'ödeme', 'payment', 'checkout', 'sipariş', 'order',
+      'ürün', 'product', 'fiyat', 'price', '₺', '$', '€',
+      'ideasoft', 'ticimax', 't-soft', 'woocommerce', 'shopify'
+    ];
+    
+    let modernEcommerceCount = 0;
+    modernEcommercePatterns.forEach(pattern => {
+      if (lowerHtml.includes(pattern)) modernEcommerceCount++;
+    });
+    
+    // Modern e-ticaret siteleri için segment yükseltme
+    if (modernEcommerceCount >= 3) {
+      siteSegment = 'E-ticaret';
+      if (lowQualityCount <= 2) {
+        siteSegment = 'Modern E-ticaret';
+      }
+    } else if (lowQualityCount > 5) {
       siteSegment = 'Düşük Segment';
     }
     
@@ -6508,7 +6534,13 @@ function analyzeCMS(website) {
     const cmsPatterns = {
       // Türkiye E-ticaret Platformları
       'İdeasoft': {
-        patterns: ['ideasoft', 'ideacms', 'ideasoft.com.tr', 'ideasoft.com', 'ideasoft®', 'akıllı e-ticaret paketleri', 'ideasoft-', 'ideasoft®', 'e-ticaret paketleri ile'],
+        patterns: [
+          'ideasoft', 'ideacms', 'ideasoft.com.tr', 'ideasoft.com', 'ideasoft®', 
+          'akıllı e-ticaret paketleri', 'ideasoft-', 'e-ticaret paketleri ile',
+          'e-ticaret paketleri ile hazırlanmıştır', 'e-ticaret paketleri ile hazirlanmistir',
+          'ideasoft® | e-ticaret paketleri ile hazırlanmıştır',
+          'ideasoft® | e-ticaret paketleri ile hazirlanmistir'
+        ],
         group: 'Türkiye E-ticaret'
       },
       'Ticimax': {
