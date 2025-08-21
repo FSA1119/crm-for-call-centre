@@ -6474,11 +6474,24 @@ function analyzeCMS(website) {
       if (lowerHtml.includes(feature)) modernFeatureCount++;
     });
     
-    // Site kalitesi belirleme - Modern özellikler dikkate alınır
-    if (qualityIssues.length > 0 && modernFeatureCount < 2) {
-      siteQuality = 'Kritik Eksikler';
+    // E-ticaret siteleri için ek modern özellik kontrolü
+    const ecommerceModernFeatures = [
+      'sepet', 'cart', 'ödeme', 'payment', 'ürün', 'product',
+      'ssl', 'https', 'güvenli', 'secure'
+    ];
+    
+    let ecommerceModernCount = 0;
+    ecommerceModernFeatures.forEach(feature => {
+      if (lowerHtml.includes(feature)) ecommerceModernCount++;
+    });
+    
+    // Site kalitesi belirleme - E-ticaret siteleri için özel yaklaşım
+    if (ecommerceModernCount >= 3) {
+      siteQuality = 'Modern E-ticaret';
     } else if (modernFeatureCount >= 3) {
       siteQuality = 'Modern';
+    } else if (qualityIssues.length > 0 && modernFeatureCount < 1 && ecommerceModernCount < 1) {
+      siteQuality = 'Kritik Eksikler';
     }
     
     // Site segmenti belirleme - Daha esnek yaklaşım
@@ -6539,7 +6552,9 @@ function analyzeCMS(website) {
           'akıllı e-ticaret paketleri', 'ideasoft-', 'e-ticaret paketleri ile',
           'e-ticaret paketleri ile hazırlanmıştır', 'e-ticaret paketleri ile hazirlanmistir',
           'ideasoft® | e-ticaret paketleri ile hazırlanmıştır',
-          'ideasoft® | e-ticaret paketleri ile hazirlanmistir'
+          'ideasoft® | e-ticaret paketleri ile hazirlanmistir',
+          'ideasoft® |', 'ideasoft |', 'ideasoft®', 'ideasoft akıllı',
+          'powered by ideasoft', 'by ideasoft', 'ideasoft e-ticaret'
         ],
         group: 'Türkiye E-ticaret'
       },
@@ -6661,6 +6676,7 @@ function analyzeCMS(website) {
       if (cmsData) {
         for (const pattern of cmsData.patterns) {
           if (lowerHtml.includes(pattern.toLowerCase())) {
+            console.log(`🎯 CMS tespit edildi: ${cmsName} - Pattern: ${pattern}`);
             return {
               cmsName: cmsName,
               cmsGroup: cmsData.group,
@@ -6671,6 +6687,12 @@ function analyzeCMS(website) {
           }
         }
       }
+    }
+    
+    // IdeaSoft için özel debug
+    if (lowerHtml.includes('ideasoft')) {
+      console.log('⚠️ IdeaSoft metni bulundu ama CMS tespit edilmedi');
+      console.log('HTML snippet:', lowerHtml.substring(lowerHtml.indexOf('ideasoft') - 50, lowerHtml.indexOf('ideasoft') + 100));
     }
     
     // E-ticaret tespiti (genel)
