@@ -6192,6 +6192,7 @@ function sortMeetingsSalesTop(sheet) {
     }
     const idxResult = findIdx(['Toplantı Sonucu','Toplantı sonucu']);
     const idxDate = findIdx(['Toplantı Tarihi','Toplantı tarihi']);
+    const idxPotential = findIdx(['Satış Potansiyeli']);
     if (idxResult === -1 || idxDate === -1) return;
 
     // Create temporary rank column at the end
@@ -6200,10 +6201,34 @@ function sortMeetingsSalesTop(sheet) {
     sheet.getRange(1, rankCol).setValue('ZZ__rank');
     const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues();
     const ranks = values.map((r, i) => {
-      const t = String(r[idxResult]||'').toLowerCase().trim();
+      const resultText = String(r[idxResult]||'').toLowerCase().trim();
+      const potentialText = idxPotential !== -1 ? String(r[idxPotential]||'').toLowerCase().trim() : '';
+      
+      // Rank priority (lower is higher):
+      // 1. Satış Yapıldı: 0
+      // 2. Yerinde Satış: 1
+      // 3. Sıcak: 2
+      // 4. Soğuk: 3
+      // 5. Orta: 4
+      // 6. Other: 9
+      let rank = 9;
+      
+      if (resultText === 'satış yapıldı' || resultText === 'satis yapildi') {
+        rank = 0;
+      } else if (potentialText) {
+        if (potentialText === 'yerinde satış' || potentialText === 'yerinde satis') {
+          rank = 1;
+        } else if (potentialText === 'sıcak' || potentialText === 'sicak') {
+          rank = 2;
+        } else if (potentialText === 'soğuk' || potentialText === 'soguk') {
+          rank = 3;
+        } else if (potentialText === 'orta') {
+          rank = 4;
+        }
+      }
+      
       // ikincil kriter: aynı güne ait kayıtların stabil sıralanması için satır index'i
-      const primary = (t==='satış yapıldı' || t==='satis yapildi') ? 0 : 1;
-      return [primary*100000 + i];
+      return [rank*100000 + i];
     });
     sheet.getRange(2, rankCol, ranks.length, 1).setValues(ranks);
 
