@@ -6176,7 +6176,7 @@ function generateWeeklyReportSeriesManager(options) {
   }
 }
 
-// Keep 'Satış Yapıldı' rows at top in meetings, then sort by Toplantı Tarihi
+// Satış Yapıldı > Yerinde Satış > Sıcak > Orta > Soğuk > Toplantı Tarihi sıralaması
 function sortMeetingsSalesTop(sheet) {
   console.log("🔄 sortMeetingsSalesTop başlatıldı - Toplantılar sıralama");
   try { sheet.getRange(1,1,1,1).getValues(); } catch(e) { SpreadsheetApp.flush(); }
