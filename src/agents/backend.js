@@ -6379,10 +6379,10 @@ function analyzeCMS(website) {
       return { cmsName: 'Geçersiz URL', cmsGroup: 'Geçersiz' };
     }
     
-    // HTML kaynak kodunu al
+    // HTML kaynak kodunu al - yönlendirmeleri takip et
     const response = UrlFetchApp.fetch(url, {
       muteHttpExceptions: true,
-      timeout: 8000, // 8 saniye timeout
+      timeout: 10000, // 10 saniye timeout
       followRedirects: true
     });
     
@@ -6508,7 +6508,7 @@ function analyzeCMS(website) {
     const cmsPatterns = {
       // Türkiye E-ticaret Platformları
       'İdeasoft': {
-        patterns: ['ideasoft', 'ideacms', 'ideasoft.com.tr', 'ideasoft.com', 'ideasoft®', 'akıllı e-ticaret paketleri', 'ideasoft-'],
+        patterns: ['ideasoft', 'ideacms', 'ideasoft.com.tr', 'ideasoft.com', 'ideasoft®', 'akıllı e-ticaret paketleri', 'ideasoft-', 'ideasoft®', 'e-ticaret paketleri ile'],
         group: 'Türkiye E-ticaret'
       },
       'Ticimax': {
@@ -6672,7 +6672,7 @@ function analyzeCMS(website) {
     
     // Tanınmayan CMS
     return {
-      cmsName: 'Tanınmayan CMS',
+      cmsName: 'Tespit Edilemedi',
       cmsGroup: 'Bilinmeyen',
       siteQuality: siteQuality,
       qualityIssues: qualityIssues,
@@ -6681,6 +6681,12 @@ function analyzeCMS(website) {
     
   } catch (error) {
     console.error('❌ Website analiz hatası:', error);
+    // Hata detaylarını logla
+    try {
+      console.log('URL:', website);
+      console.log('Hata detayı:', error.stack || error.message);
+    } catch (e) {}
+    
     return {
       cmsName: 'Erişilemiyor',
       cmsGroup: 'Erişilemiyor'
@@ -6860,10 +6866,10 @@ function analyzeEcommerce(website) {
       return 'Geçersiz URL';
     }
     
-    // HTML kaynak kodunu al
+    // HTML kaynak kodunu al - yönlendirmeleri takip et
     const response = UrlFetchApp.fetch(url, {
       muteHttpExceptions: true,
-      timeout: 8000,
+      timeout: 10000,
       followRedirects: true
     });
     
