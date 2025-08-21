@@ -6220,9 +6220,9 @@ function sortMeetingsSalesTop(sheet) {
           rank = 1;
         } else if (potentialText === 'sıcak' || potentialText === 'sicak') {
           rank = 2;
-        } else if (potentialText === 'soğuk' || potentialText === 'soguk') {
-          rank = 3;
         } else if (potentialText === 'orta') {
+          rank = 3;
+        } else if (potentialText === 'soğuk' || potentialText === 'soguk') {
           rank = 4;
         }
       }
