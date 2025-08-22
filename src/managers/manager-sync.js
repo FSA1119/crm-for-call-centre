@@ -722,8 +722,8 @@ function createManagerMenu() {
   try {
     const ui = SpreadsheetApp.getUi();
     const menu = ui.createMenu('YÖNETİCİ');
-    menu.addItem('Tüm Verileri Senkronize Et', 'collectAllData')
-        .addSeparator();
+    // "Tüm Verileri Senkronize Et" kaldırıldı - artık gerekli değil
+    // Dashboard sistemi direkt temsilci dosyalarından veri çekiyor
 
     // Odak (Temizle & Yaz)
     const replaceSubmenu = ui.createMenu('🎯 Odak (Temizle & Yaz)');
@@ -1640,115 +1640,9 @@ function runAllTests() {
  * 🔄 Complete Data Collection - Master Synchronization
  * @returns {Object} - Complete synchronization results
  */
-function collectAllData() {
-  console.log('🔄 Starting complete data collection');
-  
-  try {
-    // Get current spreadsheet instead of hardcoded ID
-    let managerFile;
-    try {
-      managerFile = SpreadsheetApp.getActiveSpreadsheet();
-      if (!managerFile) {
-        throw new Error('Yönetici dosyası bulunamadı');
-      }
-    } catch (error) {
-      throw new Error(`Manager файл недоступен: ${error.message}`);
-    }
-    
-    const totalStats = {
-      totalRecords: 0,
-      employeeStats: {},
-      errors: []
-    };
-    
-    // Process each employee
-    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
-      try {
-        console.log(`👤 Processing employee: ${employeeCode} - ${employeeName}`);
-        
-        const employeeData = collectEmployeeData(managerFile, employeeCode);
-        const employeeStats = {
-          employeeCode,
-          totalRecords: 0,
-          sheetStats: {}
-        };
-        
-        // Update manager sheets with employee data
-        for (const [sheetName, data] of Object.entries(employeeData)) {
-          if (data && data.length > 0) {
-            // full sync always replace
-            updateManagerSheet(managerFile, sheetName, data, employeeCode, 'replace');
-            employeeStats.sheetStats[sheetName] = data.length;
-            employeeStats.totalRecords += data.length;
-          }
-        }
-        
-        // Collect negatives and update summary + sources
-        const employeeFile = findEmployeeFile(employeeCode);
-        const negRows = collectFormatTableNegativeSummary(employeeFile, employeeCode);
-        updateManagerActivitySummary(managerFile, negRows, employeeCode, 'replace');
-        try { employeeStats.sheetStats['T Aktivite Özet'] = Array.isArray(negRows) ? negRows.length : 0; } catch (_) {}
-        try {
-          const withSrc = collectFormatTableNegativeSummaryWithSources(employeeFile, employeeCode);
-          applySourcesToMainActivitySummary(managerFile, withSrc, employeeCode);
-        } catch(_) {}
-        
-        totalStats.employeeStats[employeeCode] = employeeStats;
-        totalStats.totalRecords += employeeStats.totalRecords;
-        
-        console.log(`✅ Employee ${employeeCode} processed: ${employeeStats.totalRecords} records`);
-        
-      } catch (error) {
-        console.error(`❌ Error processing employee ${employeeCode}:`, error);
-        totalStats.errors.push({
-          employeeCode,
-          error: error.message
-        });
-      }
-    }
-    
-    // Update manager statistics
-    updateManagerStatistics(managerFile, totalStats);
-    
-    // Show results
-    showSyncResults(totalStats);
-    
-    // Auto-apply validations after sync (colors already applied during sync)
-    try {
-      applyDataValidationToAllManagerSheets();
-      
-      // T Aktivite Özet için özel renk kodlaması
-      const tAktiviteOzetSheet = managerFile.getSheetByName('T Aktivite Özet');
-      if (tAktiviteOzetSheet) {
-        console.log('🎨 T Aktivite Özet için özel renk kodlaması uygulanıyor...');
-        const lastRow = tAktiviteOzetSheet.getLastRow();
-        if (lastRow > 1) {
-          applyColorCodingToManagerData(tAktiviteOzetSheet, 'T Aktivite Özet', 2, lastRow - 1);
-          console.log('✅ T Aktivite Özet renk kodlaması tamamlandı');
-        }
-      }
-      // T Aktivite (Tümü) için özel renk kodlaması
-      const tAktiviteTumuSheet = managerFile.getSheetByName('T Aktivite (Tümü)');
-      if (tAktiviteTumuSheet) {
-        console.log('🎨 T Aktivite (Tümü) için özel renk kodlaması uygulanıyor...');
-        const lastRow2 = tAktiviteTumuSheet.getLastRow();
-        if (lastRow2 > 1) {
-          applyColorCodingToManagerData(tAktiviteTumuSheet, 'T Aktivite (Tümü)', 2, lastRow2 - 1);
-          console.log('✅ T Aktivite (Tümü) renk kodlaması tamamlandı');
-        }
-      }
-    } catch (postSyncError) {
-      console.error('Post-sync validation error:', postSyncError);
-    }
-    
-    console.log('✅ Complete data collection finished');
-    return totalStats;
-    
-  } catch (error) {
-    console.error('❌ Complete data collection failed:', error);
-    throw error;
-  }
-}
+// collectAllData fonksiyonu kaldırıldı - artık gerekli değil
+// Dashboard sistemi direkt temsilci dosyalarından veri çekiyor
+// Senkronizasyon işlemleri için "Sırayla Ekle" ve "Odak" fonksiyonları kullanılıyor
 
 /**
  * 🔄 Employee Data Collection - Individual Processing
@@ -5739,8 +5633,8 @@ function createManagerMenu_v2_deprecated() {
   try {
     const ui = SpreadsheetApp.getUi();
     const menu = ui.createMenu('YÖNETİCİ');
-    menu.addItem('Tüm Verileri Senkronize Et', 'collectAllData')
-        .addSeparator();
+    // "Tüm Verileri Senkronize Et" kaldırıldı - artık gerekli değil
+    // Dashboard sistemi direkt temsilci dosyalarından veri çekiyor
     // ... existing code remains ...
     const reportsGeneral = ui.createMenu('Raporlar (Genel)');
     reportsGeneral.addItem('Günlük', 'generateDailyReportAutoSeriesManager')
@@ -6705,9 +6599,10 @@ function sortMeetingsManual() {
 
 /**
  * 🎯 Günlük Performans Dashboard - Tüm temsilcilerin günlük aktivite özeti
+ * GÜNCELLENDİ: Direkt temsilci dosyalarından veri çekiyor
  */
 function generateDailyPerformanceDashboard() {
-  console.log('Function started: generateDailyPerformanceDashboard');
+  console.log('Function started: generateDailyPerformanceDashboard - REAL TIME VERSION');
   
   try {
     if (!validateInput({})) {
@@ -6718,7 +6613,7 @@ function generateDailyPerformanceDashboard() {
     const today = new Date();
     const todayKey = Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy');
     
-    console.log('Günlük performans dashboard başlatılıyor:', todayKey);
+    console.log('Gerçek zamanlı günlük performans dashboard başlatılıyor:', todayKey);
     
     // Tüm temsilci verilerini topla
     const employeeStats = {};
@@ -6738,74 +6633,105 @@ function generateDailyPerformanceDashboard() {
       };
     }
     
-    // Format Tablo sayfalarından veri topla
-    const sheets = ss.getSheets();
-    for (const sheet of sheets) {
-      const sheetName = sheet.getName();
-      if (sheetName.includes('Format Tablo') && sheet.getLastRow() > 1) {
-        console.log('Format Tablo işleniyor:', sheetName);
+    // Temsilci dosyalarından direkt veri topla
+    console.log('Temsilci dosyalarından veri toplanıyor...');
+    
+    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
+      try {
+        // Temsilci dosya ismini oluştur
+        const fileName = `${employeeCode} - ${employeeName}`;
+        console.log(`Temsilci dosyası aranıyor: ${fileName}`);
         
-        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-        const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getDisplayValues();
-        
-        const kodIdx = headers.indexOf('Kod');
-        const aktiviteIdx = headers.indexOf('Aktivite');
-        const aktiviteTarihiIdx = headers.indexOf('Aktivite Tarihi');
-        const logIdx = headers.indexOf('Log');
-        
-        if (kodIdx !== -1 && aktiviteIdx !== -1) {
-          for (const row of data) {
-            const kod = String(row[kodIdx] || '').trim();
-            const aktivite = String(row[aktiviteIdx] || '').trim();
-            const tarih = aktiviteTarihiIdx !== -1 ? row[aktiviteTarihiIdx] : null;
-            const log = logIdx !== -1 ? row[logIdx] : null;
+        // Google Drive'dan dosyayı bul
+        const files = DriveApp.getFilesByName(fileName);
+        if (files.hasNext()) {
+          const file = files.next();
+          console.log(`Dosya bulundu: ${file.getName()}`);
+          
+          // Dosyayı aç
+          const employeeSpreadsheet = SpreadsheetApp.openById(file.getId());
+          
+          // Format Tablo sayfasını bul
+          const formatTableSheet = employeeSpreadsheet.getSheetByName('Format Tablo');
+          if (formatTableSheet && formatTableSheet.getLastRow() > 1) {
+            console.log(`Format Tablo sayfası bulundu: ${formatTableSheet.getName()}, Satır: ${formatTableSheet.getLastRow()}`);
             
-            if (kod && aktivite && employeeStats[kod]) {
-              // Tarih kontrolü - bugün mü?
-              let isToday = false;
-              if (tarih === todayKey) {
-                isToday = true;
-              } else if (log && log.includes(todayKey)) {
-                isToday = true;
-              }
-              
-              if (isToday) {
-                const activityTime = extractTimeFromLog(log);
-                const activityData = {
-                  activity: aktivite,
-                  time: activityTime,
-                  timestamp: new Date()
-                };
+            const headers = formatTableSheet.getRange(1, 1, 1, formatTableSheet.getLastColumn()).getDisplayValues()[0];
+            const data = formatTableSheet.getRange(2, 1, formatTableSheet.getLastRow() - 1, formatTableSheet.getLastColumn()).getDisplayValues();
+            
+            const kodIdx = headers.indexOf('Kod');
+            const aktiviteIdx = headers.indexOf('Aktivite');
+            const aktiviteTarihiIdx = headers.indexOf('Aktivite Tarihi');
+            const logIdx = headers.indexOf('Log');
+            
+            console.log(`Sütun indeksleri: Kod=${kodIdx}, Aktivite=${aktiviteIdx}, Tarih=${aktiviteTarihiIdx}, Log=${logIdx}`);
+            
+            if (aktiviteIdx !== -1) {
+              let activityCount = 0;
+              for (const row of data) {
+                const aktivite = String(row[aktiviteIdx] || '').trim();
+                const tarih = aktiviteTarihiIdx !== -1 ? row[aktiviteTarihiIdx] : null;
+                const log = logIdx !== -1 ? row[logIdx] : null;
                 
-                employeeStats[kod].activities.push(activityData);
-                employeeStats[kod].totalCalls++;
-                
-                // İlk ve son aktivite zamanı
-                if (!employeeStats[kod].firstActivity || activityTime < employeeStats[kod].firstActivity) {
-                  employeeStats[kod].firstActivity = activityTime;
-                }
-                if (!employeeStats[kod].lastActivity || activityTime > employeeStats[kod].lastActivity) {
-                  employeeStats[kod].lastActivity = activityTime;
-                }
-                
-                // Aktivite kategorileri
-                if (['İlgilenmiyor', 'Ulaşılamadı'].includes(aktivite)) {
-                  employeeStats[kod].negativeActivities++;
-                } else {
-                  employeeStats[kod].positiveActivities++;
-                  if (aktivite.includes('Randevu')) {
-                    employeeStats[kod].appointments++;
+                if (aktivite) {
+                  // Tarih kontrolü - bugün mü?
+                  let isToday = false;
+                  if (tarih === todayKey) {
+                    isToday = true;
+                  } else if (log && log.includes(todayKey)) {
+                    isToday = true;
                   }
-                  if (aktivite.includes('Fırsat')) {
-                    employeeStats[kod].opportunities++;
+                  
+                  if (isToday) {
+                    const activityTime = extractTimeFromLog(log);
+                    const activityData = {
+                      activity: aktivite,
+                      time: activityTime,
+                      timestamp: new Date()
+                    };
+                    
+                    employeeStats[employeeCode].activities.push(activityData);
+                    employeeStats[employeeCode].totalCalls++;
+                    activityCount++;
+                    
+                    // İlk ve son aktivite zamanı
+                    if (!employeeStats[employeeCode].firstActivity || activityTime < employeeStats[employeeCode].firstActivity) {
+                      employeeStats[employeeCode].firstActivity = activityTime;
+                    }
+                    if (!employeeStats[employeeCode].lastActivity || activityTime > employeeStats[employeeCode].lastActivity) {
+                      employeeStats[employeeCode].lastActivity = activityTime;
+                    }
+                    
+                    // Aktivite kategorileri
+                    if (['İlgilenmiyor', 'Ulaşılamadı'].includes(aktivite)) {
+                      employeeStats[employeeCode].negativeActivities++;
+                    } else {
+                      employeeStats[employeeCode].positiveActivities++;
+                      if (aktivite.includes('Randevu')) {
+                        employeeStats[employeeCode].appointments++;
+                      }
+                      if (aktivite.includes('Fırsat')) {
+                        employeeStats[employeeCode].opportunities++;
+                      }
+                    }
                   }
                 }
               }
+              console.log(`${employeeCode} için ${activityCount} bugünkü aktivite bulundu`);
             }
+          } else {
+            console.log(`${employeeCode} için Format Tablo sayfası bulunamadı veya boş`);
           }
+        } else {
+          console.log(`Temsilci dosyası bulunamadı: ${fileName}`);
         }
+      } catch (error) {
+        console.error(`${employeeCode} dosyası işlenirken hata:`, error.message);
+        // Hata olsa bile devam et
       }
     }
+    
+    console.log('Temsilci verileri toplandı:', employeeStats);
     
     // Dashboard sayfasını oluştur
     let dashboardSheet = ss.getSheetByName('📊 Günlük Performans');
@@ -6816,7 +6742,7 @@ function generateDailyPerformanceDashboard() {
     }
     
     // Dashboard başlığı
-    dashboardSheet.getRange('A1').setValue('📊 GÜNLÜK PERFORMANS DASHBOARD');
+    dashboardSheet.getRange('A1').setValue('📊 GÜNLÜK PERFORMANS DASHBOARD (GERÇEK ZAMANLI)');
     dashboardSheet.getRange('A1:D1').merge();
     dashboardSheet.getRange('A1').setFontSize(16).setFontWeight('bold').setBackground('#4285F4').setFontColor('white');
     
@@ -6825,17 +6751,22 @@ function generateDailyPerformanceDashboard() {
     dashboardSheet.getRange('A2:D2').merge();
     dashboardSheet.getRange('A2').setFontSize(12).setFontWeight('bold');
     
+    // Veri kaynağı bilgisi
+    dashboardSheet.getRange('A3').setValue('🔄 Veri Kaynağı: Direkt Temsilci Dosyalarından (Gerçek Zamanlı)');
+    dashboardSheet.getRange('A3:D3').merge();
+    dashboardSheet.getRange('A3').setFontSize(10).setFontColor('#666');
+    
     // Başlık satırı
     const headers = [
       '👤 Temsilci', '🕐 Çalışma Süresi', '📞 Toplam Arama', 
       '✅ Pozitif', '❌ Negatif', '📅 Randevu', '💰 Fırsat', '📋 Son Aktivite'
     ];
     
-    dashboardSheet.getRange('A4:H4').setValues([headers]);
-    dashboardSheet.getRange('A4:H4').setFontWeight('bold').setBackground('#E8F5E8');
+    dashboardSheet.getRange('A6:H6').setValues([headers]);
+    dashboardSheet.getRange('A6:H6').setFontWeight('bold').setBackground('#E8F5E8');
     
     // Veri satırları
-    let row = 5;
+    let row = 7;
     for (const [code, stats] of Object.entries(employeeStats)) {
       if (stats.totalCalls > 0) {
         const workDuration = calculateWorkDuration(stats.firstActivity, stats.lastActivity);
