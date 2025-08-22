@@ -1,6 +1,9 @@
 // ========================================
 // MANAGER SYNC - YÖNETİCİ AKIŞLARI
 // Version: 4.5
+// 
+// 📊 PERFORMANCE DASHBOARD SİSTEMİ DAHİL EDİLDİ
+// performance-dashboard.gs dosyasından import edildi
 // ========================================
 
 // ========================================
@@ -806,6 +809,15 @@ function createManagerMenu() {
     viewMenu.addItem('Okunabilir Yap (Bu Sayfa)', 'applyReadableView')
             .addItem('Görünümü Sıfırla (Bu Sayfa)', 'resetReadableView');
     menu.addSubMenu(viewMenu)
+        .addSeparator();
+
+    // 📊 PERFORMANS DASHBOARD - Yeni Eklenen
+    const dashboardMenu = ui.createMenu('📊 Performans Dashboard');
+    dashboardMenu.addItem('🎯 Günlük Performans Özeti', 'generateDailyPerformanceDashboard')
+                .addItem('📈 Haftalık Performans Grafiği', 'generateWeeklyPerformanceChart')
+                .addItem('⏰ Zaman Analizi Raporu', 'generateTimeAnalysisReport')
+                .addItem('🔄 Canlı Dashboard Yenile', 'refreshLiveDashboard');
+    menu.addSubMenu(dashboardMenu)
         .addSeparator();
     
     
