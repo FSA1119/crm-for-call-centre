@@ -897,3 +897,339 @@ function installCmsMenuOnOpenTrigger() {
   // removed: top-level CMS menu trigger disabled
   console.log('CMS top-level menu trigger disabled');
 }
+
+// ========================================
+// BACKEND.JS'DEN TAŞINAN FONKSIYONLAR
+// ========================================
+
+/**
+ * 🌐 Gelişmiş Website Analizi - backend.js'den taşındı
+ * @param {string} website - Analiz edilecek website URL'si
+ * @returns {Object} - Analiz sonuçları
+ */
+function analyzeWebsite(website) {
+  console.log('🌐 Website analizi başlatılıyor:', website);
+  
+  try {
+    if (!validateInput({ website })) {
+      throw new Error('Invalid website provided');
+    }
+
+    // URL'yi temizle ve doğrula
+    let url = website.toString().trim();
+    
+    if (!url || url === '') {
+      return 'Boş URL';
+    }
+    
+    // Basit URL temizleme
+    url = url.replace(/^https?:\/\//, ''); // http:// veya https:// kaldır
+    url = url.replace(/^www\./, ''); // www. kaldır
+    url = url.replace(/\/$/, ''); // Sondaki / kaldır
+    
+    // URL'yi yeniden oluştur
+    url = 'https://' + url;
+    
+    // Basit URL doğrulama
+    if (!url.includes('.') || url.length < 5) {
+      return 'Geçersiz URL';
+    }
+    
+    // HTML kaynak kodunu al - yönlendirmeleri takip et
+    const response = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      timeout: 10000, // 10 saniye timeout
+      followRedirects: true
+    });
+    
+    if (!response) {
+      return {
+        cmsName: 'Erişilemiyor',
+        cmsGroup: 'Erişilemiyor'
+      };
+    }
+    
+    const statusCode = response.getResponseCode();
+    const html = response.getContentText();
+    const lowerHtml = html.toLowerCase();
+    
+    console.log(`Status: ${statusCode}, HTML length: ${html.length}`);
+    
+    // Site kalitesi kontrolü - Çok daha esnek yaklaşım
+    let siteQuality = 'Normal';
+    let qualityIssues = [];
+    let siteSegment = 'Normal';
+    
+    // 404 linkleri kontrolü - Daha esnek
+    const brokenLinks = (lowerHtml.match(/404/g) || []).length;
+    if (brokenLinks > 10) { // Eşiği yükselttim
+      qualityIssues.push(`${brokenLinks} adet 404 link`);
+    }
+    
+    // Hata mesajları kontrolü - Daha esnek
+    const errorMessages = [
+      'broken', 'kırık', 'sorun', 'problem'
+    ];
+    let errorCount = 0;
+    errorMessages.forEach(msg => {
+      if (lowerHtml.includes(msg)) errorCount++;
+    });
+    
+    // Modern e-ticaret siteleri için kalite yükseltme
+    const modernFeatures = [
+      'responsive', 'mobile-friendly', 'seo', 'meta', 'viewport',
+      'css3', 'html5', 'modern', 'professional', 'clean'
+    ];
+    
+    let modernFeatureCount = 0;
+    modernFeatures.forEach(feature => {
+      if (lowerHtml.includes(feature)) modernFeatureCount++;
+    });
+    
+    // E-ticaret siteleri için ek modern özellik kontrolü
+    const ecommerceModernFeatures = [
+      'sepet', 'cart', 'ödeme', 'payment', 'ürün', 'product',
+      'ssl', 'https', 'güvenli', 'secure'
+    ];
+    
+    let ecommerceModernCount = 0;
+    ecommerceModernFeatures.forEach(feature => {
+      if (lowerHtml.includes(feature)) ecommerceModernCount++;
+    });
+    
+    // Site kalitesi belirleme - E-ticaret siteleri için özel yaklaşım
+    if (ecommerceModernCount >= 3) {
+      siteQuality = 'Modern E-ticaret';
+    } else if (modernFeatureCount >= 3) {
+      siteQuality = 'Modern';
+    } else if (qualityIssues.length > 0 && modernFeatureCount < 1 && ecommerceModernCount < 1) {
+      siteQuality = 'Kritik Eksikler';
+    }
+    
+    // Site segmenti belirleme - Daha esnek yaklaşım
+    const lowQualityPatterns = [
+      'marquee', 'blink', 'javascript:void(0)',
+      'onclick', 'onload', 'onerror'
+    ];
+    
+    let lowQualityCount = 0;
+    lowQualityPatterns.forEach(pattern => {
+      if (lowerHtml.includes(pattern)) lowQualityCount++;
+    });
+    
+    // Modern e-ticaret siteleri için daha esnek kurallar
+    const modernEcommercePatterns = [
+      'sepet', 'cart', 'basket', 'shopping cart',
+      'ödeme', 'payment', 'checkout', 'sipariş', 'order',
+      'ürün', 'product', 'fiyat', 'price', '₺', '$', '€',
+      'ideasoft', 'ticimax', 't-soft', 'woocommerce', 'shopify'
+    ];
+    
+    let modernEcommerceCount = 0;
+    modernEcommercePatterns.forEach(pattern => {
+      if (lowerHtml.includes(pattern)) modernEcommerceCount++;
+    });
+    
+    // Modern e-ticaret siteleri için segment yükseltme
+    if (modernEcommerceCount >= 3) {
+      siteSegment = 'E-ticaret';
+      if (lowQualityCount <= 2) {
+        siteSegment = 'Modern E-ticaret';
+      }
+    } else if (lowQualityCount > 5) {
+      siteSegment = 'Düşük Segment';
+    }
+    
+    // Güvenlik kontrolü
+    const securityIssues = [
+      'admin', 'login', 'password', 'user', 'test',
+      'debug', 'error', 'exception', 'stack trace'
+    ];
+    
+    let securityCount = 0;
+    securityIssues.forEach(issue => {
+      if (lowerHtml.includes(issue)) securityCount++;
+    });
+    
+    if (securityCount > 5) {
+      siteSegment = 'Güvenli Değil';
+    }
+    
+    // CMS Tespit Algoritması - cms_detector.gs'deki gelişmiş algoritma kullanılıyor
+    const cmsResult = detectCMSForUrl(url);
+    if (cmsResult && cmsResult !== 'Tespit Edilemedi') {
+      return {
+        cmsName: cmsResult,
+        cmsGroup: mapCmsGroup(cmsResult),
+        siteQuality: siteQuality,
+        qualityIssues: qualityIssues,
+        siteSegment: siteSegment
+      };
+    }
+    
+    // E-ticaret tespiti (genel)
+    const ecommercePatterns = [
+      'sepet', 'cart', 'basket', 'shopping cart',
+      'ödeme', 'payment', 'checkout',
+      'kredi kartı', 'credit card', 'debit card',
+      'sipariş', 'order', 'purchase',
+      'add to cart', 'sepete ekle', 'buy now', 'şimdi al',
+      'ürün', 'product', 'item',
+      'fiyat', 'price', 'cost',
+      '₺', '$', '€', 'tl'
+    ];
+    
+    let ecommerceScore = 0;
+    for (const pattern of ecommercePatterns) {
+      if (lowerHtml.includes(pattern.toLowerCase())) {
+        ecommerceScore++;
+      }
+    }
+    
+    if (ecommerceScore >= 3) {
+      return {
+        cmsName: 'Özel E-ticaret',
+        cmsGroup: 'Özel Sistem',
+        siteQuality: siteQuality,
+        qualityIssues: qualityIssues,
+        siteSegment: siteSegment
+      };
+    }
+    
+    // Tanınmayan CMS
+    return {
+      cmsName: 'Tespit Edilemedi',
+      cmsGroup: 'Bilinmeyen',
+      siteQuality: siteQuality,
+      qualityIssues: qualityIssues,
+      siteSegment: siteSegment
+    };
+    
+  } catch (error) {
+    console.error('❌ Website analiz hatası:', error);
+    // Hata detaylarını logla
+    try {
+      console.log('URL:', website);
+      console.log('Hata detayı:', error.stack || error.message);
+    } catch (e) {}
+    
+    return {
+      cmsName: 'Erişilemiyor',
+      cmsGroup: 'Erişilemiyor'
+    };
+  }
+}
+
+/**
+ * 🌐 URL Analizi (Seçili Satırlar)
+ */
+function analyzeSelectedWebsites(parameters) {
+  console.log('🌐 URL Analizi başlatılıyor:', parameters);
+  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
+}
+
+/**
+ * 🛒 E-ticaret İzi Tespiti (Seçili Satırlar)  
+ */
+function detectEcommerceSelectedRows(parameters) {
+  console.log('🛒 E-ticaret İzi Tespiti başlatılıyor:', parameters);
+  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
+}
+
+/**
+ * ⚡ Hız Testi (Seçili Satırlar)
+ */
+function speedTestSelectedRows(parameters) {
+  console.log('⚡ Hız Testi başlatılıyor:', parameters);
+  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
+}
+
+/**
+ * Validation helper function
+ */
+function validateInput(parameters) {
+  if (!parameters) return false;
+  if (typeof parameters !== 'object') return false;
+  return true;
+}
+
+/**
+ * 🧱 Tüm Format Tablo sayfalarına CMS sütunlarını Website yanına ekle
+ */
+function addCmsColumnsNextToWebsiteOnAllFormatTables() {
+  console.log('🧱 CMS sütunları ekleme işlemi başlatılıyor');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = ss.getSheets();
+    let processedSheets = 0;
+    let addedColumns = 0;
+    
+    for (const sheet of sheets) {
+      if (typeof isFormatTable === 'function' && isFormatTable(sheet)) {
+        const result = addCmsColumnsToSheet(sheet);
+        if (result.success) {
+          processedSheets++;
+          addedColumns += result.addedColumns;
+        }
+      }
+    }
+    
+    const ui = SpreadsheetApp.getUi();
+    ui.alert(
+      'CMS Sütunları Eklendi', 
+      `${processedSheets} Format Tablo sayfasında ${addedColumns} sütun eklendi.`, 
+      ui.ButtonSet.OK
+    );
+    
+    console.log('Processing complete:', { processedSheets, addedColumns });
+    return { processedSheets, addedColumns };
+    
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Tek bir sayfaya CMS sütunlarını ekle
+ */
+function addCmsColumnsToSheet(sheet) {
+  try {
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    
+    const websiteIndex = headers.indexOf('Website');
+    if (websiteIndex === -1) {
+      console.log('Website sütunu bulunamadı:', sheet.getName());
+      return { success: false, addedColumns: 0 };
+    }
+    
+    let addedColumns = 0;
+    const insertPosition = websiteIndex + 2; // Website sütunundan sonra
+    
+    // CMS Adı sütunu ekle
+    if (!headers.includes('CMS Adı')) {
+      sheet.insertColumnAfter(websiteIndex + addedColumns);
+      sheet.getRange(1, insertPosition + addedColumns).setValue('CMS Adı');
+      addedColumns++;
+    }
+    
+    // CMS Grubu sütunu ekle  
+    if (!headers.includes('CMS Grubu')) {
+      sheet.insertColumnAfter(websiteIndex + addedColumns);
+      sheet.getRange(1, insertPosition + addedColumns).setValue('CMS Grubu');
+      addedColumns++;
+    }
+    
+    console.log(`${sheet.getName()}: ${addedColumns} sütun eklendi`);
+    return { success: true, addedColumns };
+    
+  } catch (error) {
+    console.error('Sheet işleme hatası:', error);
+    return { success: false, addedColumns: 0 };
+  }
+}
+
+console.log('📋 CMS Detector - Backend fonksiyonları entegre edildi');

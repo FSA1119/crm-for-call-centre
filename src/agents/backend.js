@@ -3740,63 +3740,7 @@ function showGenerateReportDialog() {
   generateReport({});
 }
 
-function addCmsColumnsNextToWebsiteOnAllFormatTables(parameters) {
-  console.log('Function started:', parameters);
-  try {
-    if (!validateInput(parameters || {})) {
-      throw new Error('Invalid input provided');
-    }
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const sheets = spreadsheet.getSheets();
-    let processedSheets = 0;
-    sheets.forEach(sheet => {
-      if (!isFormatTable(sheet)) return;
-      const lastCol = sheet.getLastColumn();
-      if (lastCol < 1) return;
-      const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-      const iWebsite = headers.indexOf('Website');
-      if (iWebsite === -1) return;
-      let iCmsName = headers.indexOf('CMS Adı');
-      let iCmsGroup = headers.indexOf('CMS Grubu');
-      if (iCmsName === -1) {
-        sheet.insertColumnAfter(iWebsite + 1);
-        sheet.getRange(1, iWebsite + 2).setValue('CMS Adı');
-      }
-      const headers2 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-      iCmsName = headers2.indexOf('CMS Adı');
-      iCmsGroup = headers2.indexOf('CMS Grubu');
-      if (iCmsGroup === -1) {
-        const insertAfter = Math.max(iWebsite + 1, iCmsName) + 1;
-        sheet.insertColumnAfter(insertAfter);
-        sheet.getRange(1, insertAfter + 1).setValue('CMS Grubu');
-      }
-      const headers3 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-      const idxWebsite = headers3.indexOf('Website');
-      const idxCmsName = headers3.indexOf('CMS Adı');
-      const idxCmsGroup = headers3.indexOf('CMS Grubu');
-      const desiredCmsNameCol = idxWebsite + 2;
-      if (idxCmsName + 1 !== desiredCmsNameCol) {
-        sheet.moveColumns(sheet.getRange(1, idxCmsName + 1, sheet.getMaxRows(), 1), desiredCmsNameCol);
-      }
-      const headers4 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-      const nameNow = headers4.indexOf('CMS Adı');
-      const groupNow = headers4.indexOf('CMS Grubu');
-      if (groupNow + 1 !== nameNow + 2) {
-        sheet.moveColumns(sheet.getRange(1, groupNow + 1, sheet.getMaxRows(), 1), nameNow + 2);
-      }
-      sheet.autoResizeColumn(idxWebsite + 2);
-      sheet.autoResizeColumn(idxWebsite + 3);
-      processedSheets++;
-    });
-    try { refreshFormatTabloValidation({ silent: true }); } catch (e) {}
-    SpreadsheetApp.getUi().alert('Tamam', `CMS sütunları Website yanına taşındı/oluşturuldu. İşlenen sayfa: ${processedSheets}`, SpreadsheetApp.getUi().ButtonSet.OK);
-    return { success: true, processedSheets };
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
-    throw error;
-  }
-}
+// CMS fonksiyonları src/managers/cms_detector.gs dosyasına taşındı
 
 // ========================================
 // MENU CREATION
@@ -7312,29 +7256,7 @@ console.log('📊 CMS Altyapısı fonksiyonları hazır');
 console.log('🛒 E-ticaret İzi fonksiyonları hazır');
 console.log('⚡ Hız Testi fonksiyonları hazır');
 
-/**
- * 🌐 URL Analizi (Seçili Satırlar)
- */
-function analyzeSelectedWebsites(parameters) {
-  console.log('🌐 URL Analizi başlatılıyor:', parameters);
-  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
-}
-
-/**
- * 🛒 E-ticaret İzi Tespiti (Seçili Satırlar)  
- */
-function detectEcommerceSelectedRows(parameters) {
-  console.log('🛒 E-ticaret İzi Tespiti başlatılıyor:', parameters);
-  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
-}
-
-/**
- * ⚡ Hız Testi (Seçili Satırlar)
- */
-function speedTestSelectedRows(parameters) {
-  console.log('⚡ Hız Testi başlatılıyor:', parameters);
-  return openCMSDetectionCurrentAgentSelectionAccurate(parameters);
-}
+// CMS fonksiyonları src/managers/cms_detector.gs dosyasına taşındı
 
 /**
  * 🧪 Test function to manually test date sorting
