@@ -7971,13 +7971,23 @@ function urlTekrarlariniSil() {
     const ui = SpreadsheetApp.getUi();
     const response = ui.alert(
       '🗑️ URL Tekrarları Silme',
-      'Temizlenmiş URL\'lerde tekrarlanan satırları sileceğim. Her URL\'den sadece bir tane (orijinal) kalacak.\n\nDevam etmek istiyor musunuz?',
+      'Temizlenmiş URL\'lerde tekrarlanan satırları sileceğim. Her URL\'den sadece bir tane (orijinal) kalacak.\n\n' +
+      '⚠️ Sosyal medya ve e-ticaret platformları atlanacak!\n\n' +
+      'Devam etmek istiyor musunuz?',
       ui.ButtonSet.YES_NO
     );
     if (response !== ui.Button.YES) {
       console.log('Kullanıcı iptal etti');
       return { success: false, message: 'İşlem iptal edildi' };
     }
+    
+    // Atlanacak platformlar (sosyal medya ve e-ticaret)
+    const SKIP_PLATFORMS = [
+      'instagram.com', 'facebook.com', 'twitter.com', 'linkedin.com', 'youtube.com',
+      'yemeksepeti.com', 'getir.com', 'trendyol.com', 'hepsiburada.com', 'n11.com',
+      'sahibinden.com', 'gittigidiyor.com', 'amazon.com', 'ebay.com', 'etsy.com',
+      'shopier.com', 'tgoyemek.com', 'uber.com', 'taxi.com', 'booking.com'
+    ];
     
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
@@ -7989,15 +7999,23 @@ function urlTekrarlariniSil() {
     
     console.log(`🔍 URL sütunu bulundu: ${headers[urlColumnIndex]} (Sütun ${urlColumnIndex + 1})`);
     
-    // URL'leri temizle ve grupla
+    // URL'leri temizle ve grupla (platformları atla)
     const urlGroups = new Map();
     let processedCount = 0;
+    let skippedCount = 0;
     
     for (let i = 1; i < data.length; i++) {
       const url = data[i][urlColumnIndex];
       if (url && typeof url === 'string') {
         const temizUrl = urlTemizle(url);
         if (temizUrl) {
+          // Platform kontrolü
+          if (SKIP_PLATFORMS.includes(temizUrl)) {
+            console.log(`⏭️ Platform atlandı: ${temizUrl} (Satır ${i + 1})`);
+            skippedCount++;
+            continue;
+          }
+          
           if (!urlGroups.has(temizUrl)) {
             urlGroups.set(temizUrl, []);
           }
@@ -8008,12 +8026,14 @@ function urlTekrarlariniSil() {
     }
     
     console.log(`🔍 Toplam işlenen URL: ${processedCount}`);
+    console.log(`⏭️ Atlanan platform: ${skippedCount}`);
     console.log(`🔍 Farklı URL grubu: ${urlGroups.size}`);
     
-    // Tekrarları bul ve sil
+    // Tekrarları bul ve detaylı rapor hazırla
     let deletedCount = 0;
     let duplicateGroups = 0;
     const rowsToDelete = [];
+    const deletionReport = [];
     
     for (const [temizUrl, rowNumbers] of urlGroups) {
       if (rowNumbers.length > 1) {
@@ -8024,6 +8044,14 @@ function urlTekrarlariniSil() {
         
         console.log(`   Orijinal: Satır ${originalRow}`);
         console.log(`   Silinecek: Satırlar ${duplicateRows.join(', ')}`);
+        
+        // Detaylı rapor için
+        deletionReport.push({
+          url: temizUrl,
+          originalRow: originalRow,
+          duplicateRows: duplicateRows,
+          totalDuplicates: duplicateRows.length
+        });
         
         duplicateRows.reverse().forEach(rowNum => {
           rowsToDelete.push(rowNum);
@@ -8044,17 +8072,31 @@ function urlTekrarlariniSil() {
       }
     }
     
-    const resultMessage = `🗑️ URL Tekrar Temizleme Tamamlandı!\n\n` +
-      `🔍 İşlenen URL: ${processedCount}\n` +
-      `🔍 Farklı URL grubu: ${urlGroups.size}\n` +
-      `🔍 Tekrarlanan grup: ${duplicateGroups}\n` +
-      `🗑️ Silinen tekrarlanan satır: ${deletedCount}\n` +
-      `✅ Her URL'den sadece bir tane (orijinal) kaldı`;
+    // Detaylı silme raporu
+    let detailedReport = `🗑️ URL Tekrar Temizleme Tamamlandı!\n\n`;
+    detailedReport += `🔍 İşlenen URL: ${processedCount}\n`;
+    detailedReport += `⏭️ Atlanan platform: ${skippedCount}\n`;
+    detailedReport += `🔍 Farklı URL grubu: ${urlGroups.size}\n`;
+    detailedReport += `🔍 Tekrarlanan grup: ${duplicateGroups}\n`;
+    detailedReport += `🗑️ Silinen tekrarlanan satır: ${deletedCount}\n\n`;
     
-    ui.alert('🗑️ URL Tekrar Temizleme', resultMessage, ui.ButtonSet.OK);
+    if (deletionReport.length > 0) {
+      detailedReport += `📋 DETAYLI SİLME RAPORU:\n`;
+      detailedReport += `═══════════════════════════\n`;
+      
+      deletionReport.forEach((item, index) => {
+        detailedReport += `${index + 1}. ${item.url}\n`;
+        detailedReport += `   ✅ Orijinal: Satır ${item.originalRow}\n`;
+        detailedReport += `   🗑️ Silinen: Satırlar ${item.duplicateRows.join(', ')} (${item.totalDuplicates} adet)\n\n`;
+      });
+    }
+    
+    detailedReport += `✅ Her URL'den sadece bir tane (orijinal) kaldı`;
+    
+    ui.alert('🗑️ URL Tekrar Temizleme', detailedReport, ui.ButtonSet.OK);
     console.log(`🗑️ ${processedCount} URL işlendi, ${duplicateGroups} grupta tekrar bulundu, ${deletedCount} satır silindi`);
     
-    return { success: true, processedCount, duplicateGroups, deletedCount };
+    return { success: true, processedCount, skippedCount, duplicateGroups, deletedCount, deletionReport };
     
   } catch (error) {
     console.error('Function failed:', error);
