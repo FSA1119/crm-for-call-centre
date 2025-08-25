@@ -7862,14 +7862,29 @@ function normalizeUrl(url) {
     console.log(`🔧 URL boş, null döndürülüyor`);
     return null;
   }
+  
   let normalized = url.toLowerCase().trim();
   console.log(`🔧 Küçük harf ve trim: "${normalized}"`);
+  
+  // http/https kaldır
   normalized = normalized.replace(/^https?:\/\//, '');
   console.log(`🔧 http/https kaldırıldı: "${normalized}"`);
+  
+  // www kaldır
   normalized = normalized.replace(/^www\./, '');
   console.log(`🔧 www kaldırıldı: "${normalized}"`);
+  
+  // Sondaki / kaldır
   normalized = normalized.replace(/\/$/, '');
   console.log(`🔧 Sondaki / kaldırıldı: "${normalized}"`);
+  
+  // Sondaki .com, .com.tr, .net gibi uzantıları koru
+  // Ama path'leri kaldır (örn: /urunler, /hakkimizda)
+  if (normalized.includes('/')) {
+    normalized = normalized.split('/')[0];
+    console.log(`🔧 Path kaldırıldı, sadece domain: "${normalized}"`);
+  }
+  
   console.log(`🔧 Final sonuç: "${normalized}"`);
   return normalized;
 }
