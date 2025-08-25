@@ -6043,8 +6043,12 @@ function getCountForDateAndCategory(randevularimSheet, firsatlarimSheet, formatT
 // Yardımcı fonksiyonlar
 function findColumnIndex(headers, possibleNames) {
   for (const name of possibleNames) {
-    const index = headers.indexOf(name);
-    if (index !== -1) return index;
+    const index = headers.findIndex(header => 
+      header && header.toString().toLowerCase().includes(name.toLowerCase())
+    );
+    if (index !== -1) {
+      return index;
+    }
   }
   return -1;
 }
