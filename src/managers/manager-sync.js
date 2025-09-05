@@ -1911,10 +1911,10 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         }
       } catch (_) {}
 
-      // Sorting for appended aggregate sheets
+      // Sorting for aggregate sheets
       try {
         const lastRow = sheet.getLastRow();
-        if (effectiveMode === 'append' && lastRow > 2) {
+        if (lastRow > 2) {
           const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
           // For T Randevular and T Toplantılar: sort by date, but in meetings keep 'Satış Yapıldı' on top
           if (lowerBase.includes('randevu')) {
@@ -1925,8 +1925,12 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
             const values = rng.getValues();
             function getActDate(row){
               if (dateIdx>=0) {
-                const d = parseDdMmYyyy(row[dateIdx]);
-                if (d) return d;
+                const v = row[dateIdx];
+                if (v instanceof Date && !isNaN(v.getTime())) return v;
+                const d1 = parseDdMmYyyy(v);
+                if (d1) return d1;
+                const d2 = new Date(v);
+                if (!isNaN(d2.getTime())) return d2;
               }
               return new Date('2099-12-31');
             }
@@ -1940,10 +1944,11 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
             function groupRank(row){
               const s = String(statusIdx>=0 ? row[statusIdx] : '').toLowerCase();
               if (s.includes('iptal')) return 0; // Randevu İptal oldu
-              if (s.includes('erte')) return 0; // Randevu Ertelendi
-              if (s.includes('teyit')) return 1; // Randevu Teyitlendi
-              if (s.includes('randevu al')) return 1; // Randevu Alındı
-              return 2; // diğerleri
+              if (s.includes('erte')) return 1; // Randevu Ertelendi
+              if (s.includes('teyit')) return 2; // Randevu Teyitlendi
+              if (s.includes('randevu al')) return 3; // Randevu Alındı
+              if (s.includes('ileri')) return 4; // İleri Tarih Randevu
+              return 5; // diğerleri
             }
             values.sort(function(a,b){
               const ra = groupRank(a);
