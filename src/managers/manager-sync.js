@@ -93,13 +93,7 @@ const CRM_CONFIG = {
   TIMEOUT_SECONDS: 5
 };
 
-// 🗂️ Employee File ID Mapping (Temsilci Kod → Google Sheets ID)
-const EMPLOYEE_FILES = {
-  'BH 007': '1X0k3uUh7KoiywGO3ewg7ULMAWOrY86I2NCBV7zaHUus',
-  'TD 008': '1tokFq-zPejBe-Npc1f4RHlRC15tgHn57qJIIIeVdXtQ'
-};
 
-// ========================================
 // 🔧 UTILITY FUNCTIONS - FOUNDATION LAYER
 // ========================================
 
@@ -2559,7 +2553,9 @@ const EMPLOYEE_FILES = {
   'KO 003': '1uLufPJqFSfm1WxqSzcvDOKW_hAv8AMhkQwljeiD51mc',
   'SB 004': '17RWqUrQ_m9h0ktJQ_E_55dt-Ao-RA01O6pUFbZ9DxDs',
   'KM 005': '15mwfzEBth_qIDEA8WofxOR5T3P8s-rMcMaLheBoV9uI',
-  'GŞ 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8'
+  'GŞ 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8',
+  'BH 007': '1X0k3uUh7KoiywGO3ewg7ULMAWOrY86I2NCBV7zaHUus',
+  'TD 008': '1tokFq-zPejBe-Npc1f4RHlRC15tgHn57qJIIIeVdXtQ'
 };
 
 const MANAGER_FILE_ID = '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A';
