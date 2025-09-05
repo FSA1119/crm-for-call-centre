@@ -1918,6 +1918,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
           const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
           // For T Randevular and T Toplantılar: sort by date, but in meetings keep 'Satış Yapıldı' on top
           if (lowerBase.includes('randevu')) {
+            const statusIdx = findIdx(['Randevu durumu','Durum']);
             const dateIdx = findIdx(['Randevu Tarihi','Tarih']);
             const timeIdx = findIdx(['Saat']);
             const logIdx = findIdx(['Log']);
@@ -1940,7 +1941,6 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
                 const d = parseDdMmYyyy(row[dateIdx]);
                 if (d) return d;
               }
-              // Tarihsiz satırları en sona koy (2100 yerine 2099 kullan)
               return new Date('2099-12-31');
             }
             function parseTime(v){
@@ -1950,7 +1950,18 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
               if (m) return Number(m[1])*60 + Number(m[2]);
               return 0;
             }
+            function groupRank(row){
+              const s = String(statusIdx>=0 ? row[statusIdx] : '').toLowerCase();
+              if (s.includes('iptal')) return 0; // Randevu İptal oldu
+              if (s.includes('erte')) return 0; // Randevu Ertelendi
+              if (s.includes('teyit')) return 1; // Randevu Teyitlendi
+              if (s.includes('randevu al')) return 1; // Randevu Alındı
+              return 2; // diğerleri
+            }
             values.sort(function(a,b){
+              const ra = groupRank(a);
+              const rb = groupRank(b);
+              if (ra !== rb) return ra - rb;
               const da = getActDate(a);
               const db = getActDate(b);
               if (da.getTime() !== db.getTime()) return da - db;
@@ -6534,6 +6545,7 @@ function sortTRandevularByDateAscending() {
       for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; }
       return -1;
     }
+    const idxStatus = findIdx(['Randevu durumu','Durum']);
     const idxDate = findIdx(['Randevu Tarihi','Tarih']);
     const idxTime = findIdx(['Saat']);
     if (idxDate === -1) {
@@ -6549,7 +6561,18 @@ function sortTRandevularByDateAscending() {
       if (m) return Number(m[1])*60 + Number(m[2]);
       return 0;
     }
+    function groupRank(row){
+      const s = String(idxStatus>=0 ? row[idxStatus] : '').toLowerCase();
+      if (s.includes('iptal')) return 0;
+      if (s.includes('erte')) return 0;
+      if (s.includes('teyit')) return 1;
+      if (s.includes('randevu al')) return 1;
+      return 2;
+    }
     values.sort(function(a,b){
+      const ra = groupRank(a);
+      const rb = groupRank(b);
+      if (ra !== rb) return ra - rb;
       const da = parseDdMmYyyy(a[idxDate]) || new Date('2099-12-31');
       const db = parseDdMmYyyy(b[idxDate]) || new Date('2099-12-31');
       if (da.getTime() !== db.getTime()) return da - db;
@@ -6557,7 +6580,7 @@ function sortTRandevularByDateAscending() {
       return 0;
     });
     rng.setValues(values);
-    SpreadsheetApp.getUi().alert('T Randevular randevu tarihine göre sıralandı (artan).');
+    SpreadsheetApp.getUi().alert('T Randevular durum önceliği (İptal/Ertelendi üstte) ve tarih artan şekilde sıralandı.');
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata: ' + error.message);
