@@ -761,6 +761,10 @@ function createManagerMenu() {
     menu.addSubMenu(perfSubmenu)
         .addSeparator();
 
+    // Sıralama
+    menu.addItem('↕️ T Randevular: Tarihe Göre Sırala (Artan)', 'sortTRandevularByDateAscending')
+        .addSeparator();
+
     // Seçili randevuyu toplantıya taşı
     menu.addItem('📥 Seçili Randevuyu Toplantıya Taşı', 'moveSelectedRandevuToMeeting')
         .addSeparator();
@@ -6506,6 +6510,58 @@ function sortMeetingsManual() {
   } catch (error) {
     console.error('Toplantı sıralama hatası:', error);
     SpreadsheetApp.getUi().alert('Sıralama sırasında bir hata oluştu: ' + error.message);
+  }
+}
+
+function sortTRandevularByDateAscending() {
+  console.log('Function started:', {});
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('T Randevular');
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('T Randevular sayfası bulunamadı');
+      return;
+    }
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 2) {
+      SpreadsheetApp.getUi().alert('Sıralanacak veri yok');
+      return;
+    }
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    function findIdx(cands){
+      const lowered = headers.map(h => String(h||"").trim().toLowerCase());
+      for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; }
+      return -1;
+    }
+    const idxDate = findIdx(['Randevu Tarihi','Tarih']);
+    const idxTime = findIdx(['Saat']);
+    if (idxDate === -1) {
+      SpreadsheetApp.getUi().alert('Randevu Tarihi sütunu bulunamadı');
+      return;
+    }
+    const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    const values = rng.getValues();
+    function parseTime(v){
+      if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
+      const s = String(v || '').trim();
+      const m = s.match(/^(\d{1,2}):(\d{2})/);
+      if (m) return Number(m[1])*60 + Number(m[2]);
+      return 0;
+    }
+    values.sort(function(a,b){
+      const da = parseDdMmYyyy(a[idxDate]) || new Date('2099-12-31');
+      const db = parseDdMmYyyy(b[idxDate]) || new Date('2099-12-31');
+      if (da.getTime() !== db.getTime()) return da - db;
+      if (idxTime >= 0) return parseTime(a[idxTime]) - parseTime(b[idxTime]);
+      return 0;
+    });
+    rng.setValues(values);
+    SpreadsheetApp.getUi().alert('T Randevular randevu tarihine göre sıralandı (artan).');
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
   }
 }
 // ========================================
