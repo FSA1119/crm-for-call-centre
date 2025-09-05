@@ -8,8 +8,12 @@
 console.log('🔧 DEBUG: backend.js dosyası yüklendi - Test mesajı!');
 
 // ========================================
-// GLOBAL CONSTANTS
+// GLOBAL CONSTANTS & VARIABLES
 // ========================================
+
+// Global variable to store selected row data for HTML dialogs
+let SELECTED_ROW_DATA = null;
+// let SELECTED_ROW_NUMBER = null;
 
 const CRM_CONFIG = {
   // Employee codes
@@ -19,11 +23,14 @@ const CRM_CONFIG = {
     'KO 003': 'Kadir Öztürk',
     'SB 004': 'Sinem Bakalcı',
     'KM 005': 'Kübra Murat',
-    'GŞ 006': 'Gamze Şafaklıoğlu'
+    'GŞ 006': 'Gamze Şafaklıoğlu',
+    'BH 007': 'Bilge Hin',
+    'TD 008': 'Tuğçe Duman'
   },
   
   // Manager file
   MANAGER_FILE: 'FSA_019 - Yonetici Takip Dosyasi',
+  MANAGER_FILE_ID: '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A',
   
   // 🎨 Centralized Color System - Visual Harmony (SYNCED WITH RENK_KODLARI.md)
   COLOR_CODES: {
@@ -31,7 +38,7 @@ const CRM_CONFIG = {
     'Randevu Alındı': 'rgb(232, 245, 232)',      // #E8F5E8 - Light Green
     'İleri Tarih Randevu': 'rgb(245, 245, 245)', // #F5F5F5 - Light Gray
     'Randevu Teyitlendi': 'rgb(232, 245, 232)',  // #E8F5E8 - Light Green
-    'Randevu Ertelendi': 'rgb(255, 248, 225)',   // #FFF8E1 - Light Yellow (Açık Sarı)
+    'Randevu Ertelendi': 'rgb(255, 243, 224)',   // #FFF3E0 - Soft Orange
     'Randevu İptal oldu': 'rgb(255, 235, 238)',  // #FFEBEE - Light Red (Açık Kırmızı)
     
     // Opportunity Colors - Görseldeki Renkler
@@ -44,7 +51,14 @@ const CRM_CONFIG = {
     'Ulaşılamadı': 'rgb(255, 235, 238)',         // #FFEBEE - Light Red (Yeniden arama için farklı)
     
     // Meeting Colors
-    'Toplantı Tamamlandı': 'rgb(200, 230, 201)'  // Light Green
+    'Toplantı Tamamlandı': 'rgb(200, 230, 201)',  // Light Green
+    'Toplantı Teklif': 'rgb(165, 214, 167)',      // Darker Green
+    'Toplantı Beklemede': 'rgb(255, 243, 224)',   // Soft Orange
+    'Toplantı İptal': 'rgb(255, 235, 238)',       // Light Red
+    'Satış Yapıldı': 'rgb(187, 222, 251)',        // Light Blue
+    'Potansiyel Sıcak': 'rgb(255, 224, 178)',     // Light Orange
+    'Potansiyel Orta': 'rgb(225, 245, 254)',      // Light Blue
+    'Potansiyel Soğuk': 'rgb(236, 239, 241)'      // Light Gray
   },
   
   // Activity options (all)
@@ -785,7 +799,7 @@ function showAppointmentDialog(rowData) {
  * @param {Object} formData - Form data from HTML
  * @returns {Object} - Result object
  */
-function processAppointmentForm(formData) {
+function processAppointmentForm(formData, selectedRowData = null, rowNumber = null) {
   console.log('Processing appointment form data:', formData);
   
   try {
@@ -796,45 +810,54 @@ function processAppointmentForm(formData) {
     
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const activeSheet = SpreadsheetApp.getActiveSheet();
-    const activeRange = SpreadsheetApp.getActiveRange();
     
-    // Get selected row data
-    const selectedRowData = getSelectedRowData(activeSheet, activeRange.getRow());
+    // Use provided row data or get from active range
+    let rowData = selectedRowData;
+    let rowNum = rowNumber;
+    
+    if (!rowData || !rowNum) {
+      const activeRange = SpreadsheetApp.getActiveRange();
+      if (!activeRange || activeRange.getRow() === 1) {
+        throw new Error('Geçerli bir satır seçili değil. Lütfen bir satır seçin ve tekrar deneyin.');
+      }
+      rowData = getSelectedRowData(activeSheet, activeRange.getRow());
+      rowNum = activeRange.getRow();
+    }
     
     // Add source sheet information to rowData
     console.log('📋 Setting source information for sheet:', activeSheet.getName());
     
     if (isFormatTable(activeSheet)) {
-      selectedRowData.Kaynak = activeSheet.getName();
+      rowData.Kaynak = activeSheet.getName();
       console.log('📋 Source set to Format Tablo:', activeSheet.getName());
     } else if (activeSheet.getName() === 'Fırsatlarım') {
-      selectedRowData.Kaynak = 'Format Tablo'; // Default for Fırsatlarım
+      rowData.Kaynak = 'Format Tablo'; // Default for Fırsatlarım
       console.log('📋 Source set to Format Tablo (from Fırsatlarım)');
     }
     
     // Create appointment in Randevularım
-    const result = createAppointmentInRandevularim(spreadsheet, selectedRowData, formData);
+    const result = createAppointmentInRandevularim(spreadsheet, rowData, formData);
     
       // Update Format Tablo row with selected activity and form data (only for Format Tablo sheets)
   if (isFormatTable(activeSheet)) {
     console.log('📋 Updating Format Tablo row with activity:', formData.aktivite);
     const activity = formData.aktivite || 'Randevu Alındı';
-    updateFormatTableRow(activeSheet, activeRange.getRow(), activity, formData);
+    updateFormatTableRow(activeSheet, rowNum, activity, formData);
     
     // Apply color coding to Format Tablo row
     console.log('🎨 Applying color coding to Format Tablo row for activity:', activity);
-    applyFormatTableColorCoding(activeSheet, activeRange.getRow(), activity);
+    applyFormatTableColorCoding(activeSheet, rowNum, activity);
   }
     
     // Apply appointment color coding to Fırsatlarım row (if from Fırsatlarım)
     if (activeSheet.getName() === 'Fırsatlarım') {
       console.log('📋 Applying appointment color coding to Fırsatlarım row');
-      applyFirsatlarimAppointmentColorCoding(activeSheet, activeRange.getRow());
+      applyFirsatlarimAppointmentColorCoding(activeSheet, rowNum);
     }
     
     console.log('Processing complete:', result);
     logActivity('takeAppointment', { 
-      rowId: selectedRowData.Kod,
+      rowId: rowData.Kod,
       appointmentData: formData 
     });
     
@@ -850,6 +873,53 @@ function processAppointmentForm(formData) {
     return {
       success: false,
       message: error.message
+    };
+  }
+}
+
+/**
+ * Saves appointment data from HTML dialog
+ * @param {Object} formData - Form data from HTML
+ * @returns {Object} - Result object
+ */
+function saveAppointmentData(formData) {
+  console.log('Saving appointment data from HTML dialog:', formData);
+  
+  try {
+    // Convert HTML form data to backend format
+    const appointmentData = {
+      isimSoyisim: formData.isimSoyisim,
+      randevuTarihi: formData.randevuTarihi,
+      saat: formData.saat,
+      yorum: formData.yorum,
+      aktivite: formData.aktivite || 'Randevu Alındı',
+      toplantiFormat: formData.toplantiFormat || 'Yüz Yüze'
+    };
+    
+    // Get current active range to determine row number
+    const activeRange = SpreadsheetApp.getActiveRange();
+    const activeSheet = SpreadsheetApp.getActiveSheet();
+    const rowNumber = activeRange ? activeRange.getRow() : null;
+    
+    console.log('🔍 Active range from saveAppointmentData:', activeRange ? activeRange.getA1Notation() : 'No active range');
+    console.log('🔍 Row number from saveAppointmentData:', rowNumber);
+    
+    if (!rowNumber || rowNumber === 1) {
+      throw new Error('Geçerli bir satır seçili değil. Lütfen bir satır seçin ve tekrar deneyin.');
+    }
+    
+    // Get selected row data
+    const selectedRowData = getSelectedRowData(activeSheet, rowNumber);
+    console.log('🔍 Selected row data from saveAppointmentData:', selectedRowData);
+    
+    // Call processAppointmentForm with converted data and row info
+    return processAppointmentForm(appointmentData, selectedRowData, rowNumber);
+    
+  } catch (error) {
+    console.error('Save appointment data failed:', error);
+    return {
+      success: false,
+      error: error.message
     };
   }
 }
@@ -1409,7 +1479,7 @@ function setRandevularimDataValidation(sheet) {
     const randevuDurumuOptions = ['Randevu Alındı', 'İleri Tarih Randevu', 'Randevu Teyitlendi', 'Randevu Ertelendi', 'Randevu İptal oldu'];
     const randevuRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(randevuDurumuOptions, true)
-      .setAllowInvalid(true) // Geçersiz değerlere izin ver
+      .setAllowInvalid(false) // Geçersiz değerlere izin verme
       .build();
     
     sheet.getRange(2, randevuDurumuIndex, validationRows, 1).setDataValidation(randevuRule);
@@ -1446,7 +1516,7 @@ function setRandevularimDataValidation(sheet) {
   if (toplantiFormatIndex > 0) {
     const toplantiRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
-      .setAllowInvalid(true) // Geçersiz değerlere izin ver
+      .setAllowInvalid(false) // Geçersiz değerlere izin verme
       .build();
     
     sheet.getRange(2, toplantiFormatIndex, validationRows, 1).setDataValidation(toplantiRule);
@@ -1461,7 +1531,7 @@ function setRandevularimDataValidation(sheet) {
   if (toplantiTarihiIndex > 0) {
     const toplantiTarihRule = SpreadsheetApp.newDataValidation()
       .requireDate()
-      .setAllowInvalid(true) // Geçersiz değerlere izin ver
+      .setAllowInvalid(false) // Geçersiz değerlere izin verme
       .build();
     
     sheet.getRange(2, toplantiTarihiIndex, validationRows, 1).setDataValidation(toplantiTarihRule);
@@ -2304,12 +2374,12 @@ function showAddOpportunityDialog() {
  * @param {Object} parameters - Function parameters
  * @returns {Object} - Result object
  */
-function moveToMeeting(parameters) {
+function moveToMeeting(parameters = {}) {
   console.log('Function started: moveToMeeting', parameters);
   
   try {
-    // Input validation
-    if (!validateInput(parameters)) {
+    // Input validation - allow empty parameters for menu calls
+    if (parameters && !validateInput(parameters)) {
       throw new Error('Invalid input provided');
     }
     
@@ -2329,6 +2399,13 @@ function moveToMeeting(parameters) {
     
     // Get selected row data
     const selectedRowData = getSelectedRowData(activeSheet, activeRange.getRow());
+    const selectedRowNumber = activeRange.getRow();
+    
+    // Store row data and number globally before showing dialog
+    SELECTED_ROW_DATA = selectedRowData;
+    SELECTED_ROW_NUMBER = selectedRowNumber;
+    console.log('🔍 Stored SELECTED_ROW_DATA in moveToMeeting:', SELECTED_ROW_DATA);
+    console.log('🔍 Stored SELECTED_ROW_NUMBER in moveToMeeting:', SELECTED_ROW_NUMBER);
     
     // Check if appointment exists and has valid status
     if (!selectedRowData['Randevu durumu'] || 
@@ -2400,6 +2477,10 @@ function showMeetingDialog(rowData) {
   console.log('Row data saat:', rowData['Saat']);
   console.log('Row data randevu tarihi:', rowData['Randevu Tarihi']);
   
+  // SELECTED_ROW_DATA and SELECTED_ROW_NUMBER are already set in moveToMeeting function
+  console.log('🔍 Using SELECTED_ROW_DATA:', SELECTED_ROW_DATA);
+  console.log('🔍 Using SELECTED_ROW_NUMBER:', SELECTED_ROW_NUMBER);
+  
   // Convert Randevu Tarihi to YYYY-MM-DD format for HTML date input
   let randevuTarihi = rowData['Randevu Tarihi'];
   if (randevuTarihi && typeof randevuTarihi === 'string' && randevuTarihi.includes('.')) {
@@ -2434,6 +2515,8 @@ function showMeetingDialog(rowData) {
     'Randevu Tarihi': randevuTarihi
   };
   htmlTemplate.meetingFormats = CRM_CONFIG.MEETING_FORMAT_OPTIONS;
+  htmlTemplate.rowNumber = SELECTED_ROW_NUMBER;
+  htmlTemplate.sourceSheetName = SpreadsheetApp.getActiveSheet().getName();
   
   const htmlOutput = htmlTemplate.evaluate()
     .setWidth(700)
@@ -2465,49 +2548,27 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
     toplantilarimSheet = createToplantilarimSheet(spreadsheet);
   }
   
-  // Define Toplantılarım columns based on sayfa_kolonlari.md
+  // Define Toplantılarım columns based on sayfa_kolonlari.md - TAM uyumlu
   const toplantilarimColumns = [
-    'Kod',
-    'Kaynak',
-    'Keyword',
-    'Location',
-    'Company name',
-    'Category',
-    'Website',
-    'Phone',
-    'Yetkili Tel',
-    'Mail',
-    'İsim Soyisim',
-    'Randevu durumu',
-    'Randevu Tarihi',
-    'Saat',
-    'Yorum',
-    'Yönetici Not',
-    'CMS Adı',
-    'CMS Grubu',
-    'E-Ticaret İzi',
-    'Site Hızı',
-    'Site Trafiği',
-    'Log',
-    'Toplantı formatı',
-    'Address',
-    'City',
-    'Rating count',
-    'Review',
-    'Toplantı Sonucu',
-    'Teklif Detayı',
-    'Satış Potansiyeli',
-    'Toplantı Tarihi',
-    'Yeni Takip Tarihi',
-    'Maplink'
+    'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
+    'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
+    'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
+    'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+    'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+    'Rating count', 'Review'
   ];
   
   // Prepare meeting row data
   const meetingRow = prepareMeetingRow(rowData, meetingData, toplantilarimColumns, toplantilarimSheet);
+  console.log('🔍 Prepared meeting row:', meetingRow);
+  console.log('🔍 Meeting row length:', meetingRow.length);
+  console.log('🔍 Columns length:', toplantilarimColumns.length);
   
   // Add to Toplantılarım
   const nextRow = toplantilarimSheet.getLastRow() + 1;
+  console.log('🔍 Adding to row:', nextRow);
   toplantilarimSheet.getRange(nextRow, 1, 1, toplantilarimColumns.length).setValues([meetingRow]);
+  console.log('🔍 Data written to sheet');
 
   // Kaynak kolonunu metin formatında zorla (dataset adı bozulmasın)
   const kaynakIdx = toplantilarimColumns.indexOf('Kaynak') + 1;
@@ -2522,7 +2583,11 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
     console.log('Kod column forced to text format for new meeting');
   }
   
+  // Wait a moment for data to be written
+  Utilities.sleep(100);
+  
   // Apply color coding
+  console.log('🎨 Applying color coding to new meeting row:', nextRow);
   applyMeetingColorCoding(toplantilarimSheet, nextRow);
   
   // Activate Toplantılarım sheet to show the new meeting
@@ -2548,14 +2613,14 @@ function createToplantilarimSheet(spreadsheet) {
   
   const sheet = spreadsheet.insertSheet('Toplantılarım');
   
-  // Define columns
+  // Define columns - sayfa_kolonlari.md ile TAM uyumlu sıralama
   const columns = [
-    'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-    'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-    'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi', 'Site Hızı',
-    'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City', 'Rating count',
-    'Review', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi',
-    'Yeni Takip Tarihi', 'Maplink'
+    'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
+    'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
+    'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
+    'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+    'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+    'Rating count', 'Review'
   ];
   
   // Set headers
@@ -2578,6 +2643,60 @@ function createToplantilarimSheet(spreadsheet) {
 }
 
 /**
+ * Mevcut Toplantılarım sayfasını sayfa_kolonlari.md ile uyumlu hale getir
+ */
+function fixToplantilarimColumnOrder() {
+  console.log('Function started: fixToplantilarimColumnOrder');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('Toplantılarım');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('Hata', 'Toplantılarım sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    // Yeni sütun sıralaması - sayfa_kolonlari.md ile TAM uyumlu
+    const newColumns = [
+      'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
+      'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
+      'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
+      'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+      'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+      'Rating count', 'Review'
+    ];
+    
+    // Mevcut başlıkları al
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    console.log('Mevcut başlıklar:', currentHeaders);
+    
+    // Yeni sütun sıralamasını uygula
+    sheet.getRange(1, 1, 1, newColumns.length).setValues([newColumns]);
+    
+    // Kod sütununu text formatına zorla
+    const kodColumnIndex = newColumns.indexOf('Kod') + 1;
+    if (kodColumnIndex > 0) {
+      sheet.getRange(1, kodColumnIndex, 1000, 1).setNumberFormat('@');
+      console.log('Kod column forced to text format');
+    }
+    
+    // Styling ve data validation'ı yeniden uygula
+    applyToplantilarimStyling(sheet);
+    setToplantilarimDataValidation(sheet);
+    
+    const message = `✅ Toplantılarım sayfası düzenlendi!\n\n📋 Yeni sütun sıralaması:\n${newColumns.join(', ')}`;
+    SpreadsheetApp.getUi().alert('✅ Başarılı', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    console.log('Toplantılarım sayfası sütun sıralaması düzenlendi');
+    
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Sütun düzenleme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
  * Prepares meeting row data
  * @param {Object} rowData - Original row data
  * @param {Object} meetingData - Meeting form data
@@ -2587,6 +2706,8 @@ function createToplantilarimSheet(spreadsheet) {
  */
 function prepareMeetingRow(rowData, meetingData, columns, sheet) {
   console.log('Preparing meeting row data');
+  console.log('🔍 rowData.Kod:', rowData.Kod);
+  console.log('🔍 meetingData:', meetingData);
   
   const row = new Array(columns.length).fill('');
   
@@ -2595,6 +2716,9 @@ function prepareMeetingRow(rowData, meetingData, columns, sheet) {
       case 'Kod':
         // Use original format
         row[index] = String(rowData.Kod || '');
+        console.log('🔍 rowData.Kod:', rowData.Kod);
+        console.log('🔍 Kod set to:', row[index]);
+        console.log('🔍 Kod index:', index);
         break;
       case 'Kaynak':
         // Kaynak: Randevularım satırındaki orijinal dataset adı varsa onu taşı
@@ -2689,6 +2813,9 @@ function prepareMeetingRow(rowData, meetingData, columns, sheet) {
         }
         row[index] = yeniTakipTarihi;
         break;
+      case 'Toplantıyı Yapan':
+        row[index] = meetingData.toplantiyiYapan || getCurrentEmployeeCode() || '';
+        break;
     }
   });
   
@@ -2725,6 +2852,11 @@ function updateRandevularimRow(sheet, rowNumber, meetingData) {
     const newLog = `Toplantıya geçildi - ${new Date().toLocaleString('tr-TR')}`;
     sheet.getRange(rowNumber, logIndex).setValue(newLog);
   }
+  
+  // Apply color coding after updating meeting data
+  const status = sheet.getRange(rowNumber, headers.indexOf('Randevu durumu') + 1).getDisplayValue();
+  updateRandevularimRowColor(sheet, rowNumber, status);
+  console.log('🎨 Randevularım renklendirme uygulandı');
 }
 
 /**
@@ -2972,14 +3104,230 @@ function applyMeetingColorCoding(sheet, rowNumber) {
       return;
     }
     
-    const color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+    // Get headers
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    console.log('🎨 Headers found:', headers);
+    let color = 'rgb(255, 255, 255)'; // Default white
+    
+    // Check Toplantı Sonucu first
+    const toplantiSonucuIndex = headers.indexOf('Toplantı Sonucu');
+    if (toplantiSonucuIndex !== -1) {
+      const toplantiSonucu = String(sheet.getRange(rowNumber, toplantiSonucuIndex + 1).getDisplayValue() || '').trim();
+      const toplantiSonucuLower = toplantiSonucu.toLowerCase();
+      
+      console.log(`🎨 Toplantılarım Row ${rowNumber}: Toplantı Sonucu="${toplantiSonucu}"`);
+      
+      if (toplantiSonucu && toplantiSonucu !== '') {
+        if (toplantiSonucu === 'Satış Yapıldı') {
+          color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+          console.log(`🎨 Toplantılarım Row ${rowNumber}: Satış Yapıldı color applied`);
+        } else if (toplantiSonucu === 'Teklif iletildi' || toplantiSonucuLower.indexOf('teklif') !== -1) {
+          color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
+          console.log(`🎨 Toplantılarım Row ${rowNumber}: Teklif iletildi color applied`);
+        } else if (toplantiSonucuLower.indexOf('beklemede') !== -1) {
+          color = CRM_CONFIG.COLOR_CODES['Toplantı Beklemede'];
+          console.log(`🎨 Toplantılarım Row ${rowNumber}: Toplantı Beklemede color applied`);
+        } else if (toplantiSonucuLower.indexOf('iptal') !== -1) {
+          color = CRM_CONFIG.COLOR_CODES['Toplantı İptal'];
+          console.log(`🎨 Toplantılarım Row ${rowNumber}: Toplantı İptal color applied`);
+        } else {
+          color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+          console.log(`🎨 Toplantılarım Row ${rowNumber}: Toplantı Tamamlandı color applied`);
+        }
+      } else {
+        // Toplantı Sonucu boşsa Satış Potansiyeli'ne bak
+        const satisPotansiyeliIndex = headers.indexOf('Satış Potansiyeli');
+        if (satisPotansiyeliIndex !== -1) {
+          const satisPotansiyeli = String(sheet.getRange(rowNumber, satisPotansiyeliIndex + 1).getDisplayValue() || '').trim().toLowerCase();
+          
+          console.log(`🎨 Toplantılarım Row ${rowNumber}: Satış Potansiyeli="${satisPotansiyeli}"`);
+          
+          if (satisPotansiyeli === 'yerinde satış' || satisPotansiyeli === 'yerinde satis') {
+            color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+            console.log(`🎨 Toplantılarım Row ${rowNumber}: Yerinde Satış color applied`);
+          } else if (satisPotansiyeli === 'sıcak' || satisPotansiyeli === 'sicak') {
+            color = CRM_CONFIG.COLOR_CODES['Potansiyel Sıcak'];
+            console.log(`🎨 Toplantılarım Row ${rowNumber}: Sıcak color applied`);
+          } else if (satisPotansiyeli === 'orta') {
+            color = CRM_CONFIG.COLOR_CODES['Potansiyel Orta'];
+            console.log(`🎨 Toplantılarım Row ${rowNumber}: Orta color applied`);
+          } else if (satisPotansiyeli === 'soğuk' || satisPotansiyeli === 'soguk') {
+            color = CRM_CONFIG.COLOR_CODES['Potansiyel Soğuk'];
+            console.log(`🎨 Toplantılarım Row ${rowNumber}: Soğuk color applied`);
+          } else {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+            console.log(`🎨 Toplantılarım Row ${rowNumber}: Default color applied`);
+          }
+        } else {
+          color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+          console.log(`🎨 Toplantılarım Row ${rowNumber}: Default color applied (no Satış Potansiyeli)`);
+        }
+      }
+    }
+    
     const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+    console.log('🎨 Range to color:', range.getA1Notation());
+    console.log('🎨 Color to apply:', color);
     range.setBackground(color);
     
     console.log(`✅ Applied meeting color ${color} to row ${rowNumber}`);
+    console.log('🎨 Final range background:', range.getBackground());
     
   } catch (error) {
     console.error('❌ Error applying meeting color coding:', error);
+  }
+}
+
+/**
+ * Fix data validation for existing sheets
+ */
+function fixDataValidationForExistingSheets() {
+  console.log('🔧 Fixing data validation for existing sheets...');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let fixedSheets = [];
+    
+    // Fix Randevularım sheet
+    const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
+    if (randevularimSheet) {
+      console.log('🔧 Fixing Randevularım data validation...');
+      
+      // Clear existing validation first
+      const range = randevularimSheet.getRange(2, 1, 1000, randevularimSheet.getLastColumn());
+      range.clearDataValidations();
+      console.log('🧹 Cleared existing validations');
+      
+      // Apply new validation
+      setRandevularimDataValidation(randevularimSheet);
+      console.log('✅ Randevularım data validation fixed');
+      fixedSheets.push('Randevularım');
+    } else {
+      console.log('⚠️ Randevularım sheet not found');
+    }
+    
+    // Fix Toplantılarım sheet
+    const toplantilarimSheet = spreadsheet.getSheetByName('Toplantılarım');
+    if (toplantilarimSheet) {
+      console.log('🔧 Fixing Toplantılarım data validation...');
+      
+      // Clear existing validation first
+      const range = toplantilarimSheet.getRange(2, 1, 1000, toplantilarimSheet.getLastColumn());
+      range.clearDataValidations();
+      console.log('🧹 Cleared existing validations');
+      
+      // Apply new validation
+      setToplantilarimDataValidation(toplantilarimSheet);
+      console.log('✅ Toplantılarım data validation fixed');
+      fixedSheets.push('Toplantılarım');
+    } else {
+      console.log('⚠️ Toplantılarım sheet not found');
+    }
+    
+    // Fix Fırsatlarım sheet
+    const firsatlarimSheet = spreadsheet.getSheetByName('Fırsatlarım');
+    if (firsatlarimSheet) {
+      console.log('🔧 Fixing Fırsatlarım data validation...');
+      
+      // Clear existing validation first
+      const range = firsatlarimSheet.getRange(2, 1, 1000, firsatlarimSheet.getLastColumn());
+      range.clearDataValidations();
+      console.log('🧹 Cleared existing validations');
+      
+      // Apply new validation
+      setFirsatlarimDataValidation(firsatlarimSheet);
+      console.log('✅ Fırsatlarım data validation fixed');
+      fixedSheets.push('Fırsatlarım');
+    } else {
+      console.log('⚠️ Fırsatlarım sheet not found');
+    }
+    
+    const message = `✅ Data validation düzeltildi!\n\n📋 Düzeltilen sayfalar:\n${fixedSheets.map(s => `• ${s}`).join('\n')}\n\n🎯 Artık dropdown ve datepicker'lar çalışacak!\n\n💡 Test etmek için:\n• Randevu durumu sütununa tıklayın\n• Randevu Tarihi sütununa tıklayın\n• Saat sütununa tıklayın`;
+    SpreadsheetApp.getUi().alert('✅ Başarılı', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+  } catch (error) {
+    console.error('❌ Data validation fix failed:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Data validation düzeltme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * Fix ONLY Randevularım data validation
+ */
+function fixRandevularimOnly() {
+  console.log('🔧 Fixing ONLY Randevularım data validation...');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
+    
+    if (!randevularimSheet) {
+      console.error('❌ Randevularım sheet not found');
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Randevularım sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    console.log('🔧 Found Randevularım sheet, applying validation...');
+    
+    // Clear existing validation first
+    const range = randevularimSheet.getRange(2, 1, 1000, randevularimSheet.getLastColumn());
+    range.clearDataValidations();
+    console.log('🧹 Cleared existing validations');
+    
+    // Apply new validation
+    setRandevularimDataValidation(randevularimSheet);
+    console.log('✅ Randevularım data validation applied');
+    
+    SpreadsheetApp.getUi().alert('✅ Başarılı', 'Randevularım sayfasında dropdown ve datepicker\'lar aktif edildi!', SpreadsheetApp.getUi().ButtonSet.OK);
+    
+  } catch (error) {
+    console.error('❌ Randevularım validation fix failed:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Randevularım validation hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * Test function for meeting creation
+ */
+function testMeetingCreation() {
+  console.log('🧪 Testing meeting creation...');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
+    
+    if (!randevularimSheet) {
+      console.error('❌ Randevularım sheet not found');
+      return;
+    }
+    
+    // Get first data row
+    const lastRow = randevularimSheet.getLastRow();
+    if (lastRow <= 1) {
+      console.error('❌ No data in Randevularım sheet');
+      return;
+    }
+    
+    const rowData = getSelectedRowData(randevularimSheet, 2); // Second row (first data row)
+    console.log('🧪 Test row data:', rowData);
+    
+    const testMeetingData = {
+      toplantiTarihi: '2025-01-15',
+      toplantiSonucu: 'Satış Yapıldı',
+      satisPotansiyeli: 'Sıcak',
+      toplantiFormat: 'Yüz Yüze',
+      yorum: 'Test toplantısı',
+      yoneticiNot: 'Test notu'
+    };
+    
+    console.log('🧪 Test meeting data:', testMeetingData);
+    
+    // Create meeting
+    const result = createMeetingInToplantilarim(spreadsheet, rowData, testMeetingData);
+    console.log('🧪 Meeting creation result:', result);
+    
+  } catch (error) {
+    console.error('❌ Test failed:', error);
   }
 }
 
@@ -2996,7 +3344,7 @@ function showMoveToMeetingDialog() {
  * @param {Object} formData - Form data from HTML
  * @returns {Object} - Result object
  */
-function processMeetingForm(formData) {
+function processMeetingForm(formData, selectedRowData = null, rowNumber = null) {
   console.log('Processing meeting form data:', formData);
   
   try {
@@ -3006,26 +3354,64 @@ function processMeetingForm(formData) {
     }
     
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const activeSheet = SpreadsheetApp.getActiveSheet();
-    const activeRange = SpreadsheetApp.getActiveRange();
     
-    // Get selected row data
-    const selectedRowData = getSelectedRowData(activeSheet, activeRange.getRow());
+      // Use provided row data or fall back to stored data
+  let rowData = selectedRowData;
+  let rowNum = rowNumber;
+  
+  if (!rowData || !rowNum) {
+    console.log('🔍 Using stored data as fallback');
+    rowData = SELECTED_ROW_DATA;
+    rowNum = SELECTED_ROW_NUMBER;
+  }
+  
+  // As a final fallback, if formData contains explicit context, use it
+  if ((!rowData || !rowNum) && formData && (formData.rowNumber || formData.sourceSheet)) {
+    try {
+      const explicitRow = Number(formData.rowNumber || 0);
+      const explicitSheetName = String(formData.sourceSheet || '');
+      if (explicitRow && explicitRow !== 1 && explicitSheetName) {
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(explicitSheetName) || SpreadsheetApp.getActiveSheet();
+        if (sheet) {
+          console.log('🔎 Reconstructing row from formData context:', explicitRow, explicitSheetName);
+          rowData = getSelectedRowData(sheet, explicitRow);
+          rowNum = explicitRow;
+        }
+      }
+    } catch (e) {
+      console.log('⚠️ Fallback reconstruct error:', e && e.message);
+    }
+  }
+  
+  console.log('🔍 Using row data:', rowData);
+  console.log('🔍 Using row number:', rowNum);
+    
+    if (!rowData) {
+      throw new Error('Seçili satır verisi bulunamadı. Lütfen tekrar deneyin.');
+    }
+    
+    if (!rowNum) {
+      throw new Error('Seçili satır numarası bulunamadı. Lütfen tekrar deneyin.');
+    }
     
     // Create meeting in Toplantılarım
-    const result = createMeetingInToplantilarim(spreadsheet, selectedRowData, formData);
+    const result = createMeetingInToplantilarim(spreadsheet, rowData, formData);
     
     // Update Randevularım row if it exists
     const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
     if (randevularimSheet) {
-      updateRandevularimRow(randevularimSheet, selectedRowData.Kod, formData);
+      updateRandevularimRow(randevularimSheet, rowNum, formData);
     }
     
     console.log('Processing complete:', result);
     logActivity('moveToMeeting', { 
-      rowId: selectedRowData.Kod,
+      rowId: rowData.Kod,
       meetingData: formData 
     });
+    
+    // Clear stored data
+    SELECTED_ROW_DATA = null;
+    SELECTED_ROW_NUMBER = null;
     
     // Return success to close dialog
     return {
@@ -3039,6 +3425,103 @@ function processMeetingForm(formData) {
     return {
       success: false,
       message: error.message
+    };
+  }
+}
+
+/**
+ * Saves meeting data from HTML dialog
+ * @param {Object} formData - Form data from HTML
+ * @returns {Object} - Result object
+ */
+function saveMeetingData(formData) {
+  console.log('Saving meeting data from HTML dialog:', formData);
+  
+  try {
+    // Convert HTML form data to backend format
+    const meetingData = {
+      toplantiTarihi: formData.meetingDate,
+      toplantiSaati: formData.meetingTime,
+      toplantiFormat: formData.meetingFormat,
+      yorum: formData.meetingNotes,
+      toplantiSonucu: formData.meetingResult
+    };
+    
+    // Get current active range to determine row number
+    const activeRange = SpreadsheetApp.getActiveRange();
+    const activeSheet = SpreadsheetApp.getActiveSheet();
+    const rowNumber = activeRange ? activeRange.getRow() : null;
+    
+    console.log('🔍 Active range from saveMeetingData:', activeRange ? activeRange.getA1Notation() : 'No active range');
+    console.log('🔍 Row number from saveMeetingData:', rowNumber);
+    
+    if (!rowNumber || rowNumber === 1) {
+      throw new Error('Geçerli bir satır seçili değil. Lütfen bir satır seçin ve tekrar deneyin.');
+    }
+    
+    // Get selected row data
+    const selectedRowData = getSelectedRowData(activeSheet, rowNumber);
+    console.log('🔍 Selected row data from saveMeetingData:', selectedRowData);
+    
+    // Call processMeetingForm with converted data and row info
+    return processMeetingForm(meetingData, selectedRowData, rowNumber);
+    
+  } catch (error) {
+    console.error('Save meeting data failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Saves meeting data from HTML dialog using explicit row context
+ * @param {Object} formData - Form data from HTML
+ * @param {number} rowNumber - Selected row number
+ * @param {string} sourceSheetName - Source sheet name
+ * @returns {Object} - Result object
+ */
+function saveMeetingDataWithRow(formData, rowNumber, sourceSheetName) {
+  console.log('Saving meeting data with explicit row context:', formData, rowNumber, sourceSheetName);
+  
+  try {
+    // Convert HTML form data to backend format
+    const meetingData = {
+      toplantiTarihi: formData.meetingDate,
+      toplantiSaati: formData.meetingTime,
+      toplantiFormat: formData.meetingFormat,
+      yorum: formData.meetingNotes,
+      toplantiSonucu: formData.meetingResult
+    };
+    
+    // Fallbacks from formData if parameters are not provided
+    if (!rowNumber) rowNumber = formData.rowNumber;
+    if (!sourceSheetName) sourceSheetName = formData.sourceSheet;
+    console.log('🔎 Resolved rowNumber:', rowNumber, 'sourceSheetName:', sourceSheetName);
+    
+    // Validate inputs
+    if (!rowNumber || rowNumber === 1) {
+      throw new Error('Geçerli bir satır seçili değil. Lütfen bir satır seçin ve tekrar deneyin.');
+    }
+    
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = sourceSheetName ? spreadsheet.getSheetByName(sourceSheetName) : SpreadsheetApp.getActiveSheet();
+    if (!sheet) {
+      throw new Error('Kaynak sayfa bulunamadı: ' + sourceSheetName);
+    }
+    console.log('📄 Using sheet:', sheet.getName());
+    
+    const selectedRowData = getSelectedRowData(sheet, rowNumber);
+    console.log('🔍 Selected row data (explicit):', selectedRowData);
+    
+    return processMeetingForm(meetingData, selectedRowData, rowNumber);
+    
+  } catch (error) {
+    console.error('Save meeting data with row failed:', error);
+    return {
+      success: false,
+      error: error.message
     };
   }
 }
@@ -4117,15 +4600,56 @@ function onEdit(e) {
     if (sheetName === 'Randevularım') {
       console.log('Randevularım sheet detected, calling handleRandevularimStatusChange');
       handleRandevularimStatusChange(e, sheet);
+      
       // Force recolor on the edited row to reflect status immediately
       try {
         const headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getDisplayValues()[0];
         const durumIdx = headers.map(h=>String(h||'').toLowerCase()).indexOf('randevu durumu');
-        if (durumIdx !== -1) {
+        const toplantiSonucuIdx = headers.indexOf('Toplantı Sonucu');
+        
+        // Randevu Durumu değiştiyse
+        if (durumIdx !== -1 && col === durumIdx + 1) {
           const status = sheet.getRange(e.range.getRow(), durumIdx + 1).getDisplayValue();
           updateRandevularimRowColor(sheet, e.range.getRow(), status);
+          console.log('🎨 Randevu Durumu değişti, renklendirme uygulandı');
         }
-      } catch (_) {}
+        
+        // Toplantı Sonucu değiştiyse
+        if (toplantiSonucuIdx !== -1 && col === toplantiSonucuIdx + 1) {
+          const status = sheet.getRange(e.range.getRow(), durumIdx + 1).getDisplayValue();
+          updateRandevularimRowColor(sheet, e.range.getRow(), status);
+          console.log('🎨 Toplantı Sonucu değişti, renklendirme uygulandı');
+        }
+      } catch (error) {
+        console.log('🎨 Randevularım renklendirme hatası:', error && error.message);
+      }
+      return;
+    }
+    
+    // Process Toplantılarım sheet for status changes
+    if (sheetName === 'Toplantılarım') {
+      console.log('Toplantılarım sheet detected, checking for status changes');
+      
+      // Force recolor on the edited row to reflect status immediately
+      try {
+        const headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getDisplayValues()[0];
+        const toplantiSonucuIdx = headers.indexOf('Toplantı Sonucu');
+        const satisPotansiyeliIdx = headers.indexOf('Satış Potansiyeli');
+        
+        // Toplantı Sonucu değiştiyse
+        if (toplantiSonucuIdx !== -1 && col === toplantiSonucuIdx + 1) {
+          applyMeetingColorCoding(sheet, e.range.getRow());
+          console.log('🎨 Toplantı Sonucu değişti, renklendirme uygulandı');
+        }
+        
+        // Satış Potansiyeli değiştiyse
+        if (satisPotansiyeliIdx !== -1 && col === satisPotansiyeliIdx + 1) {
+          applyMeetingColorCoding(sheet, e.range.getRow());
+          console.log('🎨 Satış Potansiyeli değişti, renklendirme uygulandı');
+        }
+      } catch (error) {
+        console.log('🎨 Toplantılarım renklendirme hatası:', error && error.message);
+      }
       return;
     }
     
@@ -4371,6 +4895,63 @@ function applyManualColorCoding() {
 }
 
 /**
+ * 🎨 Tüm Sayfalarda Renklendirme - Manager dosyası için
+ */
+function applyColorCodingToAllManagerSheets() {
+  console.log('🎨 Tüm sayfalarda renklendirme başlatılıyor...');
+  
+  try {
+    // Manager dosyası kontrolü
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const spreadsheetId = spreadsheet.getId();
+    
+    if (spreadsheetId !== CRM_CONFIG.MANAGER_FILE_ID) {
+      SpreadsheetApp.getUi().alert('Bu fonksiyon sadece Manager dosyasında çalışır');
+      return;
+    }
+    
+    // Tüm sayfalarda renklendirme
+    const sheets = spreadsheet.getSheets();
+    let processedCount = 0;
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      
+      // Sadece T sayfalarında renklendirme yap
+      if (sheetName.startsWith('T ') && sheet.getLastRow() > 1) {
+        try {
+          console.log(`🎨 Renklendiriliyor: ${sheetName}`);
+          
+          // Manager sync fonksiyonunu çağır
+          if (typeof applyColorCodingToManagerData === 'function') {
+            const lastRow = sheet.getLastRow();
+            applyColorCodingToManagerData(sheet, sheetName, 2, lastRow - 1);
+            processedCount++;
+            console.log(`✅ ${sheetName} renklendirildi`);
+          } else {
+            console.log(`⚠️ applyColorCodingToManagerData fonksiyonu bulunamadı`);
+          }
+        } catch (error) {
+          console.error(`❌ ${sheetName} renklendirilemedi:`, error.message);
+        }
+      }
+    }
+    
+    SpreadsheetApp.getUi().alert(
+      'Renklendirme Tamamlandı', 
+      `${processedCount} sayfa başarıyla renklendirildi.`, 
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    console.log(`✅ Tüm sayfalarda renklendirme tamamlandı: ${processedCount} sayfa`);
+    
+  } catch (error) {
+    console.error('❌ Tüm sayfalarda renklendirme hatası:', error);
+    SpreadsheetApp.getUi().alert('Hata', 'Renklendirme sırasında hata oluştu: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
  * 🧪 Test Fırsat İletildi Color Coding
  */
 function testFirsatIletildi() {
@@ -4543,8 +5124,15 @@ function createAdminMenu() {
     menu.addSeparator();
     menu.addItem('🧪 Test onEdit Trigger', 'testOnEditTrigger');
     menu.addItem('🎨 Manuel Renk Uygula', 'applyManualColorCoding');
+    menu.addItem('🎨 Tüm Sayfalarda Renklendirme', 'applyColorCodingToAllManagerSheets');
     menu.addItem('🧪 Test Fırsat İletildi', 'testFirsatIletildi');
     menu.addItem('🧪 Test Monthly Report', 'testMonthlyReport');
+    menu.addSeparator();
+    menu.addItem('🔧 Toplantılarım Sütun Sıralamasını Düzenle', 'fixToplantilarimColumnOrder');
+    menu.addItem('🎨 Randevularım Renklerini Yenile', 'refreshRandevularimColors');
+    menu.addItem('🎨 Toplantılarım Renklerini Yenile', 'refreshToplantilarimColors');
+    menu.addItem('🧪 Test Toplantı Oluşturma', 'testMeetingCreation');
+    menu.addItem('🔧 Data Validation Düzelt (Dropdown/Datepicker)', 'fixDataValidationForExistingSheets');
 
     // CMS Analizi fonksiyonları doğrudan Admin menüsüne ekleniyor
     menu.addSeparator();
@@ -4736,7 +5324,7 @@ function generateDatasetReport(parameters) {
     let report = ss.getSheetByName(reportName) || ss.insertSheet(reportName);
     const startRow = report.getLastRow() + 2;
 
-    // Format Tablo’dan sadece ulaşılamadı / ilgilenmiyor sayımları (stabil değilse bile anlık)
+    // Format Tablo'dan sadece ulaşılamadı / ilgilenmiyor sayımları (stabil değilse bile anlık)
     const ftSheet = ss.getSheetByName(dataset);
     let ftCounts = { 'Ulaşılamadı': 0, 'İlgilenmiyor': 0 };
     let totalContacts = 0;
@@ -4988,15 +5576,155 @@ function updateRandevularimRowColor(randevularimSheet, rowNumber, status) {
       }
     }
     
+    // Toplantı Sonucu override'ları - Yönetici dosyasındaki mantık
+    try {
+      const headers = randevularimSheet.getRange(1, 1, 1, randevularimSheet.getLastColumn()).getDisplayValues()[0];
+      const toplantiSonucuIndex = headers.indexOf('Toplantı Sonucu');
+      
+      if (toplantiSonucuIndex !== -1) {
+        const toplantiSonucu = String(randevularimSheet.getRange(rowNumber, toplantiSonucuIndex + 1).getDisplayValue() || '').trim();
+        const toplantiSonucuLower = toplantiSonucu.toLowerCase();
+        
+        console.log(`🎨 Randevularım Row ${rowNumber}: Toplantı Sonucu="${toplantiSonucu}", toplantiSonucuLower="${toplantiSonucuLower}"`);
+        
+        // Only override if Toplantı Sonucu has a meaningful value
+        if (toplantiSonucu && 
+            toplantiSonucu !== '' && 
+            toplantiSonucu !== 'undefined' && 
+            toplantiSonucu !== 'null' &&
+            toplantiSonucu.length > 0 &&
+            !toplantiSonucu.match(/^\s*$/)) {
+          if (toplantiSonucu === 'Satış Yapıldı') {
+            color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+            console.log(`🎨 Randevularım Row ${rowNumber}: Override to Satış Yapıldı: ${color}`);
+          } else if (toplantiSonucuLower.indexOf('teklif') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
+            console.log(`🎨 Randevularım Row ${rowNumber}: Override to Toplantı Teklif: ${color}`);
+          } else if (toplantiSonucuLower.indexOf('beklemede') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı Beklemede'];
+            console.log(`🎨 Randevularım Row ${rowNumber}: Override to Toplantı Beklemede: ${color}`);
+          } else if (toplantiSonucuLower.indexOf('iptal') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı İptal'];
+            console.log(`🎨 Randevularım Row ${rowNumber}: Override to Toplantı İptal: ${color}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`🎨 Randevularım Row ${rowNumber}: Toplantı Sonucu okuma hatası:`, e && e.message);
+    }
+    
     const range = randevularimSheet.getRange(rowNumber, 1, 1, randevularimSheet.getLastColumn());
     range.setBackground(color);
     
     console.log(`✅ Randevularım color updated: ${color} for status: ${status}`);
     console.log(`🔍 Debug - Range applied: ${range.getA1Notation()}`);
     console.log(`🔍 Debug - Color applied: ${color}`);
+    console.log(`🔍 Debug - Final color: ${color}`);
+    console.log(`🔍 Debug - Status was: ${status}`);
     
   } catch (error) {
     console.error('❌ Error updating Randevularım row color:', error);
+  }
+}
+
+/**
+ * 🎨 Randevularım sayfasındaki tüm satırları yeniden renklendir
+ */
+function refreshRandevularimColors() {
+  console.log('🎨 Function started: refreshRandevularimColors');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('Randevularım');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('Hata', 'Randevularım sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      SpreadsheetApp.getUi().alert('Bilgi', 'Randevularım sayfasında veri bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    console.log(`🎨 Randevularım sayfasında ${lastRow} satır bulundu`);
+    
+    // Her satırı yeniden renklendir
+    for (let row = 2; row <= lastRow; row++) {
+      try {
+        // Randevu Durumu sütununu bul
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+        const randevuDurumuIndex = headers.indexOf('Randevu Durumu');
+        
+        if (randevuDurumuIndex === -1) {
+          console.log('⚠️ Randevu Durumu sütunu bulunamadı');
+          continue;
+        }
+        
+        // Status değerini al
+        const status = sheet.getRange(row, randevuDurumuIndex + 1).getDisplayValue();
+        console.log(`🎨 Satır ${row}: Status="${status}"`);
+        
+        // Renk kodlamasını uygula
+        updateRandevularimRowColor(sheet, row, status);
+        
+      } catch (error) {
+        console.error(`❌ Satır ${row} renklendirme hatası:`, error);
+      }
+    }
+    
+    const message = `✅ Randevularım renklendirme tamamlandı!\n\n📊 İşlenen satır: ${lastRow - 1}\n🎨 Yeni renk sistemi uygulandı`;
+    SpreadsheetApp.getUi().alert('✅ Başarılı', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    console.log('🎨 Randevularım renklendirme tamamlandı');
+    
+  } catch (error) {
+    console.error('❌ Function failed:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Renklendirme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 🎨 Toplantılarım sayfasındaki tüm satırları yeniden renklendir
+ */
+function refreshToplantilarimColors() {
+  console.log('🎨 Function started: refreshToplantilarimColors');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('Toplantılarım');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('Hata', 'Toplantılarım sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      SpreadsheetApp.getUi().alert('Bilgi', 'Toplantılarım sayfasında veri bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    console.log(`🎨 Toplantılarım sayfasında ${lastRow} satır bulundu`);
+    
+    // Her satırı yeniden renklendir
+    for (let row = 2; row <= lastRow; row++) {
+      try {
+        applyMeetingColorCoding(sheet, row);
+      } catch (error) {
+        console.error(`❌ Satır ${row} renklendirme hatası:`, error);
+      }
+    }
+    
+    const message = `✅ Toplantılarım renklendirme tamamlandı!\n\n📊 İşlenen satır: ${lastRow - 1}\n🎨 Toplantı Sonucu ve Satış Potansiyeli renklendirmesi uygulandı`;
+    SpreadsheetApp.getUi().alert('✅ Başarılı', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    console.log('🎨 Toplantılarım renklendirme tamamlandı');
+    
+  } catch (error) {
+    console.error('❌ Function failed:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Renklendirme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
@@ -5011,7 +5739,9 @@ const EMPLOYEE_FILES = {
   'KO 003': '1uLufPJqFSfm1WxqSzcvDOKW_hAv8AMhkQwljeiD51mc',
   'SB 004': '17RWqUrQ_m9h0ktJQ_E_55dt-Ao-RA01O6pUFbZ9DxDs',
   'KM 005': '11veeCnPYRPGEWMzZzpLiwUOSNvPhp8n_qHEiDi7lXlw',
-  'GŞ 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8'
+  'GŞ 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8',
+  'BH 007': '1JdU8uIXOcmSQ1c70OOklcR97tqdmDTeCeikpa8DHltE',
+  'TD 008': '1Q6IIfbIlTTM8hf1Nv67KLiHGzoAJUBWIhp7rOel9ngQ'
 };
 
 const MANAGER_FILE_ID = '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A';
@@ -7706,401 +8436,3 @@ function deleteRowsWithoutWebsite(parameters) {
   }
 }
 
-// ========================================
-// 🎨 RENK YENİLEME FONKSİYONЛARI (BAKIM)
-// ========================================
-
-/**
- * 🎨 Renkleri Yenile (Bu sayfa) - Sadece aktif sayfadaki renkleri normalizer
- */
-function refreshColorsOnActiveSheet(parameters) {
-  console.log('Function started: refreshColorsOnActiveSheet', parameters);
-  
-  try {
-    if (!validateInput(parameters || {})) {
-      throw new Error('Invalid input provided');
-    }
-
-    const sheet = SpreadsheetApp.getActiveSheet();
-    const name = sheet.getName();
-    let updated = 0;
-
-    if (isFormatTable(sheet)) {
-      const data = sheet.getDataRange().getValues();
-      if (data.length > 1) {
-        const headers = data[0];
-        const aktiviteIdx = headers.indexOf('Aktivite');
-        if (aktiviteIdx !== -1) {
-          for (let i = 1; i < data.length; i++) {
-            const activity = data[i][aktiviteIdx] || '';
-            applyFormatTableColorCoding(sheet, i + 1, activity);
-            updated++;
-          }
-        }
-      }
-    } else if (name === 'Randevularım') {
-      const data = sheet.getDataRange().getValues();
-      if (data.length > 1) {
-        const headers = data[0];
-        const durumIdx = findColumnIndex(headers, ['Randevu Durumu', 'Randevu durumu']);
-        if (durumIdx !== -1) {
-          for (let i = 1; i < data.length; i++) {
-            const status = data[i][durumIdx] || '';
-            updateRandevularimRowColor(sheet, i + 1, status);
-            updated++;
-          }
-        }
-      }
-    } else if (name === 'Fırsatlarım') {
-      const data = sheet.getDataRange().getValues();
-      if (data.length > 1) {
-        for (let i = 1; i < data.length; i++) {
-          applyOpportunityColorCoding(sheet, i + 1);
-          updated++;
-        }
-      }
-    } else {
-      console.log('Bu sayfa için renk yenileme kuralı yok:', name);
-    }
-
-    SpreadsheetApp.getUi().alert(`Bu sayfada renkler yenilendi. Güncellenen satır: ${updated}`);
-    console.log('Processing complete:', { sheet: name, updated });
-    return { success: true, updated };
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
-    throw error;
-  }
-}
-
-/**
- * 🎨 Renkleri Yenile (Tüm sayfalar) - Tüm sayfalarda mevcut statülere göre arka planları normalize eder
- */
-function refreshAllColors(parameters) {
-  console.log('Function started: refreshAllColors', parameters);
-
-  try {
-    if (!validateInput(parameters || {})) {
-      throw new Error('Invalid input provided');
-    }
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheets = ss.getSheets();
-    const ui = SpreadsheetApp.getUi();
-
-    let updated = 0;
-    let processedSheets = { format: 0, randevu: 0, firsat: 0 };
-
-    for (const sheet of sheets) {
-      const name = sheet.getName();
-
-      // Format Tablo sayfaları
-      if (isFormatTable(sheet)) {
-        const data = sheet.getDataRange().getValues();
-        if (data.length > 1) {
-          const headers = data[0];
-          const aktiviteIdx = headers.indexOf('Aktivite');
-          if (aktiviteIdx !== -1) {
-            for (let i = 1; i < data.length; i++) {
-              const activity = data[i][aktiviteIdx] || '';
-              applyFormatTableColorCoding(sheet, i + 1, activity);
-              updated++;
-            }
-          }
-        }
-        processedSheets.format++;
-        continue;
-      }
-
-      // Randevularım
-      if (name === 'Randevularım') {
-        const data = sheet.getDataRange().getValues();
-        if (data.length > 1) {
-          const headers = data[0];
-          const durumIdx = findColumnIndex(headers, ['Randevu Durumu', 'Randevu durumu']);
-          if (durumIdx !== -1) {
-            for (let i = 1; i < data.length; i++) {
-              const status = data[i][durumIdx] || '';
-              updateRandevularimRowColor(sheet, i + 1, status);
-              updated++;
-            }
-          }
-        }
-        processedSheets.randevu++;
-        continue;
-      }
-
-      // Fırsatlarım
-      if (name === 'Fırsatlarım') {
-        const data = sheet.getDataRange().getValues();
-        if (data.length > 1) {
-          for (let i = 1; i < data.length; i++) {
-            applyOpportunityColorCoding(sheet, i + 1);
-            updated++;
-          }
-        }
-        processedSheets.firsat++;
-        continue;
-      }
-    }
-
-    const msg = `Renkler yenilendi.\nFormat Tablo: ${processedSheets.format} sayfa\nRandevularım: ${processedSheets.randevu}\nFırsatlarım: ${processedSheets.firsat}\nGüncellenen satır: ${updated}`;
-    ui.alert('🎨 Renkleri Yenile', msg, ui.ButtonSet.OK);
-    console.log('Processing complete:', { processedSheets, updated });
-
-    return { success: true, processedSheets, updated };
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
-    throw error;
-  }
-}
-
-/**
- * 🧹 URL Temizle - Tüm URL'leri temizler (1. AŞAMA)
- * @param {string} url - Temizlenecek URL
- * @returns {string|null} - Temizlenmiş URL veya null
- */
-function urlTemizle(url) {
-  if (!url || typeof url !== 'string') return null;
-  
-  let temiz = url.toLowerCase().trim();
-  
-  // http/https kaldır
-  temiz = temiz.replace(/^https?:\/\//, '');
-  
-  // www kaldır
-  temiz = temiz.replace(/^www\./, '');
-  
-  // Sondaki / kaldır
-  temiz = temiz.replace(/\/$/, '');
-  
-  // Path'leri kaldır (sadece domain + uzantı kalsın)
-  if (temiz.includes('/')) {
-    temiz = temiz.split('/')[0];
-  }
-  
-  // Query string'leri kaldır (?utm_source=...)
-  if (temiz.includes('?')) {
-    temiz = temiz.split('?')[0];
-  }
-  
-  return temiz;
-}
-
-/**
- * 🧹 URL Temizle Tümünü - Tüm sayfadaki URL'leri temizler (1. AŞAMA)
- * @returns {Object} - İşlem sonucu
- */
-function urlTemizleTumunu() {
-  console.log('Function started: urlTemizleTumunu');
-  try {
-    const sheet = SpreadsheetApp.getActiveSheet();
-    const ui = SpreadsheetApp.getUi();
-    const response = ui.alert(
-      '🧹 URL Temizleme',
-      'Tüm sayfadaki URL\'leri temizleyeceğim:\n\n' +
-      '• https://, http:// kaldırılacak\n' +
-      '• www. kaldırılacak\n' +
-      '• Sondaki / kaldırılacak\n' +
-      '• Path\'ler kaldırılacak\n' +
-      '• Query string\'ler kaldırılacak\n\n' +
-      'Sadece domain + uzantı kalacak (örn: divanpastaneleri.com.tr)\n\n' +
-      'Devam etmek istiyor musunuz?',
-      ui.ButtonSet.YES_NO
-    );
-    
-    if (response !== ui.Button.YES) {
-      console.log('Kullanıcı iptal etti');
-      return { success: false, message: 'İşlem iptal edildi' };
-    }
-    
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const urlColumnIndex = findColumnIndex(headers, ['Website', 'URL', 'Site', 'Web']);
-    
-    if (urlColumnIndex === -1) {
-      throw new Error('URL sütunu bulunamadı. Lütfen "Website", "URL", "Site" veya "Web" başlıklı bir sütun ekleyin.');
-    }
-    
-    console.log(`🧹 URL sütunu bulundu: ${headers[urlColumnIndex]} (Sütun ${urlColumnIndex + 1})`);
-    
-    let processedCount = 0;
-    let updatedCount = 0;
-    
-    for (let i = 1; i < data.length; i++) {
-      const url = data[i][urlColumnIndex];
-      if (url && typeof url === 'string') {
-        const temizUrl = urlTemizle(url);
-        if (temizUrl && temizUrl !== url) {
-          // URL'yi güncelle
-          sheet.getRange(i + 1, urlColumnIndex + 1).setValue(temizUrl);
-          updatedCount++;
-          console.log(`🧹 Satır ${i + 1}: "${url}" → "${temizUrl}"`);
-        }
-        processedCount++;
-      }
-    }
-    
-    const resultMessage = `🧹 URL Temizleme Tamamlandı!\n\n` +
-      `🔍 İşlenen URL: ${processedCount}\n` +
-      `✅ Güncellenen URL: ${updatedCount}\n` +
-      `📝 Değişmeyen URL: ${processedCount - updatedCount}\n\n` +
-      `🎯 Artık 2. aşama için hazır: "🗑️ URL Tekrarları Sil (2. Aşama)"`;
-    
-    ui.alert('🧹 URL Temizleme', resultMessage, ui.ButtonSet.OK);
-    console.log(`🧹 ${processedCount} URL işlendi, ${updatedCount} URL güncellendi`);
-    
-    return { success: true, processedCount, updatedCount };
-    
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
-    throw error;
-  }
-}
-
-/**
- * 🗑️ URL Tekrarları Sil - Temizlenmiş URL'lerde tekrarları siler (2. AŞAMA)
- * @returns {Object} - İşlem sonucu
- */
-function urlTekrarlariniSil() {
-  console.log('Function started: urlTekrarlariniSil');
-  try {
-    const sheet = SpreadsheetApp.getActiveSheet();
-    const ui = SpreadsheetApp.getUi();
-    const response = ui.alert(
-      '🗑️ URL Tekrarları Silme',
-      'Temizlenmiş URL\'lerde tekrarlanan satırları sileceğim. Her URL\'den sadece bir tane (orijinal) kalacak.\n\n' +
-      '⚠️ Sosyal medya ve e-ticaret platformları atlanacak!\n\n' +
-      'Devam etmek istiyor musunuz?',
-      ui.ButtonSet.YES_NO
-    );
-    if (response !== ui.Button.YES) {
-      console.log('Kullanıcı iptal etti');
-      return { success: false, message: 'İşlem iptal edildi' };
-    }
-    
-    // Atlanacak platformlar (sosyal medya ve e-ticaret)
-    const SKIP_PLATFORMS = [
-      'instagram.com', 'facebook.com', 'twitter.com', 'linkedin.com', 'youtube.com',
-      'yemeksepeti.com', 'getir.com', 'trendyol.com', 'hepsiburada.com', 'n11.com',
-      'sahibinden.com', 'gittigidiyor.com', 'amazon.com', 'ebay.com', 'etsy.com',
-      'shopier.com', 'tgoyemek.com', 'uber.com', 'taxi.com', 'booking.com'
-    ];
-    
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const urlColumnIndex = findColumnIndex(headers, ['Website', 'URL', 'Site', 'Web']);
-    
-    if (urlColumnIndex === -1) {
-      throw new Error('URL sütunu bulunamadı. Lütfen "Website", "URL", "Site" veya "Web" başlıklı bir sütun ekleyin.');
-    }
-    
-    console.log(`🔍 URL sütunu bulundu: ${headers[urlColumnIndex]} (Sütun ${urlColumnIndex + 1})`);
-    
-    // URL'leri temizle ve grupla (platformları atla)
-    const urlGroups = new Map();
-    let processedCount = 0;
-    let skippedCount = 0;
-    
-    for (let i = 1; i < data.length; i++) {
-      const url = data[i][urlColumnIndex];
-      if (url && typeof url === 'string') {
-        const temizUrl = urlTemizle(url);
-        if (temizUrl) {
-          // Platform kontrolü
-          if (SKIP_PLATFORMS.includes(temizUrl)) {
-            console.log(`⏭️ Platform atlandı: ${temizUrl} (Satır ${i + 1})`);
-            skippedCount++;
-            continue;
-          }
-          
-          if (!urlGroups.has(temizUrl)) {
-            urlGroups.set(temizUrl, []);
-          }
-          urlGroups.get(temizUrl).push(i + 1);
-          processedCount++;
-        }
-      }
-    }
-    
-    console.log(`🔍 Toplam işlenen URL: ${processedCount}`);
-    console.log(`⏭️ Atlanan platform: ${skippedCount}`);
-    console.log(`🔍 Farklı URL grubu: ${urlGroups.size}`);
-    
-    // Tekrarları bul ve detaylı rapor hazırla
-    let deletedCount = 0;
-    let duplicateGroups = 0;
-    const rowsToDelete = [];
-    const deletionReport = [];
-    
-    for (const [temizUrl, rowNumbers] of urlGroups) {
-      if (rowNumbers.length > 1) {
-        console.log(`🔍 URL: ${temizUrl} - ${rowNumbers.length} kez tekrarlanıyor (Satırlar: ${rowNumbers.join(', ')})`);
-        
-        const originalRow = rowNumbers[0];
-        const duplicateRows = rowNumbers.slice(1);
-        
-        console.log(`   Orijinal: Satır ${originalRow}`);
-        console.log(`   Silinecek: Satırlar ${duplicateRows.join(', ')}`);
-        
-        // Detaylı rapor için
-        deletionReport.push({
-          url: temizUrl,
-          originalRow: originalRow,
-          duplicateRows: duplicateRows,
-          totalDuplicates: duplicateRows.length
-        });
-        
-        duplicateRows.reverse().forEach(rowNum => {
-          rowsToDelete.push(rowNum);
-        });
-        
-        deletedCount += duplicateRows.length;
-        duplicateGroups++;
-      }
-    }
-    
-    // Tekrarlanan satırları sil
-    if (rowsToDelete.length > 0) {
-      rowsToDelete.sort((a, b) => b - a);
-      
-      for (const rowNum of rowsToDelete) {
-        sheet.deleteRow(rowNum);
-        console.log(`🗑️ Satır ${rowNum} silindi`);
-      }
-    }
-    
-    // Detaylı silme raporu
-    let detailedReport = `🗑️ URL Tekrar Temizleme Tamamlandı!\n\n`;
-    detailedReport += `🔍 İşlenen URL: ${processedCount}\n`;
-    detailedReport += `⏭️ Atlanan platform: ${skippedCount}\n`;
-    detailedReport += `🔍 Farklı URL grubu: ${urlGroups.size}\n`;
-    detailedReport += `🔍 Tekrarlanan grup: ${duplicateGroups}\n`;
-    detailedReport += `🗑️ Silinen tekrarlanan satır: ${deletedCount}\n\n`;
-    
-    if (deletionReport.length > 0) {
-      detailedReport += `📋 DETAYLI SİLME RAPORU:\n`;
-      detailedReport += `═══════════════════════════\n`;
-      
-      deletionReport.forEach((item, index) => {
-        detailedReport += `${index + 1}. ${item.url}\n`;
-        detailedReport += `   ✅ Orijinal: Satır ${item.originalRow}\n`;
-        detailedReport += `   🗑️ Silinen: Satırlar ${item.duplicateRows.join(', ')} (${item.totalDuplicates} adet)\n\n`;
-      });
-    }
-    
-    detailedReport += `✅ Her URL'den sadece bir tane (orijinal) kaldı`;
-    
-    ui.alert('🗑️ URL Tekrar Temizleme', detailedReport, ui.ButtonSet.OK);
-    console.log(`🗑️ ${processedCount} URL işlendi, ${duplicateGroups} grupta tekrar bulundu, ${deletedCount} satır silindi`);
-    
-    return { success: true, processedCount, skippedCount, duplicateGroups, deletedCount, deletionReport };
-    
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
-    throw error;
-  }
-}

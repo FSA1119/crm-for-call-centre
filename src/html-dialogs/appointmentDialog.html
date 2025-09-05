@@ -328,7 +328,7 @@
       google.script.run
         .withSuccessHandler(onSuccess)
         .withFailureHandler(onError)
-        .processAppointmentForm(formData);
+        .saveAppointmentData(formData);
     });
     
     function showError(message) {

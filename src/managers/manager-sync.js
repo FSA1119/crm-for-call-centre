@@ -18,7 +18,9 @@ const CRM_CONFIG = {
     'KO 003': 'Kadir Öztürk',
     'SB 004': 'Sinem Bakalcı',
     'KM 005': 'Kübra Murat',
-    'GŞ 006': 'Gamze Şafaklıoğlu'
+    'GŞ 006': 'Gamze Şafaklıoğlu',
+    'BH 007': 'Bilge Hin',
+    'TD 008': 'Tuğçe Duman'
   },
   
   // 📁 File Management - Data Sources
@@ -89,6 +91,12 @@ const CRM_CONFIG = {
   // ⚡ Performance Configuration
   BATCH_SIZE: 50,
   TIMEOUT_SECONDS: 5
+};
+
+// 🗂️ Employee File ID Mapping (Temsilci Kod → Google Sheets ID)
+const EMPLOYEE_FILES = {
+  'BH 007': '1X0k3uUh7KoiywGO3ewg7ULMAWOrY86I2NCBV7zaHUus',
+  'TD 008': '1tokFq-zPejBe-Npc1f4RHlRC15tgHn57qJIIIeVdXtQ'
 };
 
 // ========================================
@@ -428,9 +436,9 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
       statusColumnIndex = headers.indexOf('Fırsat Durumu');
       if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Aktivite');
     } else if (lowerName.includes('toplant')) {
-      // Try multiple candidates for meeting status
-      statusColumnIndex = headers.indexOf('Toplantı durumu');
-      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Toplantı Sonucu');
+      // Try multiple candidates for meeting status - T Toplantılar için
+      statusColumnIndex = headers.indexOf('Toplantı Sonucu');
+      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Toplantı durumu');
       if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu durumu');
       // Ayrıca Toplantı Sonucu için indeks
       var meetingResultIdx = headers.indexOf('Toplantı Sonucu');
@@ -453,7 +461,17 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
     
     // T Aktivite Özet/Tümü için status sütunu zorunlu değil
     if (statusColumnIndex === -1 && (sheetName !== 'T Aktivite Özet' && sheetName !== 'T Aktivite (Tümü)')) {
+      console.log(`⚠️ ${sheetName}: Status column not found (${statusColumnIndex}), skipping color coding`);
       return;
+    }
+    
+    // T sayfaları için özel debug
+    if (lowerName.includes('toplant')) {
+      console.log(`🎨 T Toplantılar Debug: StatusCol=${statusColumnIndex}, MeetingResultIdx=${meetingResultIdx}, Headers=${headers.join(', ')}`);
+    } else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) {
+      console.log(`🎨 T Fırsatlar Debug: StatusCol=${statusColumnIndex}, Headers=${headers.join(', ')}`);
+    } else if (lowerName.includes('randevu')) {
+      console.log(`🎨 T Randevular Debug: StatusCol=${statusColumnIndex}, RandevuMeetingResultIdx=${randevuMeetingResultIdx}, Headers=${headers.join(', ')}`);
     }
     
     console.log(`🎨 applyColorCodingToManagerData: Sheet=${sheetName}, StatusCol=${statusColumnIndex}, EmployeeCol=${employeeCodeColumnIndex}, Rows=${rowCount}`);
@@ -490,6 +508,8 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           const isSale = (rv === 'satış yapıldı' || rv === 'satis yapildi');
           const isOffer = (!isSale && rv.indexOf('teklif') !== -1);
           const isCancel = (!isSale && rv.indexOf('iptal') !== -1);
+          
+          console.log(`🎨 T Toplantılar Row ${rowNumber}: resultVal="${resultVal}", rv="${rv}", isSale=${isSale}, isOffer=${isOffer}, isCancel=${isCancel}`);
           // Potansiyel rengi oku (Satış/Teklif/İptal değilse)
           let potentialColor = '';
           try {
@@ -499,8 +519,13 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
               if (pot === 'sıcak' || pot === 'sicak') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Sıcak'];
               else if (pot === 'orta') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Orta'];
               else if (pot === 'soğuk' || pot === 'soguk') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Soğuk'];
+              console.log(`🎨 T Toplantılar Row ${rowNumber}: pot="${pot}", potentialColor="${potentialColor}"`);
+            } else {
+              console.log(`🎨 T Toplantılar Row ${rowNumber}: Satış Potansiyeli sütunu bulunamadı (potIdx=${potIdx})`);
             }
-          } catch(_) {}
+          } catch(e) {
+            console.log(`🎨 T Toplantılar Row ${rowNumber}: Potansiyel renk okuma hatası:`, e && e.message);
+          }
           if (isSale) {
             color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
           } else if (isOffer) {
@@ -513,10 +538,15 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           } else {
             color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
           }
+          
+          console.log(`🎨 T Toplantılar Row ${rowNumber}: Final color determined: ${color}`);
         } else if (lowerName.includes('randevu')) {
           // Randevular: kesin eşleşme (TR başlıklar)
           const raw = String(status || '').trim();
           const n = normStatusStr;
+          
+          console.log(`🎨 T Randevular Row ${rowNumber}: raw="${raw}", n="${n}"`);
+          
           if (raw === 'Randevu Alındı' || n.indexOf('randevu alindi') !== -1) {
             color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
           } else if (raw === 'İleri Tarih Randevu' || (n.indexOf('ileri') !== -1 && n.indexOf('tarih') !== -1)) {
@@ -528,20 +558,33 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           } else if (raw === 'Randevu İptal oldu' || n.indexOf('iptal') !== -1) {
             color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
           }
+          
+          console.log(`🎨 T Randevular Row ${rowNumber}: Initial color determined: ${color}`);
           // Toplantı Sonucu override'ları
           if (typeof randevuMeetingResultIdx === 'number' && randevuMeetingResultIdx >= 0) {
             try {
               const res = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getDisplayValue() || '').trim();
               const resLower = res.toLowerCase();
+              
+              console.log(`🎨 T Randevular Row ${rowNumber}: Toplantı Sonucu="${res}", resLower="${resLower}"`);
+              
               if (res === 'Satış Yapıldı') {
                 color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+                console.log(`🎨 T Randevular Row ${rowNumber}: Override to Satış Yapıldı: ${color}`);
               } else if (resLower.indexOf('teklif') !== -1) {
                 color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
+                console.log(`🎨 T Randevular Row ${rowNumber}: Override to Toplantı Teklif: ${color}`);
               }
-            } catch (e) {}
+            } catch (e) {
+              console.log(`🎨 T Randevular Row ${rowNumber}: Toplantı Sonucu okuma hatası:`, e && e.message);
+            }
           }
+          
+          console.log(`🎨 T Randevular Row ${rowNumber}: Final color determined: ${color}`);
         } else {
           // Fırsatlar ve diğerleri
+          console.log(`🎨 T Fırsatlar Row ${rowNumber}: status="${status}", normStatusStr="${normStatusStr}"`);
+          
           if (status === 'Fırsat İletildi' || String(status).toLowerCase().includes('teklif')) {
             color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
           } else if (status === 'Bilgi Verildi') {
@@ -555,6 +598,8 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           } else if (status === 'Toplantı Tamamlandı') {
             color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
           }
+          
+          console.log(`🎨 T Fırsatlar Row ${rowNumber}: Final color determined: ${color}`);
         }
       }
       
@@ -625,7 +670,12 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
           // Diğer sayfalarda tüm satıra durum rengi uygula
           const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
           range.setBackground(finalColor);
-          console.log(`🎨 Row ${rowNumber}: Background color set: ${finalColor}`);
+          console.log(`🎨 Row ${rowNumber}: Background color set: ${finalColor} (Sheet: ${sheetName})`);
+          
+          // T sayfaları için özel debug
+          if (lowerName.includes('toplant') || lowerName.includes('fırsat') || lowerName.includes('firsat') || lowerName.includes('randevu')) {
+            console.log(`🎨 T Sayfa Row ${rowNumber}: finalColor="${finalColor}", sheetName="${sheetName}"`);
+          }
         }
       } catch(e) {
         console.log('setBackground fail', e && e.message);
@@ -690,20 +740,24 @@ function createManagerMenu() {
 
     // Bu menü kaldırıldı - kullanılmıyor
 
-    // Tek Temsilci Analizi
-    const analyzeSubmenu = ui.createMenu('🎯 Tek Temsilci Analizi');
-    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
-      analyzeSubmenu.addItem(`${employeeCode} - ${employeeName}`, `analyze${employeeCode.replace(/\s+/g, '')}`);
-    }
-    menu.addSubMenu(analyzeSubmenu)
-        .addSeparator();
-
     // Sırayla (Üstüne Ekle) - Kullanılıyor
     const appendSubmenu = ui.createMenu('➕ Sırayla (Üstüne Ekle)');
     for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
-      appendSubmenu.addItem(`${employeeCode} - ${employeeName}`, `syncSingleEmployeeAppend_${employeeCode.replace(/\s+/g, '_')}`);
+      // Boşlukları alt çizgi ile değiştir ve doğru fonksiyon ismini oluştur
+      const functionName = `syncSingleEmployeeAppend_${employeeCode.replace(/\s+/g, '_')}`;
+      appendSubmenu.addItem(`${employeeCode} - ${employeeName}`, functionName);
     }
     menu.addSubMenu(appendSubmenu)
+        .addSeparator();
+
+    // 📊 Log Özeti - Sadece log analizi
+    const logAnalysisSubmenu = ui.createMenu('📊 Log Özeti');
+    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
+      // Boşlukları alt çizgi ile değiştir ve doğru fonksiyon ismini oluştur
+      const functionName = `logAnalysis_${employeeCode.replace(/\s+/g, '_')}`;
+      logAnalysisSubmenu.addItem(`📊 ${employeeCode} - ${employeeName}`, functionName);
+    }
+    menu.addSubMenu(logAnalysisSubmenu)
         .addSeparator();
 
     // Performans
@@ -717,9 +771,7 @@ function createManagerMenu() {
     menu.addItem('📥 Seçili Randevuyu Toplantıya Taşı', 'moveSelectedRandevuToMeeting')
         .addSeparator();
 
-    // Test fonksiyonları
-    // Bu menü öğeleri kaldırıldı - kullanılmıyor
-        .addSeparator();
+    // Test fonksiyonları kaldırıldı - kullanılmıyor
 
     // Aktivite özeti
     menu.addItem('📊 Aktivite Özeti Yenile', 'refreshActivitySummaryAll')
@@ -747,6 +799,7 @@ function createManagerMenu() {
     const maintenance = ui.createMenu('🧼 Bakım');
     maintenance.addItem('🎨 (Yönetici) Renk Kodlaması – Tüm Sayfalar', 'forceRefreshManagerColorCoding')
                .addItem('🎨 (Yönetici) Bu Sayfayı Yenile', 'applyManualManagerColorCoding')
+               .addItem('🎨 Tüm T Sayfalarında Renklendirme', 'applyColorCodingToAllManagerSheets')
                .addItem('🧭 Sadece Sırala (Toplantılar)', 'sortMeetingsManual')
                .addSeparator()
                .addItem('🎨 (Temsilci) Renkleri Yenile – Tümü', 'refreshAgentColorCodingAll')
@@ -886,105 +939,11 @@ function resetReadableView() {
   }
 }
 
-/**
- * 📅 Open Meeting Dialog - Opens a dialog for the selected appointment
- */
-function openMeetingDialog() {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    const range = sheet.getActiveRange();
-    
-    if (!range || range.getNumRows() !== 1) {
-      SpreadsheetApp.getUi().alert('Lütfen bir randevu satırı seçin.');
-      return;
-    }
-    
-    const rowIndex = range.getRow();
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    // Randevu bilgilerini hazırla
-    const employeeCode = getColumnValue(headers, rowData, 'Temsilci Kodu');
-    const companyName = getColumnValue(headers, rowData, 'Company name') || getColumnValue(headers, rowData, 'Company');
-    const phone = getColumnValue(headers, rowData, 'Phone');
-    const mail = getColumnValue(headers, rowData, 'Mail');
-    const address = getColumnValue(headers, rowData, 'Address');
-    
-    // HTML dialog'u aç
-    const htmlTemplate = HtmlService.createTemplateFromFile('managerMeetingDialog');
-    htmlTemplate.employeeCode = employeeCode;
-    htmlTemplate.companyName = companyName;
-    htmlTemplate.phone = phone;
-    htmlTemplate.mail = mail;
-    htmlTemplate.address = address;
-    
-    const htmlOutput = htmlTemplate.evaluate()
-      .setWidth(500)
-      .setHeight(700);
-    
-    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Yönetici Toplantı Ekle');
-    
-  } catch (error) {
-    console.error('❌ Error opening meeting dialog:', error);
-    SpreadsheetApp.getUi().alert('❌ Hata', 'Toplantı penceresi açılırken bir hata oluştu: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
-  }
-}
-
 // Bu fonksiyon kaldırıldı - kullanılmıyor
 
 
 
-/**
- * 💾 Process manager meeting form data
- * @param {Object} formData - Form data from HTML dialog
- */
-function processManagerMeetingForm(formData) {
-  try {
-    console.log('💾 Processing manager meeting form:', formData);
-    
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    const range = sheet.getActiveRange();
-    
-    if (!range || range.getNumRows() !== 1) {
-      throw new Error('Geçerli bir satır seçilmedi');
-    }
-    
-    const rowIndex = range.getRow();
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    // Toplantı bilgilerini güncelle
-    const updates = [
-      { header: 'Company name', value: formData.sirketAdi },
-      { header: 'Phone', value: formData.telefon },
-      { header: 'Mail', value: formData.mail },
-      { header: 'Address', value: formData.adres },
-      { header: 'Toplantı Tarihi', value: formData.toplamtiTarihi },
-      { header: 'Saat', value: formData.toplamtiSaati },
-      { header: 'Toplantı formatı', value: formData.toplamtiFormat },
-      { header: 'Toplantı Sonucu', value: formData.toplamtiSonucu },
-      { header: 'Teklif Detayı', value: formData.teklifDetayi },
-      { header: 'Satış Potansiyeli', value: formData.satisPotansiyeli },
-      { header: 'Yeni Takip Tarihi', value: formData.yeniTakipTarihi },
-      { header: 'Yönetici Not', value: formData.yoneticiNot }
-    ];
-    
-    for (const update of updates) {
-      const columnIndex = headers.findIndex(header => header === update.header);
-      if (columnIndex !== -1) {
-        sheet.getRange(rowIndex, columnIndex + 1).setValue(update.value);
-      }
-    }
-    
-    // Renk kodlamasını yenile (manuel renk koruması olmadan)
-    applyColorCodingToManagerData(sheet, sheet.getName(), rowIndex, 1, false);
-    
-    console.log('✅ Manager meeting data saved successfully');
-    
-  } catch (error) {
-    console.error('❌ Error processing manager meeting form:', error);
-    throw error;
-  }
-}
+// Bu fonksiyon kaldırıldı - kullanılmıyor
 
 /**
  * 🔄 Synchronize a single employee
@@ -1052,74 +1011,7 @@ function syncSingleEmployee(employeeCode, options) {
   }
 }
 
-/**
- * LG 001 için senkronizasyon fonksiyonu
- */
-function syncSingleEmployee_LG_001() { console.log('🔄 Starting sync for single employee: LG 001'); syncSingleEmployee('LG 001', { mode: 'replace' }); }
 
-/**
- * NT 002 için senkronizasyon fonksiyonu
- */
-function syncSingleEmployee_NT_002() { console.log('🔄 Starting sync for single employee: NT 002'); syncSingleEmployee('NT 002', { mode: 'replace' }); }
-
-/**
- * KO 003 için senkronizasyon fonksiyonu
- */
-function syncSingleEmployee_KO_003() { console.log('🔄 Starting sync for single employee: KO 003'); syncSingleEmployee('KO 003', { mode: 'replace' }); }
-
-/**
- * SB 004 için senkronizasyon fonksiyonu
- */
-function syncSingleEmployee_SB_004() { console.log('🔄 Starting sync for single employee: SB 004'); syncSingleEmployee('SB 004', { mode: 'replace' }); }
-
-/**
- * KM 005 için senkronizasyon fonksiyonu
- */
-function syncSingleEmployee_KM_005() { console.log('🔄 Starting sync for single employee: KM 005'); syncSingleEmployee('KM 005', { mode: 'replace' }); }
-
-/**
- * GŞ 006 için senkronizasyon fonksiyonu
- */
-function syncSingleEmployee_GŞ_006() { console.log('🔄 Starting sync for single employee: GŞ 006'); syncSingleEmployee('GŞ 006', { mode: 'replace' }); }
-
-// Append-mode wrappers
-function syncSingleEmployeeAppend_LG_001() { console.log('🔄 Starting APPEND sync: LG 001'); syncSingleEmployee('LG 001', { mode: 'append' }); }
-function syncSingleEmployeeAppend_NT_002() { console.log('🔄 Starting APPEND sync: NT 002'); syncSingleEmployee('NT 002', { mode: 'append' }); }
-function syncSingleEmployeeAppend_KO_003() { console.log('🔄 Starting APPEND sync: KO 003'); syncSingleEmployee('KO 003', { mode: 'append' }); }
-function syncSingleEmployeeAppend_SB_004() { console.log('🔄 Starting APPEND sync: SB 004'); syncSingleEmployee('SB 004', { mode: 'append' }); }
-function syncSingleEmployeeAppend_KM_005() { console.log('🔄 Starting APPEND sync: KM 005'); syncSingleEmployee('KM 005', { mode: 'append' }); }
-function syncSingleEmployeeAppend_GŞ_006() { console.log('🔄 Starting APPEND sync: GŞ 006'); syncSingleEmployee('GŞ 006', { mode: 'append' }); }
-
-// === Diagnostics: count rows for a code in T sheets ===
-function debugCountTAggregates(employeeCode) {
-  console.log('🔎 debugCountTAggregates started for', employeeCode);
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const tSheets = ['T Randevular', 'T Fırsatlar', 'T Toplantılar'];
-    let msg = `Kod: ${employeeCode}\n`;
-    for (const name of tSheets) {
-      const sh = ss.getSheetByName(name);
-      if (!sh || sh.getLastRow() < 2) { msg += `${name}: 0\n`; continue; }
-      const lastCol = sh.getLastColumn();
-      const headers = sh.getRange(1,1,1,lastCol).getDisplayValues()[0];
-      let codeIdx = headers.indexOf('Temsilci Kodu');
-      if (codeIdx === -1) codeIdx = headers.indexOf('Kod');
-      const companyIdx = headers.indexOf('Company name');
-      const countRange = sh.getRange(2,1,sh.getLastRow()-1,lastCol).getDisplayValues();
-      let count = 0; const samples = [];
-      for (const row of countRange) {
-        if (String(row[codeIdx]) === String(employeeCode)) { count++; if (samples.length < 10) samples.push(row[companyIdx] || ''); }
-      }
-      msg += `${name}: ${count}${samples.length ? ` | örnek: ${samples.join(', ').slice(0,120)}` : ''}\n`;
-    }
-    console.log(msg);
-    SpreadsheetApp.getUi().alert('T Sayfa Sayımları', msg, SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch (error) {
-    console.error('debugCountTAggregates error:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-  }
-}
-function debugCountTAggregates_SB_004() { return debugCountTAggregates('SB 004'); }
 
 // ========================================
 // 🚀 INITIALIZATION SYSTEM - SYSTEM STARTUP
@@ -1686,10 +1578,54 @@ function collectSheetData(sheet, employeeCode) {
       const row = values[i];
       if (row.some(cell => cell !== '' && cell !== null && cell !== undefined && cell !== 'undefined' && cell !== 'null')) {
         const orderedRow = [];
+        let hasValidDate = false;
+        
         // Start from index 1 to skip 'Kod' (employee code is added later)
         for (let j = 1; j < targetColumns.length; j++) {
           const columnName = targetColumns[j];
-          const columnIndex = columnIndices[columnName];
+          let columnIndex = columnIndices[columnName];
+          
+          // Fallback mapping for common column name variations
+          if (columnIndex === undefined) {
+            const fallbackMappings = {
+              'Company name': ['Company', 'Firma', 'Şirket'],
+              'İsim Soyisim': ['İsim', 'Soyisim', 'Name', 'Contact'],
+              'Randevu Tarihi': ['Tarih', 'Date', 'Randevu Tarih'],
+              'Toplantı Tarihi': ['Tarih', 'Date', 'Toplantı Tarih'],
+              'Saat': ['Time', 'Zaman'],
+              'Randevu durumu': ['Durum', 'Status', 'Randevu Durum'],
+              'Toplantı durumu': ['Durum', 'Status', 'Toplantı Durum'],
+              'Phone': ['Telefon', 'Tel', 'Phone Number'],
+              'Yetkili Tel': ['Yetkili Telefon', 'Contact Phone'],
+              'Mail': ['Email', 'E-mail', 'E-posta'],
+              'Location': ['Konum', 'Lokasyon'],
+              'Website': ['URL', 'Web Site', 'Site'],
+              'Category': ['Kategori', 'Kategorisi'],
+              'Yorum': ['Comment', 'Not', 'Açıklama'],
+              'Yönetici Not': ['Manager Note', 'Yönetici Notu'],
+              'CMS Adı': ['CMS', 'CMS Name'],
+              'CMS Grubu': ['CMS Group', 'CMS Kategorisi'],
+              'E-Ticaret İzi': ['E-commerce', 'E-ticaret'],
+              'Site Hızı': ['Site Speed', 'Hız'],
+              'Site Trafiği': ['Site Traffic', 'Trafik'],
+              'Toplantı formatı': ['Meeting Format', 'Format'],
+              'Address': ['Adres', 'Adres'],
+              'City': ['Şehir', 'İl'],
+              'Rating count': ['Rating', 'Değerlendirme'],
+              'Review': ['Yorum', 'İnceleme'],
+              'Log': ['Activity Log', 'Aktivite Log']
+            };
+            
+            if (fallbackMappings[columnName]) {
+              for (const fallback of fallbackMappings[columnName]) {
+                if (columnIndices[fallback] !== undefined) {
+                  columnIndex = columnIndices[fallback];
+                  break;
+                }
+              }
+            }
+          }
+          
           if (columnIndex !== undefined) {
             let cellValue = row[columnIndex];
             if (columnName === 'Saat') {
@@ -1697,6 +1633,10 @@ function collectSheetData(sheet, employeeCode) {
             }
             if (columnName && columnName.includes('Tarihi')) {
               cellValue = formatDateValue(cellValue);
+              // Tarih varsa geçerli satır olarak işaretle
+              if (cellValue && cellValue !== '') {
+                hasValidDate = true;
+              }
             }
             if (columnName === 'Fırsat Durumu') {
               cellValue = normalizeOpportunityStatus(cellValue);
@@ -1706,8 +1646,12 @@ function collectSheetData(sheet, employeeCode) {
             orderedRow.push('');
           }
         }
-        const rowData = { temsilciKodu: employeeCode, rowIndex: i + 2, data: orderedRow };
-        data.push(rowData);
+        
+        // Sadece geçerli tarihi olan satırları ekle
+        if (hasValidDate) {
+          const rowData = { temsilciKodu: employeeCode, rowIndex: i + 2, data: orderedRow };
+          data.push(rowData);
+        }
       }
     }
     return data;
@@ -1998,7 +1942,8 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
                 const d = parseDdMmYyyy(row[dateIdx]);
                 if (d) return d;
               }
-              return new Date('2100-12-31');
+              // Tarihsiz satırları en sona koy (2100 yerine 2099 kullan)
+              return new Date('2099-12-31');
             }
             function parseTime(v){
               if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
@@ -2037,7 +1982,8 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
                 const d = parseDdMmYyyy(row[dateIdx]);
                 if (d) return d;
               }
-              return new Date('2100-12-31');
+              // Tarihsiz satırları en sona koy (2100 yerine 2099 kullan)
+              return new Date('2099-12-31');
             }
             values.sort(function(a,b){
               const da = getDate(a);
@@ -2134,7 +2080,7 @@ function createManagerSheetHeaders(sheet, sheetName) {
           'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
           'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
           'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-                    'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+          'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
          ];
          break;
       case 'Fırsatlar':
@@ -2149,9 +2095,7 @@ function createManagerSheetHeaders(sheet, sheetName) {
       case 'Toplantılar':
         headers = [
           'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
-          // İstenen ekler: Company name ve İsim Soyisim'den hemen sonra
           'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
-          // Diğer alanlar
           'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
           'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
           'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
@@ -2949,32 +2893,7 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
   }
 }
 
-function syncSingleEmployeeIsolated(employeeCode) {
-  console.log('Function started:', { employeeCode });
-  try {
-    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    if (!managerFile) throw new Error('Yönetici dosyası bulunamadı');
-
-    const employeeData = collectEmployeeData(managerFile, employeeCode);
-    for (const [sheetName, data] of Object.entries(employeeData)) {
-      // sheetName is target base: Randevular | Fırsatlar | Toplantılar
-      updateManagerSheetIsolated(managerFile, sheetName, data, employeeCode);
-    }
-
-    SpreadsheetApp.getUi().alert('✅ Tamamlandı', `${employeeCode} için ayrı sekmeler güncellendi`, SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('❌ Hata', error.message, SpreadsheetApp.getUi().ButtonSet.OK);
-  }
-}
-
-// Isolated wrappers per employee
-function syncSingleEmployeeIsolated_LG_001() { syncSingleEmployeeIsolated('LG 001'); }
-function syncSingleEmployeeIsolated_NT_002() { syncSingleEmployeeIsolated('NT 002'); }
-function syncSingleEmployeeIsolated_KO_003() { syncSingleEmployeeIsolated('KO 003'); }
-function syncSingleEmployeeIsolated_SB_004() { syncSingleEmployeeIsolated('SB 004'); }
-function syncSingleEmployeeIsolated_KM_005() { syncSingleEmployeeIsolated('KM 005'); }
-function syncSingleEmployeeIsolated_GŞ_006() { syncSingleEmployeeIsolated('GŞ 006'); }
+// Bu izole fonksiyonları kaldırıldı - kullanılmıyor
 
 function moveSelectedRandevuToMeeting() {
   console.log('Function started:', {});
@@ -3042,21 +2961,92 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
       if (srcIdx !== -1) output[i] = rowR[srcIdx];
     });
 
-    // Explicit mappings to align differing header names
+    // Comprehensive mappings to align all possible header names
     const mapPairs = [
+      // Kod mappings
       ['Kod', 'Kod'],
       ['Kod', 'Temsilci Kodu'],
-      ['Randevu durumu', 'Randevu durumu'],
+      ['Temsilci Kodu', 'Kod'],
+      ['Temsilci Kodu', 'Temsilci Kodu'],
+      
+      // Company mappings
+      ['Company name', 'Company name'],
+      ['Company', 'Company name'],
+      ['Company name', 'Company'],
+      
+      // İsim mappings
+      ['İsim Soyisim', 'İsim Soyisim'],
+      ['İsim', 'İsim Soyisim'],
+      ['Soyisim', 'İsim Soyisim'],
+      
+      // Tarih mappings
       ['Randevu Tarihi', 'Randevu Tarihi'],
       ['Toplantı Tarihi', 'Toplantı Tarihi'],
+      ['Tarih', 'Randevu Tarihi'],
+      ['Tarih', 'Toplantı Tarihi'],
+      
+      // Saat mappings
       ['Saat', 'Saat'],
+      ['Time', 'Saat'],
+      
+      // Durum mappings
+      ['Randevu durumu', 'Randevu durumu'],
+      ['Durum', 'Randevu durumu'],
+      ['Status', 'Randevu durumu'],
+      
+      // Toplantı mappings
       ['Toplantı Sonucu', 'Toplantı Sonucu'],
       ['Toplantı formatı', 'Toplantı formatı'],
+      ['Meeting Result', 'Toplantı Sonucu'],
+      ['Meeting Format', 'Toplantı formatı'],
+      
+      // Contact mappings
+      ['Phone', 'Phone'],
+      ['Yetkili Tel', 'Yetkili Tel'],
+      ['Mail', 'Mail'],
+      ['Email', 'Mail'],
+      
+      // Location mappings
+      ['Location', 'Location'],
+      ['Address', 'Address'],
+      ['City', 'City'],
+      
+      // Website mappings
+      ['Website', 'Website'],
+      ['URL', 'Website'],
+      
+      // Category mappings
+      ['Category', 'Category'],
+      ['Kategori', 'Category'],
+      
+      // Comment mappings
+      ['Yorum', 'Yorum'],
+      ['Comment', 'Yorum'],
+      ['Yönetici Not', 'Yönetici Not'],
+      ['Manager Note', 'Yönetici Not'],
+      
+      // CMS mappings
+      ['CMS Adı', 'CMS Adı'],
+      ['CMS Grubu', 'CMS Grubu'],
+      ['E-Ticaret İzi', 'E-Ticaret İzi'],
+      
+      // Performance mappings
+      ['Site Hızı', 'Site Hızı'],
+      ['Site Trafiği', 'Site Trafiği'],
+      ['Rating count', 'Rating count'],
+      ['Review', 'Review'],
+      
+      // Log mappings
+      ['Log', 'Log'],
+      ['Activity Log', 'Log']
     ];
+    
     mapPairs.forEach(([dst, src]) => {
       const si = idxR(src);
       const di = idxT(dst);
-      if (si !== -1 && di !== -1) output[di] = rowR[si];
+      if (si !== -1 && di !== -1 && (output[di] === '' || output[di] === undefined)) {
+        output[di] = rowR[si];
+      }
     });
 
     // Force-assign Kod from source (case-insensitive search) if still empty
@@ -6619,17 +6609,18 @@ function analyzeSingleEmployee(employeeCode) {
     const startTime = new Date();
     const timeoutLimit = 30 * 1000; // 30 saniye
     
-    // Temsilci dosyasını bul ve aç
-    const fileName = `${employeeCode} - ${employeeName}`;
-    const files = DriveApp.getFilesByName(fileName);
+    // Temsilci dosyasını EMPLOYEE_FILES mapping'den al (syncSingleEmployee gibi)
+    const employeeSpreadsheet = findEmployeeFile(employeeCode);
     
-    if (!files.hasNext()) {
-      ui.alert('❌ Dosya Bulunamadı', `${fileName} dosyası bulunamadı!`, ui.ButtonSet.OK);
+    if (!employeeSpreadsheet) {
+      ui.alert('❌ Dosya Bulunamadı', 
+        `${employeeCode} - ${employeeName} dosyası bulunamadı!\n\n` +
+        `Dosya ID'si sistemde tanımlı değil. Lütfen EMPLOYEE_FILES mapping'ini kontrol edin.`, 
+        ui.ButtonSet.OK);
       return;
     }
     
-    const file = files.next();
-    const employeeSpreadsheet = SpreadsheetApp.openById(file.getId());
+    console.log(`✅ ${employeeCode} dosyası başarıyla açıldı`);
     
     // Format Tablo sayfasını analiz et
     const formatTableSheet = employeeSpreadsheet.getSheetByName('Format Tablo');
@@ -6786,99 +6777,783 @@ function showEmployeeResults(employeeCode, employeeName, data) {
   }
 }
 
+
+
 // ========================================
-// 🎯 TEK TEMSİLCİ ANALİZ FONKSİYONLARI
+// ➕ SIRAYLA EKLE FONKSİYONLARI
 // ========================================
 
 /**
- * 🎯 LG 001 - Levent Gültekin Analizi
+ * ➕ LG 001 - Lale Gül Sırayla Ekle
  */
-function analyzeLG001() {
-  analyzeSingleEmployee('LG 001');
+function syncSingleEmployeeAppend_LG_001() {
+  console.log('🔄 LG 001 append fonksiyonu çağrıldı!');
+  
+  try {
+    // Sadece sırayla ekleme (hızlı)
+    const syncResult = syncSingleEmployee('LG 001', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    
+  } catch (error) {
+    console.error('❌ LG 001 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `LG 001 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 /**
- * 🎯 NT 002 - Nihan Taş Analizi
+ * ➕ NT 002 - Neslihan Türk Sırayla Ekle
  */
-function analyzeNT002() {
-  analyzeSingleEmployee('NT 002');
+function syncSingleEmployeeAppend_NT_002() {
+  console.log('🔄 NT 002 append fonksiyonu çağrıldı!');
+  
+  try {
+    // Sadece sırayla ekleme (hızlı)
+    const syncResult = syncSingleEmployee('NT 002', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    
+  } catch (error) {
+    console.error('❌ NT 002 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `NT 002 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 /**
- * 🎯 KO 003 - Kaan Özkan Analizi
+ * ➕ KO 003 - Kadir Öztürk Sırayla Ekle
  */
-function analyzeKO003() {
-  analyzeSingleEmployee('KO 003');
+function syncSingleEmployeeAppend_KO_003() {
+  console.log('🔄 KO 003 append fonksiyonu çağrıldı!');
+  
+  try {
+    // Sadece sırayla ekleme (hızlı)
+    const syncResult = syncSingleEmployee('KO 003', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    
+  } catch (error) {
+    console.error('❌ KO 003 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `KO 003 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 /**
- * 🎯 SB 004 - Selin Baş Analizi
+ * ➕ SB 004 - Sinem Bakalcı Sırayla Ekle
  */
-function analyzeSB004() {
-  analyzeSingleEmployee('SB 004');
+function syncSingleEmployeeAppend_SB_004() {
+  console.log('🔄 SB 004 append fonksiyonu çağrıldı!');
+  
+  try {
+    // Sadece sırayla ekleme (hızlı)
+    const syncResult = syncSingleEmployee('SB 004', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    
+  } catch (error) {
+    console.error('❌ SB 004 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `SB 004 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 /**
- * 🎯 KM 005 - Kaya Mert Analizi
+ * ➕ KM 005 - Kübra Murat Sırayla Ekle
  */
-function analyzeKM005() {
-  analyzeSingleEmployee('KM 005');
+function syncSingleEmployeeAppend_KM_005() {
+  console.log('🔄 KM 005 append fonksiyonu çağrıldı!');
+  
+  try {
+    // Sadece sırayla ekleme (hızlı)
+    const syncResult = syncSingleEmployee('KM 005', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    
+  } catch (error) {
+    console.error('❌ KM 005 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `KM 005 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 /**
- * 🎯 GŞ 006 - Gizem Şahin Analizi
+ * ➕ GŞ 006 - Gamze Şafaklıoğlu Sırayla Ekle
  */
-function analyzeGS006() {
-  analyzeSingleEmployee('GŞ 006');
+function syncSingleEmployeeAppend_GŞ_006() {
+  console.log('🔄 GŞ 006 append fonksiyonu çağrıldı!');
+  
+  try {
+    // Sadece sırayla ekleme (hızlı)
+    const syncResult = syncSingleEmployee('GŞ 006', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    
+  } catch (error) {
+    console.error('❌ GŞ 006 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `GŞ 006 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
+
+/**
+ * ➕ BH 007 - Bilge Hin Sırayla Ekle
+ */
+function syncSingleEmployeeAppend_BH_007() {
+  console.log('🔄 BH 007 append fonksiyonu çağrıldı!');
+  
+  try {
+    const syncResult = syncSingleEmployee('BH 007', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+  } catch (error) {
+    console.error('❌ BH 007 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `BH 007 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * ➕ TD 008 - Tuğçe Duman Sırayla Ekle
+ */
+function syncSingleEmployeeAppend_TD_008() {
+  console.log('🔄 TD 008 append fonksiyonu çağrıldı!');
+  
+  try {
+    const syncResult = syncSingleEmployee('TD 008', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+  } catch (error) {
+    console.error('❌ TD 008 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `TD 008 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+// ========================================
+// 📊 LOG ÖZETİ FONKSİYONLARI - SADECE LOG ANALİZİ
+// ========================================
+
+/**
+ * 📊 LG 001 - Lale Gül Log Özeti
+ */
+function logAnalysis_LG_001() {
+  console.log('📊 LG 001 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('LG 001', 'Lale Gül');
+  } catch (error) {
+    console.error('❌ LG 001 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `LG 001 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 NT 002 - Neslihan Türk Log Özeti
+ */
+function logAnalysis_NT_002() {
+  console.log('📊 NT 002 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('NT 002', 'Neslihan Türk');
+  } catch (error) {
+    console.error('❌ NT 002 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `NT 002 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 KO 003 - Kadir Öztürk Log Özeti
+ */
+function logAnalysis_KO_003() {
+  console.log('📊 KO 003 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('KO 003', 'Kadir Öztürk');
+  } catch (error) {
+    console.error('❌ KO 003 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `KO 003 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 SB 004 - Sinem Bakalcı Log Özeti
+ */
+function logAnalysis_SB_004() {
+  console.log('📊 SB 004 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('SB 004', 'Sinem Bakalcı');
+  } catch (error) {
+    console.error('❌ SB 004 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `SB 004 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 KM 005 - Kübra Murat Log Özeti
+ */
+function logAnalysis_KM_005() {
+  console.log('📊 KM 005 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('KM 005', 'Kübra Murat');
+  } catch (error) {
+    console.error('❌ KM 005 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `KM 005 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 GŞ 006 - Gamze Şafaklıoğlu Log Özeti
+ */
+function logAnalysis_GŞ_006() {
+  console.log('📊 GŞ 006 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('GŞ 006', 'Gamze Şafaklıoğlu');
+  } catch (error) {
+    console.error('❌ GŞ 006 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `GŞ 006 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 BH 007 - Bilge Hin Log Özeti
+ */
+function logAnalysis_BH_007() {
+  console.log('📊 BH 007 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('BH 007', 'Bilge Hin');
+  } catch (error) {
+    console.error('❌ BH 007 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `BH 007 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 TD 008 - Tuğçe Duman Log Özeti
+ */
+function logAnalysis_TD_008() {
+  console.log('📊 TD 008 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('TD 008', 'Tuğçe Duman');
+  } catch (error) {
+    console.error('❌ TD 008 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `TD 008 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+
+
+/**
+ * 📊 Temsilci Tüm Günlerdeki Log'ları Getir
+ * Tarih bazlı gruplama ile tüm aktiviteleri göster
+ */
+function getAllEmployeeLogsByDate(employeeCode, employeeName) {
+  try {
+    console.log(`📊 getAllEmployeeLogsByDate başlatıldı: ${employeeCode}`);
     
-    // Renk kodlaması uygula
-    console.log('Renk kodlaması uygulanıyor...');
-    applyColorCodingToManagerData();
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    const employeeFile = findEmployeeFile(employeeCode);
     
-    // Dashboard oluştur
-    console.log('Dashboard oluşturuluyor...');
-    const dashboardResult = generateDailyPerformanceDashboard();
-    
-    // Sonuç raporu
-    const successCount = Object.values(results).filter(r => r.success).length;
-    const errorCount = totalEmployees - successCount;
-    
-    let resultMessage = `✅ Senkronizasyon Tamamlandı!\n\n`;
-    resultMessage += `📊 Sonuçlar:\n`;
-    resultMessage += `• Başarılı: ${successCount}/${totalEmployees}\n`;
-    resultMessage += `• Hatalı: ${errorCount}/${totalEmployees}\n\n`;
-    
-    if (dashboardResult && dashboardResult.success) {
-      resultMessage += `🎯 Dashboard başarıyla oluşturuldu!\n`;
-      resultMessage += `📈 Temsilci sayısı: ${dashboardResult.employeeCount || 'N/A'}\n`;
-      resultMessage += `📞 Toplam aktivite: ${dashboardResult.totalActivities || 'N/A'}\n`;
-    } else {
-      resultMessage += `❌ Dashboard oluşturulamadı\n`;
+    if (!employeeFile) {
+      throw new Error(`${employeeCode} temsilci dosyası bulunamadı`);
     }
     
-    // Hata detayları
-    if (errorCount > 0) {
-      resultMessage += `\n❌ Hatalar:\n`;
-      for (const [code, result] of Object.entries(results)) {
-        if (!result.success) {
-          resultMessage += `• ${code}: ${result.error}\n`;
-        }
+    // GEÇİCİ: Son güncelleme tarihi kontrolünü devre dışı bırak
+    // TODO: Tarih karşılaştırması daha sonra aktif edilecek
+    const lastUpdateKey = `LAST_UPDATE_${employeeCode}`;
+    // const lastUpdateDate = PropertiesService.getScriptProperties().getProperty(lastUpdateKey);
+    const lastUpdateDate = null; // GEÇİCİ: Tüm log'ları al
+    
+    console.log(`🔍 Son güncelleme tarihi: ${lastUpdateDate || 'İlk giriş (tüm log\'lar alınacak)'}`);
+    
+    // Tüm Format Tablo sayfalarını bul - header'lara göre
+    const formatTableSheets = [];
+    const sheets = employeeFile.getSheets();
+    
+    console.log(`🔍 Mevcut sayfalar: ${sheets.map(s => s.getName()).join(', ')}`);
+    
+    for (const sheet of sheets) {
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) continue;
+      
+      const lastCol = sheet.getLastColumn();
+      const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      
+      console.log(`🔍 Sayfa "${sheet.getName()}" headers: ${headers.join(' | ')}`);
+      
+      // Skip known consolidated sheets by distinctive headers (T-Aktivite Özet mantığı)
+      const isRandevuSheet = headers.some(h => h && h.toString().toLowerCase().includes('randevu durumu'));
+      const isFirsatSheet = headers.some(h => h && h.toString().toLowerCase().includes('fırsat durumu') || h && h.toString().toLowerCase().includes('firsat durumu'));
+      const isToplSheet = headers.some(h => h && h.toString().toLowerCase().includes('toplantı durumu') || h && h.toString().toLowerCase().includes('toplanti durumu'));
+      if (isRandevuSheet || isFirsatSheet || isToplSheet) {
+        console.log(`⏭️ Bilinen sayfa atlandı: "${sheet.getName()}"`);
+        continue;
+      }
+      
+      // Format Tablo header'larını kontrol et: Aktivite + (Aktivite Tarihi veya Log) - T-Aktivite Özet mantığı
+      const hasAktivite = headers.some(h => h && h.toString().toLowerCase().includes('aktivite'));
+      const hasTarihi = headers.some(h => h && h.toString().toLowerCase().includes('aktivite tarihi') || h && h.toString().toLowerCase().includes('tarih'));
+      const hasLog = headers.some(h => h && h.toString().toLowerCase().includes('log') || h && h.toString().toLowerCase().includes('günlük'));
+      
+      // Daha esnek kontrol: Aktivite + (Tarih veya Log) - T-Aktivite Özet mantığı
+      const aktiviteIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('aktivite'));
+      const tarihIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('aktivite tarihi') || h && h.toString().toLowerCase().includes('tarih'));
+      const logIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('log') || h && h.toString().toLowerCase().includes('günlük'));
+      
+      console.log(`🔍 "${sheet.getName()}" kontrol: Aktivite=${hasAktivite}(${aktiviteIndex}), Tarih=${hasTarihi}(${tarihIndex}), Log=${hasLog}(${logIndex})`);
+      
+      // Sıkı kontrol: Aktivite + Tarih + Log - HEPSİ OLMALI
+      if (hasAktivite && hasTarihi && hasLog && aktiviteIndex !== -1 && tarihIndex !== -1 && logIndex !== -1) {
+        // Header'lar uygunsa sayfayı al - veri kontrolü yapma (çok yavaş)
+        formatTableSheets.push({
+          sheet: sheet,
+          aktiviteIndex: aktiviteIndex,
+          tarihIndex: tarihIndex,
+          logIndex: logIndex
+        });
+        console.log(`✅ Format Tablo sayfası bulundu: "${sheet.getName()}" (header kontrolü ile)`);
       }
     }
     
-    ui.alert('🔄 Senkronizasyon Tamamlandı', resultMessage, ui.ButtonSet.OK);
+    if (formatTableSheets.length === 0) {
+      const sheetNames = sheets.map(sheet => sheet.getName());
+      throw new Error(`Format Tablo sayfası bulunamadı. Mevcut sayfalar: ${sheetNames.join(', ')}`);
+    }
     
-    console.log('Tüm işlemler tamamlandı:', { results, dashboardResult });
+    console.log(`📊 ${formatTableSheets.length} adet Format Tablo sayfası bulundu`);
+    
+    // Tüm sayfalardan veri topla
+    let allData = [];
+    for (const formatSheet of formatTableSheets) {
+      const sheet = formatSheet.sheet;
+      const lastRow = sheet.getLastRow();
+      console.log(`📊 "${sheet.getName()}" sayfasından veri okunuyor (${lastRow} satır)`);
+      
+      if (lastRow > 1) {
+        const data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getDisplayValues();
+        console.log(`📊 "${sheet.getName()}" sayfasından ${data.length} satır veri alındı`);
+        allData.push(...data.map(row => ({
+          ...row,
+          _sheetName: sheet.getName(),
+          _aktiviteIndex: formatSheet.aktiviteIndex,
+          _tarihIndex: formatSheet.tarihIndex,
+          _logIndex: formatSheet.logIndex
+        })));
+      }
+    }
+    
+    console.log(`📊 Toplam ${allData.length} satır veri toplandı`);
+    
+    // Veri işleme için kolon indekslerini kullan (ilk sayfadan)
+    const firstSheet = formatTableSheets[0];
+    const logIdx = firstSheet.logIndex;
+    const aktiviteTarihiIdx = firstSheet.tarihIndex;
+    const aktiviteIdx = firstSheet.aktiviteIndex;
+    
+    console.log(`🔍 Kolon indeksleri (ilk sayfadan): Log=${logIdx}, Tarih=${aktiviteTarihiIdx}, Aktivite=${aktiviteIdx}`);
+    
+    // Tarih bazlı gruplama
+    const logsByDate = new Map();
+    
+    console.log(`📊 Toplam ${allData.length} satır okunacak`);
+    
+    // GEÇİCİ: Mevcut log özeti sayfasından eski verileri alma işlemini devre dışı bırak
+    // TODO: Bu işlem daha sonra aktif edilecek
+    const existingLogsByDate = new Map();
+    console.log(`🔄 Mevcut log özeti sayfasından eski veriler alınmayacak (tüm log'lar yeniden işlenecek)`);
+    
+    // Yeni verileri işle
+    let newLogsCount = 0;
+    console.log(`🚀 LOG İŞLEME BAŞLIYOR: ${allData.length} satır işlenecek`);
+    
+    for (let i = 0; i < allData.length; i++) {
+      const row = allData[i];
+      
+      // Her satırın kendi indekslerini kullan
+      const logValue = row[row._logIndex];
+      const aktiviteTarihi = row[row._tarihIndex];
+      const aktivite = row[row._aktiviteIndex];
+      
+      // İlk 10 satırı detaylı göster (debug için)
+      if (i < 10) {
+        console.log(`🔍 SATIR ${i + 1} DETAYI:`);
+        console.log(`   Aktivite: "${aktivite}" (tip: ${typeof aktivite})`);
+        console.log(`   Tarih: "${aktiviteTarihi}" (tip: ${typeof aktiviteTarihi})`);
+        console.log(`   Log: "${logValue?.substring(0, 50)}..." (tip: ${typeof logValue})`);
+        console.log(`   Kaynak: "${row._sheetName}"`);
+        console.log(`   İndeksler: Aktivite=${row._aktiviteIndex}, Tarih=${row._tarihIndex}, Log=${row._logIndex}`);
+        console.log(`   Ham satır:`, row);
+      }
+      
+      // "Ham veri'den aktarıldı" kontrolü - bunları atla
+      const isHamVeri = logValue && String(logValue).toLowerCase().includes('ham veri');
+      
+      if (isHamVeri) {
+        console.log(`⏭️ Ham veri satırı atlandı: "${logValue?.substring(0, 30)}..."`);
+        continue; // Bu satırı atla
+      }
+      
+      // Boş değer kontrolü
+      const hasAktiviteTarihi = aktiviteTarihi && String(aktiviteTarihi).trim() !== '';
+      const hasLogValue = logValue && String(logValue).trim() !== '';
+      const hasAktivite = aktivite && String(aktivite).trim() !== '';
+      
+      if (hasAktiviteTarihi && hasLogValue && hasAktivite) {
+        // GEÇİCİ: Tüm log'ları al (tarih karşılaştırmasını devre dışı bırak)
+        // TODO: Tarih karşılaştırması daha sonra aktif edilecek
+        
+        if (!logsByDate.has(aktiviteTarihi)) {
+          logsByDate.set(aktiviteTarihi, []);
+        }
+        
+        logsByDate.get(aktiviteTarihi).push({
+          rowIndex: i + 2,
+          log: logValue,
+          aktivite: aktivite,
+          aktiviteTarihi: aktiviteTarihi,
+          sourceSheet: row._sheetName
+        });
+        
+        newLogsCount++;
+        console.log(`✅ Yeni log eklendi: ${aktiviteTarihi} - ${aktivite} (Kaynak: ${row._sheetName})`);
+      } else {
+        console.log(`❌ Log atlandı: Tarih="${aktiviteTarihi}" (boş: ${!hasAktiviteTarihi}), Aktivite="${aktivite}" (boş: ${!hasAktivite}), Log="${logValue?.substring(0, 30)}..." (boş: ${!hasLogValue})`);
+      }
+    }
+    
+    console.log(`🎯 LOG İŞLEME TAMAMLANDI:`);
+    console.log(`   Toplam satır: ${allData.length}`);
+    console.log(`   İşlenen log: ${newLogsCount}`);
+    console.log(`   Tarih sayısı: ${logsByDate.size}`);
+    console.log(`   Tarihler: ${Array.from(logsByDate.keys()).join(', ')}`);
+    
+    // GEÇİCİ: Sadece yeni verileri kullan (eski veriler birleştirilmeyecek)
+    const allLogsByDate = new Map([...logsByDate]);
+    
+    console.log(`📊 ${allLogsByDate.size} farklı günde log bulundu (${newLogsCount} yeni)`);
+    
+    // GEÇİCİ: Son güncelleme tarihini kaydetme işlemini devre dışı bırak
+    // TODO: Bu işlem daha sonra aktif edilecek
+    // const currentDate = new Date().toISOString().split('T')[0];
+    // PropertiesService.getScriptProperties().setProperty(lastUpdateKey, currentDate);
+    // console.log(`💾 Son güncelleme tarihi kaydedildi: ${currentDate}`);
+    
+    console.log(`📊 ${allLogsByDate.size} farklı günde log bulundu (${newLogsCount} yeni)`);
+    
+    // Yönetici dosyasında log özeti sayfası oluştur
+    const logSheet = createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, allLogsByDate);
+    
+    // Sonuç raporu
+    let resultMessage = `📊 ${employeeCode} - ${employeeName} Log Özeti!\n\n`;
+    resultMessage += `📅 Toplam gün sayısı: ${allLogsByDate.size}\n`;
+    
+    let totalLogs = 0;
+    for (const [date, logs] of allLogsByDate) {
+      resultMessage += `📅 ${date}: ${logs.length} log\n`;
+      totalLogs += logs.length;
+    }
+    
+    if (newLogsCount > 0) {
+      resultMessage += `\n🆕 Yeni eklenen log: ${newLogsCount}`;
+    }
+    
+    resultMessage += `\n📊 Toplam log sayısı: ${totalLogs}`;
+    resultMessage += `\n📈 Detaylı log özeti için "📊 ${employeeCode} Log Özeti" sayfasına bakın`;
+    
+    SpreadsheetApp.getUi().alert('📊 Log Özeti Tamamlandı', resultMessage, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    console.log(`✅ ${employeeCode} log özeti tamamlandı`);
     
   } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert(
-      '❌ Senkronizasyon Hatası', 
-      'Senkronizasyon sırasında hata: ' + error.message, 
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
+    console.error(`❌ getAllEmployeeLogsByDate hatası:`, error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Log özeti hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 Temsilci Log Özet Sayfası Oluştur
+ * Tarih bazlı gruplama ile tüm log'ları göster
+ */
+function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, logsByDate) {
+  try {
+    const sheetName = `📊 ${employeeCode} Log Özeti`;
+    
+    // Eski sayfayı sil (varsa)
+    const existingSheet = managerFile.getSheetByName(sheetName);
+    if (existingSheet) {
+      managerFile.deleteSheet(existingSheet);
+    }
+    
+    // Yeni sayfa oluştur
+    const sheet = managerFile.insertSheet(sheetName);
+    
+    // Başlık
+    sheet.getRange(1, 1).setValue(`📊 ${employeeCode} - ${employeeName} Log Özeti`);
+    sheet.getRange(1, 1, 1, 4).merge();
+    sheet.getRange(1, 1).setFontWeight('bold').setFontSize(14);
+    
+    // ZAMAN ANALİZİ - ÜSTTE
+    addTimeAnalysis(sheet, logsByDate);
+    
+    // Özet bilgiler
+    let row = 10; // Zaman analizi sonrası başla
+    sheet.getRange(row, 1).setValue('📅 Toplam Gün:');
+    sheet.getRange(row, 2).setValue(logsByDate.size);
+    row++;
+    
+    let totalLogs = 0;
+    for (const [date, logs] of logsByDate) {
+      totalLogs += logs.length;
+    }
+    
+    sheet.getRange(row, 1).setValue('📊 Toplam Log:');
+    sheet.getRange(row, 2).setValue(totalLogs);
+    row++;
+    
+    // Tarih bazlı log'ları ekle - En eski tarihten en yeniye sırala
+    row += 2; // Biraz boşluk bırak
+    
+    // Tarihleri sırala: En yeni tarihten en eskiye
+    const sortedDates = Array.from(logsByDate.keys()).sort((a, b) => {
+      const dateA = new Date(a.split('.').reverse().join('-'));
+      const dateB = new Date(b.split('.').reverse().join('-'));
+      return dateB - dateA; // En yeni tarih önce
+    });
+    
+    for (const date of sortedDates) {
+      const logs = logsByDate.get(date);
+      // Tarih başlığı
+      sheet.getRange(row, 1).setValue(`📅 ${date} (${logs.length} log)`);
+      sheet.getRange(row, 1, 1, 5).merge();
+      sheet.getRange(row, 1).setFontWeight('bold').setBackground('#E3F2FD');
+      row++;
+      
+      // Kaynak bazlı gruplama
+      const logsBySource = new Map();
+      for (const log of logs) {
+        const source = log.sourceSheet || 'Bilinmiyor';
+        if (!logsBySource.has(source)) {
+          logsBySource.set(source, []);
+        }
+        logsBySource.get(source).push(log);
+      }
+      
+      // Her kaynak için ayrı bölüm
+      for (const [source, sourceLogs] of logsBySource) {
+        // Kaynak başlığı
+        sheet.getRange(row, 1).setValue(`📊 ${source} (${sourceLogs.length} log)`);
+        sheet.getRange(row, 1, 1, 5).merge();
+        sheet.getRange(row, 1).setFontWeight('bold').setBackground('#FFF3E0');
+        row++;
+        
+        // Tablo başlıkları
+        sheet.getRange(row, 1).setValue('Saat');
+        sheet.getRange(row, 2).setValue('Aktivite');
+        sheet.getRange(row, 3).setValue('Log Detayı');
+        sheet.getRange(row, 4).setValue('Kaynak');
+        sheet.getRange(row, 5).setValue('Satır No');
+        sheet.getRange(row, 1, 1, 5).setFontWeight('bold').setBackground('#F5F5F5');
+        row++;
+        
+        // Log verilerini ekle - Saat sıralaması ile
+        const sortedLogs = sourceLogs.sort((a, b) => {
+          const timeA = a.log.match(/(\d{1,2}):(\d{2})/);
+          const timeB = b.log.match(/(\d{1,2}):(\d{2})/);
+          
+          if (!timeA || !timeB) return 0;
+          
+          const minutesA = parseInt(timeA[1]) * 60 + parseInt(timeA[2]);
+          const minutesB = parseInt(timeB[1]) * 60 + parseInt(timeB[2]);
+          
+          return minutesA - minutesB; // En düşük saatten yükseğe
+        });
+        
+        for (const log of sortedLogs) {
+          // Log'dan saat bilgisini çıkar
+          const timeMatch = log.log.match(/(\d{1,2}):(\d{2})/);
+          const time = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : 'Bilinmiyor';
+          
+          sheet.getRange(row, 1).setValue(time);
+          sheet.getRange(row, 2).setValue(log.aktivite);
+          sheet.getRange(row, 3).setValue(log.log);
+          sheet.getRange(row, 4).setValue(log.sourceSheet || 'Bilinmiyor');
+          sheet.getRange(row, 5).setValue(log.rowIndex);
+          
+          // Aktivite türüne göre renklendirme - CRM_CONFIG'den
+          const aktivite = log.aktivite.toString();
+          let backgroundColor = null;
+          
+          // CRM_CONFIG'den renk bul
+          for (const [status, color] of Object.entries(CRM_CONFIG.COLOR_CODES)) {
+            if (aktivite.toLowerCase().includes(status.toLowerCase())) {
+              backgroundColor = color;
+              break;
+            }
+          }
+          
+          // Eğer renk bulunamadıysa varsayılan (Ulaşılamadı ve İlgilenmiyor hariç)
+          if (!backgroundColor) {
+            if (aktivite.toLowerCase().includes('randevu alındı') || aktivite.toLowerCase().includes('fırsat eklendi')) {
+              backgroundColor = 'rgb(232, 245, 232)'; // Açık Yeşil
+            } else if (aktivite.toLowerCase().includes('bilgi verildi') || aktivite.toLowerCase().includes('yeniden aranacak')) {
+              backgroundColor = 'rgb(255, 248, 225)'; // Açık Sarı
+            }
+            // İlgilenmiyor ve Ulaşılamadı için renk yok - beyaz kalacak
+          }
+          
+          // Renk uygula
+          if (backgroundColor) {
+            sheet.getRange(row, 1, 1, 5).setBackground(backgroundColor);
+          }
+          
+          row++;
+        }
+        
+        // Kaynaklar arası boşluk
+        row++;
+      }
+      
+      // Günler arası boşluk
+      row++;
+    }
+    
+    // ZAMAN ANALİZİ - TÜM LOG'LAR EKLENDİKTEN SONRA
+    addTimeAnalysis(sheet, logsByDate);
+    
+    // Sütun genişliklerini ayarla
+    sheet.autoResizeColumns(1, 5);
+    
+    console.log(`✅ ${sheetName} sayfası oluşturuldu`);
+    return sheet;
+    
+  } catch (error) {
+    console.error('❌ createEmployeeLogSummarySheet hatası:', error);
     throw error;
+  }
+}
+
+// ========================================
+// ⏰ ZAMAN ANALİZİ SİSTEMİ
+// ========================================
+
+/**
+ * ⏰ Log'lar arası zaman analizi yapar
+ * Her aktivite türü için ortalama süre hesaplar
+ */
+function addTimeAnalysis(sheet, logsByDate) {
+  try {
+    console.log('⏰ Zaman analizi başlatılıyor...');
+    
+    // Tüm log'ları tek array'de topla
+    const allLogs = [];
+    for (const [date, logs] of logsByDate) {
+      for (const log of logs) {
+        allLogs.push({ ...log, date: date });
+      }
+    }
+    
+    console.log(`🔍 ZAMAN ANALİZİ DEBUG: Toplam ${allLogs.length} log toplandı`);
+    console.log(`🔍 İlk 3 log örneği:`, allLogs.slice(0, 3).map(l => ({ log: l.log, date: l.date })));
+    
+    // Tarih ve saate göre sırala
+    allLogs.sort((a, b) => {
+      const dateA = new Date(a.date.split('.').reverse().join('-'));
+      const dateB = new Date(b.date.split('.').reverse().join('-'));
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      
+      const timeA = a.log.match(/\s(\d{1,2}):(\d{2}):(\d{2})/);
+      const timeB = b.log.match(/\s(\d{1,2}):(\d{2}):(\d{2})/);
+      if (timeA && timeB) {
+        const totalSecondsA = parseInt(timeA[1]) * 3600 + parseInt(timeA[2]) * 60 + parseInt(timeA[3]);
+        const totalSecondsB = parseInt(timeB[1]) * 3600 + parseInt(timeB[2]) * 60 + parseInt(timeB[3]);
+        return totalSecondsA - totalSecondsB;
+      }
+      return 0;
+    });
+    
+    console.log(`🔍 Sıralama sonrası ilk 3 log:`, allLogs.slice(0, 3).map(l => ({ log: l.log, date: l.date })));
+    
+    // Aktivite türüne göre grupla
+    const activityStats = new Map();
+    let totalTime = 0;
+    let logCount = 0;
+    
+    for (let i = 0; i < allLogs.length - 1; i++) {
+      const currentLog = allLogs[i];
+      const nextLog = allLogs[i + 1];
+      
+      // İki log arası süre hesapla
+      const timeDiff = calculateTimeDifference(currentLog, nextLog);
+      
+      // Debug: İlk 5 hesaplamayı göster
+      if (i < 5) {
+        console.log(`🔍 ZAMAN HESAPLAMA ${i + 1}:`);
+        console.log(`   Log1: "${currentLog.log}" (${currentLog.date})`);
+        console.log(`   Log2: "${nextLog.log}" (${nextLog.date})`);
+        console.log(`   Fark: ${timeDiff} dakika`);
+      }
+      
+      if (timeDiff > 0) {
+        const aktivite = currentLog.aktivite.toString().toLowerCase();
+        
+        if (!activityStats.has(aktivite)) {
+          activityStats.set(aktivite, { count: 0, totalTime: 0, avgTime: 0 });
+        }
+        
+        const stats = activityStats.get(aktivite);
+        stats.count++;
+        stats.totalTime += timeDiff;
+        stats.avgTime = stats.totalTime / stats.count;
+        
+        totalTime += timeDiff;
+        logCount++;
+      }
+    }
+    
+    // Zaman analizi özetini ekle - ÜSTTE
+    let row = 3; // Başlıktan sonra başla
+    
+    // Başlık
+    sheet.getRange(row, 1).setValue('⏰ ZAMAN ANALİZİ');
+    sheet.getRange(row, 1, 1, 5).merge();
+    sheet.getRange(row, 1).setFontWeight('bold').setFontSize(14).setBackground('#E3F2FD');
+    row++;
+    
+    // Genel ortalama
+    const generalAvg = logCount > 0 ? (totalTime / logCount).toFixed(2) : 0;
+    sheet.getRange(row, 1).setValue('📊 Genel Ortalama:');
+    sheet.getRange(row, 1, 1, 2).merge();
+    sheet.getRange(row, 3).setValue(`${generalAvg} dakika/log`);
+    sheet.getRange(row, 1, 1, 3).setFontWeight('bold').setBackground('#F5F5F5');
+    row++;
+    
+    // Aktivite türüne göre detaylar
+    for (const [aktivite, stats] of activityStats) {
+      sheet.getRange(row, 1).setValue(`📈 ${aktivite}:`);
+      sheet.getRange(row, 2).setValue(`${stats.count} log`);
+      sheet.getRange(row, 3).setValue(`${stats.avgTime.toFixed(2)} dakika/log`);
+      sheet.getRange(row, 4).setValue(`Toplam: ${stats.totalTime} dakika`);
+      row++;
+    }
+    
+    console.log('⏰ Zaman analizi tamamlandı');
+    
+  } catch (error) {
+    console.error('❌ Zaman analizi hatası:', error);
+  }
+}
+
+/**
+ * ⏰ İki log arası zaman farkını hesaplar (dakika cinsinden)
+ */
+function calculateTimeDifference(log1, log2) {
+  try {
+    const date1 = new Date(log1.date.split('.').reverse().join('-'));
+    const date2 = new Date(log2.date.split('.').reverse().join('-'));
+    
+    const time1 = log1.log.match(/\s(\d{1,2}):(\d{2}):(\d{2})/);
+    const time2 = log2.log.match(/\s(\d{1,2}):(\d{2}):(\d{2})/);
+    
+    if (!time1 || !time2) return 0;
+    
+    const dateTime1 = new Date(date1);
+    dateTime1.setHours(parseInt(time1[1]), parseInt(time1[2]), parseInt(time1[3]), 0);
+    
+    const dateTime2 = new Date(date2);
+    dateTime2.setHours(parseInt(time2[1]), parseInt(time2[2]), parseInt(time2[3]), 0);
+    
+    const diffMs = dateTime2.getTime() - dateTime1.getTime();
+    const diffMinutes = Math.round(diffMs / (1000 * 60));
+    
+    return diffMinutes > 0 ? diffMinutes : 0;
+    
+  } catch (error) {
+    console.error('❌ Zaman hesaplama hatası:', error);
+    return 0;
   }
 }
 
@@ -6970,54 +7645,6 @@ function syncAllEmployeesAndShowDashboard() {
     throw error;
   }
 }
-}
-
-// ========================================
-// 🎯 TEK TEMSİLCİ ANALİZ FONKSİYONLARI
-// ========================================
-
-/**
- * 🎯 LG 001 - Levent Gültekin Analizi
- */
-function analyzeLG001() {
-  analyzeSingleEmployee('LG 001');
-}
-
-/**
- * 🎯 NT 002 - Nihan Taş Analizi
- */
-function analyzeNT002() {
-  analyzeSingleEmployee('NT 002');
-}
-
-/**
- * 🎯 KO 003 - Kaan Özkan Analizi
- */
-function analyzeKO003() {
-  analyzeSingleEmployee('KO 003');
-}
-
-/**
- * 🎯 SB 004 - Selin Baş Analizi
- */
-function analyzeSB004() {
-  analyzeSingleEmployee('SB 004');
-}
-
-/**
- * 🎯 KM 005 - Kaya Mert Analizi
- */
-function analyzeKM005() {
-  analyzeSingleEmployee('KM 005');
-}
-
-/**
- * 🎯 GŞ 006 - Gizem Şahin Analizi
- */
-function analyzeGS006() {
-  analyzeSingleEmployee('GŞ 006');
-}
-
 
 /**
  * 🧠 Akıllı performans analizi - Her temsilcinin günlük verilerini direkt çeker
@@ -7491,3 +8118,52 @@ function calculateWorkDuration(startTime, endTime) {
     return 0;
   }
 }
+/**
+ * 🎨 Tüm Yönetici Sayfalarında Renk Kodlaması
+ * T Toplantılar renk problemi için özel çözüm
+ */
+function applyColorCodingToAllManagerSheets() {
+  console.log('🎨 Function started: applyColorCodingToAllManagerSheets');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = ss.getSheets();
+    let processedSheets = 0;
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      const lowerName = String(sheetName).toLowerCase();
+      
+      // T sayfalarını işle (T Randevular, T Fırsatlar, T Toplantılar, T Aktivite Özet)
+      if (lowerName.startsWith('t ') || lowerName.includes('t randevu') || lowerName.includes('t fırsat') || lowerName.includes('t toplant') || lowerName.includes('t aktivite')) {
+        const lastRow = sheet.getLastRow();
+        
+        if (lastRow > 1) {
+          console.log(`🎨 ${sheetName} sayfası renklendiriliyor (${lastRow} satır)`);
+          
+          // T Toplantılar için özel debug
+          if (lowerName.includes('toplant')) {
+            console.log(`🎨 T Toplantılar özel işleme başlıyor...`);
+          }
+          
+          // Renk kodlamasını uygula
+          applyColorCodingToManagerData(sheet, sheetName, 2, lastRow - 1);
+          processedSheets++;
+          
+          console.log(`✅ ${sheetName} renklendirildi`);
+        }
+      }
+    }
+    
+    const message = `🎨 Renk Kodlaması Tamamlandı!\n\n✅ İşlenen sayfa: ${processedSheets}\n📋 Tüm T sayfaları renklendirildi`;
+    SpreadsheetApp.getUi().alert('🎨 Renk Kodlaması', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    console.log(`🎨 applyColorCodingToAllManagerSheets tamamlandı: ${processedSheets} sayfa işlendi`);
+    
+  } catch (error) {
+    console.error('🎨 applyColorCodingToAllManagerSheets hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Renk Kodlaması Hatası', `Hata: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+console.log("🔧 DEBUG: Ana dosyaya eklendi");
