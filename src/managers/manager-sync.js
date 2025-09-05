@@ -1921,22 +1921,9 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
             const statusIdx = findIdx(['Randevu durumu','Durum']);
             const dateIdx = findIdx(['Randevu Tarihi','Tarih']);
             const timeIdx = findIdx(['Saat']);
-            const logIdx = findIdx(['Log']);
             const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
             const values = rng.getValues();
-            function parseDd(s){
-              const v = String(s||'').trim();
-              const m = v.match(/(\d{2}\.\d{2}\.\d{4})/);
-              if (m) {
-                const [dd,mm,yy] = m[1].split('.');
-                const d = new Date(Number(yy), Number(mm)-1, Number(dd));
-                if (!isNaN(d.getTime())) return d;
-              }
-              return null;
-            }
             function getActDate(row){
-              const dLog = logIdx>=0 ? parseDd(row[logIdx]) : null;
-              if (dLog) return dLog;
               if (dateIdx>=0) {
                 const d = parseDdMmYyyy(row[dateIdx]);
                 if (d) return d;
@@ -2051,14 +2038,8 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
     try {
       const lr = sheet.getLastRow();
       if (lr > 1) {
-        // Yalnızca görünen sayfa için uygula (performans ve çakışmayı önleme)
-        const active = managerFile.getActiveSheet();
-        if (active && active.getName() === sheet.getName()) {
-          applyColorCodingToManagerData(sheet, sheet.getName(), 2, lr - 1);
-        } else {
-          // Sadece yeni/güncellenen satırları renkle (kısa süreli)
-          // Not: Bu blok kasıtlı olarak boş bırakıldı; toplu renkleme kullanıcı komutuyla yapılır
-        }
+        // Tüm sayfa için renklendirmeyi uygula (görünür olma şartı olmadan)
+        applyColorCodingToManagerData(sheet, sheet.getName(), 2, lr - 1);
       }
     } catch (finalColErr) {
       console.log('⚠️ Final recolor skipped:', finalColErr && finalColErr.message);
