@@ -6540,6 +6540,14 @@ function sortTRandevularByDateAscending() {
     }
     const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
     const values = rng.getValues();
+    function getActDate(v){
+      if (v instanceof Date && !isNaN(v.getTime())) return v;
+      const d1 = parseDdMmYyyy(v);
+      if (d1) return d1;
+      const d2 = new Date(v);
+      if (!isNaN(d2.getTime())) return d2;
+      return new Date('2099-12-31');
+    }
     function parseTime(v){
       if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
       const s = String(v || '').trim();
@@ -6549,18 +6557,19 @@ function sortTRandevularByDateAscending() {
     }
     function groupRank(row){
       const s = String(idxStatus>=0 ? row[idxStatus] : '').toLowerCase();
-      if (s.includes('iptal')) return 0;
-      if (s.includes('erte')) return 0;
-      if (s.includes('teyit')) return 1;
-      if (s.includes('randevu al')) return 1;
-      return 2;
+      if (s.includes('iptal')) return 0; // İptal üstte
+      if (s.includes('erte')) return 1; // Ertelendi sonra
+      if (s.includes('teyit')) return 2; // Teyitlendi
+      if (s.includes('randevu al')) return 3; // Alındı
+      if (s.includes('ileri')) return 4; // İleri Tarih Randevu
+      return 5;
     }
     values.sort(function(a,b){
       const ra = groupRank(a);
       const rb = groupRank(b);
       if (ra !== rb) return ra - rb;
-      const da = parseDdMmYyyy(a[idxDate]) || new Date('2099-12-31');
-      const db = parseDdMmYyyy(b[idxDate]) || new Date('2099-12-31');
+      const da = getActDate(a[idxDate]);
+      const db = getActDate(b[idxDate]);
       if (da.getTime() !== db.getTime()) return da - db;
       if (idxTime >= 0) return parseTime(a[idxTime]) - parseTime(b[idxTime]);
       return 0;
