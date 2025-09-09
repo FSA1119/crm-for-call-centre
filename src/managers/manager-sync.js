@@ -830,7 +830,6 @@ function onOpen() {
   
   try {
     createManagerMenu();
-    createTypeBasedMenu();
     
     // Skip auto color coding on open (performance)
     console.log('⏭️ Skipping auto color coding on open');
@@ -2428,10 +2427,13 @@ function createManagerMenu() {
     // Sırayla (Üstüne Ekle) - Kullanılıyor
     const appendSubmenu = ui.createMenu('➕ Sırayla (Üstüne Ekle)');
     for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
-      // Boşlukları alt çizgi ile değiştir ve doğru fonksiyon ismini oluştur
       const functionName = `syncSingleEmployeeAppend_${employeeCode.replace(/\s+/g, '_')}`;
       appendSubmenu.addItem(`${employeeCode} - ${employeeName}`, functionName);
     }
+    appendSubmenu.addSeparator()
+      .addItem('Tüm Kodlar - Randevular', 'syncAllEmployeesAppend_Randevular')
+      .addItem('Tüm Kodlar - Fırsatlar', 'syncAllEmployeesAppend_Firsatlar')
+      .addItem('Tüm Kodlar - Toplantılar', 'syncAllEmployeesAppend_Toplantilar');
     menu.addSubMenu(appendSubmenu)
         .addSeparator();
 
@@ -9926,5 +9928,110 @@ function applyColorCodingToAllManagerSheets() {
     SpreadsheetApp.getUi().alert('❌ Renk Kodlaması Hatası', `Hata: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
+
+function syncAllEmployeesAppend_Randevular() {
+  console.log('Function started:', { action: 'syncAllEmployeesAppend_Randevular' });
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    if (!managerFile) throw new Error('Yönetici dosyası bulunamadı');
+    const allStats = { totalRecords: 0, employeeStats: {} };
+    const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    for (const code of codes) {
+      const dataBySheet = collectEmployeeData(managerFile, code);
+      const data = dataBySheet && dataBySheet['Randevular'];
+      if (Array.isArray(data) && data.length > 0) {
+        const op = updateManagerSheet(managerFile, 'Randevular', data, code, 'append') || {};
+        allStats.employeeStats[code] = op;
+        allStats.totalRecords += op.totalIncoming || 0;
+      }
+    }
+    showSyncResults(allStats);
+    SpreadsheetApp.getUi().alert('Tamam', 'Tüm kodlar için Randevular üstüne eklendi.', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', 'Randevular (tüm kodlar) üstüne ekle: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+function syncAllEmployeesAppend_Firsatlar() {
+  console.log('Function started:', { action: 'syncAllEmployeesAppend_Firsatlar' });
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    if (!managerFile) throw new Error('Yönetici dosyası bulunamadı');
+    const allStats = { totalRecords: 0, employeeStats: {} };
+    const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    for (const code of codes) {
+      const dataBySheet = collectEmployeeData(managerFile, code);
+      const data = dataBySheet && dataBySheet['Fırsatlar'];
+      if (Array.isArray(data) && data.length > 0) {
+        const op = updateManagerSheet(managerFile, 'Fırsatlar', data, code, 'append') || {};
+        allStats.employeeStats[code] = op;
+        allStats.totalRecords += op.totalIncoming || 0;
+      }
+    }
+    showSyncResults(allStats);
+    SpreadsheetApp.getUi().alert('Tamam', 'Tüm kodlar için Fırsatlar üstüne eklendi.', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', 'Fırsatlar (tüm kodlar) üstüne ekle: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+function syncAllEmployeesAppend_Toplantilar() {
+  console.log('Function started:', { action: 'syncAllEmployeesAppend_Toplantilar' });
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    if (!managerFile) throw new Error('Yönetici dosyası bulunamadı');
+    const allStats = { totalRecords: 0, employeeStats: {} };
+    const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    for (const code of codes) {
+      const dataBySheet = collectEmployeeData(managerFile, code);
+      const data = dataBySheet && dataBySheet['Toplantılar'];
+      if (Array.isArray(data) && data.length > 0) {
+        const op = updateManagerSheet(managerFile, 'Toplantılar', data, code, 'append') || {};
+        allStats.employeeStats[code] = op;
+        allStats.totalRecords += op.totalIncoming || 0;
+      }
+    }
+    showSyncResults(allStats);
+    SpreadsheetApp.getUi().alert('Tamam', 'Tüm kodlar için Toplantılar üstüne eklendi.', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', 'Toplantılar (tüm kodlar) üstüne ekle: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+function syncReportsAllEmployees() {
+  console.log('Function started:', { action: 'syncReportsAllEmployees' });
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    if (!managerFile) throw new Error('Yönetici dosyası bulunamadı');
+    const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    for (const code of codes) {
+      const employeeFile = findEmployeeFile(code);
+      if (!employeeFile) continue;
+      const negRows = collectFormatTableNegativeSummary(employeeFile, code);
+      updateManagerActivitySummary(managerFile, negRows, code, 'replace');
+      const fullRows = computeFullActivityWideRows(managerFile, code);
+      updateManagerFullActivitySummaryWide(managerFile, fullRows, code, 'replace');
+    }
+    try {
+      const shTumu = managerFile.getSheetByName('T Aktivite (Tümü)');
+      if (shTumu && shTumu.getLastRow() > 1) {
+        applyColorCodingToManagerData(shTumu, 'T Aktivite (Tümü)', 2, shTumu.getLastRow() - 1);
+      }
+    } catch (e) {}
+    SpreadsheetApp.getUi().alert('Tamam', 'Raporlar tüm kodlar için güncellendi.', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', 'Rapor güncelleme hatası: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/* createTypeBasedMenu kaldırıldı: Tüm Kodlar aksiyonları artık '➕ Sırayla (Üstüne Ekle)' altında */
 
 console.log("🔧 DEBUG: Ana dosyaya eklendi");
