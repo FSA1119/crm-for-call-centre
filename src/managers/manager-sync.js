@@ -453,6 +453,1696 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
     }
     console.log(`🎨 ${sheetName}: Temsilci Kodu sütunu bulundu: ${employeeCodeColumnIndex} (${headers[employeeCodeColumnIndex] || 'bulunamadı'})`);
     
+    // T Aktivite Özet için status sütunu zorunlu değil
+    if (statusColumnIndex === -1 && (sheetName !== 'T Aktivite Özet' && sheetName !== 'T Aktivite (Tümü)')) {
+      console.log(`⚠️ ${sheetName}: Status column not found (${statusColumnIndex}), skipping color coding`);
+      return;
+    }
+    
+    // T sayfaları için özel debug
+    if (lowerName.includes('toplant')) {
+      console.log(`🎨 T Toplantılar Debug: StatusCol=${statusColumnIndex}, MeetingResultIdx=${meetingResultIdx}, Headers=${headers.join(', ')}`);
+    } else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) {
+      console.log(`🎨 T Fırsatlar Debug: StatusCol=${statusColumnIndex}, Headers=${headers.join(', ')}`);
+    } else if (lowerName.includes('randevu')) {
+      console.log(`🎨 T Randevular Debug: StatusCol=${statusColumnIndex}, RandevuMeetingResultIdx=${randevuMeetingResultIdx}, Headers=${headers.join(', ')}`);
+    }
+    
+    console.log(`🎨 applyColorCodingToManagerData: Sheet=${sheetName}, StatusCol=${statusColumnIndex}, EmployeeCol=${employeeCodeColumnIndex}, Rows=${rowCount}`);
+    for (let i = 0; i < rowCount; i++) {
+      const rowNumber = startRow + i;
+      console.log(`🎨 Processing row ${rowNumber} for ${sheetName}`);
+      
+      // T Aktivite Özet için status kontrolü yapma
+      let status = '';
+      let normStatusStr = '';
+      if (!(sheetName === 'T Aktivite Özet' || sheetName === 'T Aktivite (Tümü)')) {
+        const statusCell = sheet.getRange(rowNumber, statusColumnIndex + 1);
+        status = String(statusCell.getDisplayValue() || '').trim();
+        normStatusStr = status.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+        console.log(`Manager color coding - Row ${rowNumber}, Status: "${status}", Sheet: ${sheetName}`);
+      }
+      
+      // Her satır için color değişkeni tanımla
+      let color = 'rgb(255, 255, 255)';
+      
+      // T Aktivite Özet için sadece temsilci koduna göre renk
+      console.log(`🔍 Row ${rowNumber}: sheetName="${sheetName}", lowerName="${lowerName}"`);
+      
+                         if (sheetName === 'T Aktivite Özet' || sheetName === 'T Aktivite (Tümü)') {
+        // T Aktivite Özet/Tümü: durum dikkate alınmaz, temsilci kodu görsel kimlik
+        color = 'rgb(255, 255, 255)';
+        console.log(`🎨 ${sheetName} row ${rowNumber}: Status bypassed, using employee code`);
+      }
+      if (status && status !== '' && !(sheetName === 'T Aktivite Özet' || sheetName === 'T Aktivite (Tümü)')) {
+        if (lowerName.includes('toplant')) {
+          var resultVal = '';
+          try { if (typeof meetingResultIdx === 'number' && meetingResultIdx >= 0) { resultVal = String(sheet.getRange(rowNumber, meetingResultIdx + 1).getDisplayValue() || ''); } } catch(e) {}
+          const rv = String(resultVal).toLowerCase();
+          const isSale = (rv === 'satış yapıldı' || rv === 'satis yapildi');
+          const isOffer = (!isSale && rv.indexOf('teklif') !== -1);
+          const isCancel = (!isSale && rv.indexOf('iptal') !== -1);
+          
+          console.log(`🎨 T Toplantılar Row ${rowNumber}: resultVal="${resultVal}", rv="${rv}", isSale=${isSale}, isOffer=${isOffer}, isCancel=${isCancel}`);
+          // Potansiyel rengi oku (Satış/Teklif/İptal değilse)
+          let potentialColor = '';
+          try {
+            const potIdx = headers.indexOf('Satış Potansiyeli');
+            if (potIdx !== -1) {
+              const pot = String(sheet.getRange(rowNumber, potIdx + 1).getDisplayValue() || '').toLowerCase();
+              if (pot === 'sıcak' || pot === 'sicak') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Sıcak'];
+              else if (pot === 'orta') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Orta'];
+              else if (pot === 'soğuk' || pot === 'soguk') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Soğuk'];
+              console.log(`🎨 T Toplantılar Row ${rowNumber}: pot="${pot}", potentialColor="${potentialColor}"`);
+            } else {
+              console.log(`🎨 T Toplantılar Row ${rowNumber}: Satış Potansiyeli sütunu bulunamadı (potIdx=${potIdx})`);
+            }
+          } catch(e) {
+            console.log(`🎨 T Toplantılar Row ${rowNumber}: Potansiyel renk okuma hatası:`, e && e.message);
+          }
+          if (isSale) {
+            color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+          } else if (isOffer) {
+            // Teklif: potansiyele göre renklendir (varsa), yoksa koyu yeşil
+            color = potentialColor || CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
+          } else if (isCancel) {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı İptal'];
+          } else if (potentialColor) {
+            color = potentialColor;
+          } else {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+          }
+          
+          console.log(`🎨 T Toplantılar Row ${rowNumber}: Final color determined: ${color}`);
+        } else if (lowerName.includes('randevu')) {
+          // Randevular: kesin eşleşme (TR başlıklar)
+          const raw = String(status || '').trim();
+          const n = normStatusStr;
+          
+          console.log(`🎨 T Randevular Row ${rowNumber}: raw="${raw}", n="${n}"`);
+          
+          if (raw === 'Randevu Alındı' || n.indexOf('randevu alindi') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+          } else if (raw === 'İleri Tarih Randevu' || (n.indexOf('ileri') !== -1 && n.indexOf('tarih') !== -1)) {
+            color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
+          } else if (raw === 'Randevu Teyitlendi' || n.indexOf('teyit') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
+          } else if (raw === 'Randevu Ertelendi' || n.indexOf('erte') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
+          } else if (raw === 'Randevu İptal oldu' || n.indexOf('iptal') !== -1) {
+            color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
+          }
+          
+          console.log(`🎨 T Randevular Row ${rowNumber}: Initial color determined: ${color}`);
+          // Toplantı Sonucu override'ları
+          if (typeof randevuMeetingResultIdx === 'number' && randevuMeetingResultIdx >= 0) {
+            try {
+              const res = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getDisplayValue() || '').trim();
+              const resLower = res.toLowerCase();
+              
+              console.log(`🎨 T Randevular Row ${rowNumber}: Toplantı Sonucu="${res}", resLower="${resLower}"`);
+              
+              if (res === 'Satış Yapıldı') {
+                color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+                console.log(`🎨 T Randevular Row ${rowNumber}: Override to Satış Yapıldı: ${color}`);
+              } else if (resLower.indexOf('teklif') !== -1) {
+                color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
+                console.log(`🎨 T Randevular Row ${rowNumber}: Override to Toplantı Teklif: ${color}`);
+              }
+            } catch (e) {
+              console.log(`🎨 T Randevular Row ${rowNumber}: Toplantı Sonucu okuma hatası:`, e && e.message);
+            }
+          }
+          
+          console.log(`🎨 T Randevular Row ${rowNumber}: Final color determined: ${color}`);
+        } else {
+          // Fırsatlar ve diğerleri
+          console.log(`🎨 T Fırsatlar Row ${rowNumber}: status="${status}", normStatusStr="${normStatusStr}"`);
+          
+          if (status === 'Fırsat İletildi' || String(status).toLowerCase().includes('teklif')) {
+            color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+          } else if (status === 'Bilgi Verildi') {
+            color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
+          } else if (status === 'Yeniden Aranacak') {
+            color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
+          } else if (status === 'İlgilenmiyor') {
+            color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
+          } else if (status === 'Ulaşılamadı') {
+            color = CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
+          } else if (status === 'Toplantı Tamamlandı') {
+            color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+          }
+          
+          console.log(`🎨 T Fırsatlar Row ${rowNumber}: Final color determined: ${color}`);
+        }
+      }
+      
+      // Her satır için final color belirle
+      let finalColor = color;
+      
+      // T Aktivite Özet için her satırda employee code işle
+      console.log(`🔍 Row ${rowNumber}: Employee code check - sheetName="${sheetName}"`);
+      
+      // T Aktivite Özet için employee code işle
+      if (sheetName === 'T Aktivite Özet') {
+        console.log(`🎨 T Aktivite Özet row ${rowNumber}: Processing employee code...`);
+        
+        if (employeeCodeColumnIndex !== -1) {
+          try {
+            const employeeCode = String(sheet.getRange(rowNumber, employeeCodeColumnIndex + 1).getDisplayValue() || '').trim();
+            console.log(`🔍 Row ${rowNumber}: Employee code found: "${employeeCode}"`);
+            
+            if (employeeCode) {
+              const employeeColor = getEmployeeColor(employeeCode);
+              console.log(`🎨 Row ${rowNumber}: getEmployeeColor("${employeeCode}") = ${employeeColor}`);
+              
+              if (employeeColor) {
+                finalColor = employeeColor;
+                console.log(`🎨 Employee color applied: ${employeeCode} → ${employeeColor}`);
+              } else {
+                console.log(`⚠️ Row ${rowNumber}: No color found for employee code "${employeeCode}"`);
+              }
+            } else {
+              console.log(`⚠️ Row ${rowNumber}: Empty employee code`);
+            }
+          } catch (e) {
+            console.log('Employee color lookup failed:', e && e.message);
+          }
+        } else {
+          console.log(`⚠️ Row ${rowNumber}: employeeCodeColumnIndex = ${employeeCodeColumnIndex}`);
+        }
+      } else if (employeeCodeColumnIndex !== -1 && sheetName === 'T Aktivite Özet') {
+        // Sadece T Aktivite Özet için employee color uygula
+        try {
+          const employeeCode = String(sheet.getRange(rowNumber, employeeCodeColumnIndex + 1).getDisplayValue() || '').trim();
+          if (employeeCode) {
+            const employeeColor = getEmployeeColor(employeeCode);
+            if (employeeColor) {
+              finalColor = employeeColor;
+              console.log(`🎨 Employee color applied: ${employeeCode} → ${employeeColor}`);
+            }
+          }
+        } catch (e) {
+          console.log('Employee color lookup failed:', e && e.message);
+        }
+      }
+      
+      // Renk uygulama
+      try {
+        if (sheetName === 'T Aktivite Özet' || sheetName === 'T Aktivite (Tümü)') {
+          // Sadece 'Kod' hücresini temsilci rengine boya, diğer hücreleri beyaz bırak
+          const rowRange = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+          rowRange.setBackground('white');
+          try {
+            const codeCell = sheet.getRange(rowNumber, (employeeCodeColumnIndex > -1 ? employeeCodeColumnIndex : 0) + 1);
+            const empCode = String(codeCell.getDisplayValue() || '').trim();
+            const empColor = empCode ? getEmployeeColor(empCode) : null;
+            if (empColor) codeCell.setBackground(empColor);
+          } catch (ecErr) { console.log('Employee cell color failed:', ecErr && ecErr.message); }
+          console.log(`🎨 Row ${rowNumber}: ${sheetName} → only Kod colored`);
+        } else {
+          // Diğer sayfalarda tüm satıra durum rengi uygula
+          const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+          range.setBackground(finalColor);
+          console.log(`🎨 Row ${rowNumber}: Background color set: ${finalColor} (Sheet: ${sheetName})`);
+          
+          // T sayfaları için özel debug
+          if (lowerName.includes('toplant') || lowerName.includes('fırsat') || lowerName.includes('firsat') || lowerName.includes('randevu')) {
+            console.log(`🎨 T Sayfa Row ${rowNumber}: finalColor="${finalColor}", sheetName="${sheetName}"`);
+          }
+        }
+      } catch(e) {
+        console.log('setBackground fail', e && e.message);
+      }
+
+      // Yeni: Randevular'da Toplantı Sonucu doluysa kursiv+kalın; boşsa normal
+      try {
+        if (lowerName.includes('randevu') && typeof randevuMeetingResultIdx === 'number' && randevuMeetingResultIdx >= 0) {
+          const resDisp = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getDisplayValue() || '').trim();
+          const rowRange = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+          if (resDisp) {
+            rowRange.setFontStyle('italic');
+            rowRange.setFontWeight('bold');
+          } else {
+            rowRange.setFontStyle('normal');
+            rowRange.setFontWeight('normal');
+          }
+        }
+      } catch (styleErr) {
+        console.log('⚠️ Font style apply skipped:', styleErr && styleErr.message);
+      }
+    }
+  } catch (error) {
+    console.error('Error applying color coding to manager data:', error);
+  }
+}
+
+function resetReadableView() {
+  console.log('Function started:', { action: 'resetReadableView' });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+    if (!sheet) {
+      throw new Error('Aktif sayfa bulunamadı');
+    }
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastCol === 0) {
+      SpreadsheetApp.getUi().alert('Uyarı', 'Bu sayfada kolon bulunmuyor.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    const lowered = headers.map(h => String(h || '').toLowerCase());
+    function idxOf(cands){ for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; } return -1; }
+
+    const idxYorum = idxOf(['Yorum']);
+    const idxYonNot = idxOf(['Yönetici Not','Yonetici Not']);
+    const idxLog   = idxOf(['Log']);
+
+    const targets = [];
+    if (idxYorum !== -1) targets.push(idxYorum + 1);
+    if (idxYonNot !== -1) targets.push(idxYonNot + 1);
+    if (idxLog   !== -1) targets.push(idxLog + 1);
+
+    for (const col of targets) {
+      try {
+        if (lastRow > 1) {
+          const rng = sheet.getRange(2, col, lastRow - 1, 1);
+          rng.setWrap(false);
+          rng.setVerticalAlignment('BOTTOM');
+        }
+        try { sheet.autoResizeColumn(col); } catch (arErr) {}
+      } catch (colErr) {
+        console.log('⚠️ Column reset skipped:', { col, error: colErr && colErr.message });
+      }
+    }
+
+    if (lastRow > 1) {
+      try { sheet.setRowHeights(2, lastRow - 1, 21); } catch (rhErr) {}
+    }
+
+    console.log('Processing complete:', { resetCols: targets });
+    SpreadsheetApp.getUi().alert('Tamam', 'Görünüm sıfırlandı (metin kaydırma kapatıldı ve sütunlar otomatik boyutlandı).', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * 🔄 Synchronize a single employee
+ * @param {string} employeeCode - Employee code to synchronize
+ */
+function syncSingleEmployee(employeeCode, options) {
+  try {
+    const mode = options && options.mode ? options.mode : 'replace'; // replace | append
+    console.log(`🔄 syncSingleEmployee started for ${employeeCode} with mode=${mode}`);
+
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    if (!managerFile) {
+      throw new Error('Yönetici dosyası bulunamadı');
+    }
+    const totalStats = { totalRecords: 0, employeeStats: {}, errors: [] };
+    const employeeData = collectEmployeeData(managerFile, employeeCode);
+    const employeeStats = { employeeCode, totalRecords: 0, sheetStats: {} };
+    for (const [sheetName, data] of Object.entries(employeeData)) {
+      if (data && data.length > 0) {
+        const op = updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) || { totalIncoming: data.length };
+        employeeStats.sheetStats[sheetName] = op;
+        employeeStats.totalRecords += op.totalIncoming;
+      }
+    }
+
+    // Collect negatives from Format Tablo as summary counts
+    const employeeFile = findEmployeeFile(employeeCode);
+    const negRows = collectFormatTableNegativeSummary(employeeFile, employeeCode);
+    updateManagerActivitySummary(managerFile, negRows, employeeCode, 'replace');
+    try { employeeStats.sheetStats['T Aktivite Özet'] = Array.isArray(negRows) ? negRows.length : 0; } catch (_) {}
+    try {
+      const fullRows = computeFullActivityWideRows(managerFile, employeeCode);
+      updateManagerFullActivitySummaryWide(managerFile, fullRows, employeeCode, mode === 'append' ? 'append' : 'replace');
+      try { employeeStats.sheetStats['T Aktivite (Tümü)'] = Array.isArray(fullRows) ? fullRows.length : 0; } catch (_) {}
+      // Zorunlu renklendirme: Sadece T Aktivite (Tümü)
+      try {
+        const shTumu = managerFile.getSheetByName('T Aktivite (Tümü)');
+        if (shTumu && shTumu.getLastRow() > 1) {
+          applyColorCodingToManagerData(shTumu, 'T Aktivite (Tümü)', 2, shTumu.getLastRow() - 1);
+        }
+      } catch (colErr1) { console.log('⚠️ Recolor T Aktivite (Tümü) skipped:', colErr1 && colErr1.message); }
+    } catch (e) { console.log('⚠️ Full activity summary generation skipped:', e && e.message); }
+
+    totalStats.employeeStats[employeeCode] = employeeStats;
+    totalStats.totalRecords += employeeStats.totalRecords;
+
+    // Append modunda ilgili T sayfasına otomatik geçiş yap
+    if (mode === 'append') {
+      try {
+        const prefer = ['T Toplantılar', 'T Fırsatlar', 'T Randevular'];
+        for (const name of prefer) {
+          const sh = managerFile.getSheetByName(name);
+          if (sh && sh.getLastRow() > 1) { managerFile.setActiveSheet(sh); break; }
+        }
+      } catch (_) {}
+    }
+
+    showSyncResults(totalStats);
+    // Removed global recoloring/validation to avoid O(N) cost across all sheets
+    return totalStats;
+  } catch (error) {
+    console.error(`Error synchronizing employee ${employeeCode}:`, error);
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('Hata', `${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+
+
+// ========================================
+// 🚀 INITIALIZATION SYSTEM - SYSTEM STARTUP
+// ========================================
+
+/**
+ * 🚀 Manager System Initialization - Master Control
+ */
+function onOpen() {
+  console.log('🚀 Manager spreadsheet opened - creating menus');
+  
+  try {
+    createManagerMenu();
+    
+    // Skip auto color coding on open (performance)
+    console.log('⏭️ Skipping auto color coding on open');
+    
+    // Apply data validation to all sheets
+    applyDataValidationToAllManagerSheets();
+    
+    console.log('✅ Manager system initialized');
+    
+  } catch (error) {
+    console.error('❌ Error initializing manager system:', error);
+  }
+}
+
+/**
+ * 🎨 Apply Color Coding to All Manager Sheets - Automatic Styling
+ */
+function applyColorCodingToAllManagerSheets() {
+  console.log('🎨 Applying color coding to all manager sheets');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      
+      // Skip system sheets
+      if (sheetName.includes('Günlük Rapor') || 
+          sheetName.includes('Haftalık Rapor') || 
+          sheetName.includes('Detaylı Rapor')) {
+        continue;
+      }
+      
+      try {
+        const data = sheet.getDataRange().getValues();
+        if (data.length > 1) {
+          applyColorCodingToManagerData(sheet, sheetName, 2, data.length - 1);
+        }
+      } catch (error) {
+        console.error(`❌ Error applying color coding to ${sheetName}:`, error);
+      }
+    }
+    
+    console.log('✅ Color coding applied to all manager sheets');
+    
+  } catch (error) {
+    console.error('❌ Error applying color coding to manager sheets:', error);
+  }
+}
+
+/**
+ * ✅ Apply Data Validation to All Manager Sheets - Data Integrity
+ */
+function applyDataValidationToAllManagerSheets() {
+  console.log('✅ Applying data validation to all manager sheets');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      
+      // Skip system sheets
+      if (sheetName.includes('Günlük Rapor') || 
+          sheetName.includes('Haftalık Rapor') || 
+          sheetName.includes('Detaylı Rapor')) {
+        continue;
+      }
+      
+      try {
+        applyManagerSheetDataValidation(sheet, sheetName);
+      } catch (error) {
+        console.error(`❌ Error applying data validation to ${sheetName}:`, error);
+      }
+    }
+    
+    console.log('✅ Data validation applied to all manager sheets');
+    
+  } catch (error) {
+    console.error('❌ Error applying data validation to manager sheets:', error);
+  }
+}
+
+/**
+ * ✅ Apply Data Validation to Manager Sheet - Data Integrity
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetName - Sheet name
+ */
+function applyManagerSheetDataValidation(sheet, sheetName) {
+  console.log(`✅ Applying data validation to ${sheetName}`);
+  
+  try {
+    if (!sheet || !sheetName) {
+      console.error('❌ Invalid parameters for data validation');
+      return;
+    }
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    
+    // Serbest metin kolonlarındaki eski validasyonları temizle (ör. Kaynak)
+    try {
+      const idxKaynak = headers.indexOf('Kaynak');
+      if (idxKaynak !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxKaynak + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+      const idxLocation = headers.indexOf('Location');
+      if (idxLocation !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxLocation + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+      const idxKeyword = headers.indexOf('Keyword');
+      if (idxKeyword !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxKeyword + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+    } catch (e) { console.log('Validation clear skipped:', e && e.message); }
+    
+    // Apply validation based on sheet type
+    switch (sheetName) {
+      case 'Randevular':
+        try { sheet.setConditionalFormatRules([]); } catch (cfErr) { console.log('⚠️ CF clear skipped:', cfErr && cfErr.message); }
+        // Add validation for Aktivite
+        const aktiviteIndex = headers.indexOf('Aktivite');
+        if (aktiviteIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, aktiviteIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Randevu durumu
+        const randevuDurumuIndex = headers.indexOf('Randevu durumu');
+        if (randevuDurumuIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(['Randevu Alındı', 'İleri Tarih Randevu', 'Randevu Teyitlendi', 'Randevu Ertelendi', 'Randevu İptal oldu'], true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, randevuDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Toplantı Sonucu
+        const toplantiSonucuIndex = headers.indexOf('Toplantı Sonucu');
+        if (toplantiSonucuIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.MEETING_RESULT_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, toplantiSonucuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        break;
+        
+      case 'Fırsatlar':
+        // Add validation for Aktivite
+        const firsatAktiviteIndex = headers.indexOf('Aktivite');
+        if (firsatAktiviteIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatAktiviteIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Fırsat Durumu
+        const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+        if (firsatDurumuIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(['Fırsat İletildi', 'Bilgi Verildi', 'Yeniden Aranacak'], true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Fırsat Tarihi
+        const firsatTarihiIndex = headers.indexOf('Fırsat Tarihi');
+        if (firsatTarihiIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireDate()
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatTarihiIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Toplantı formatı
+        const firsatToplantiFormatIndex = headers.indexOf('Toplantı formatı');
+        if (firsatToplantiFormatIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatToplantiFormatIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        break;
+        
+      case 'Toplantılar':
+        // Add validation for Toplantı durumu
+        const toplantiDurumuIndex = headers.indexOf('Toplantı durumu');
+        if (toplantiDurumuIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(['Toplantı Tamamlandı'], true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, toplantiDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Toplantı formatı
+        const toplantiFormatiIndex = headers.indexOf('Toplantı formatı');
+        if (toplantiFormatiIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, toplantiFormatiIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+
+        // Add validation for Toplantı Sonucu
+        const toplantiSonucuIdx = headers.indexOf('Toplantı Sonucu');
+        if (toplantiSonucuIdx !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.MEETING_RESULT_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, toplantiSonucuIdx + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+
+        // Add validation for Satış Potansiyeli
+        const sPotIdx = headers.indexOf('Satış Potansiyeli');
+        if (sPotIdx !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(['Yerinde Satış', 'Sıcak', 'Orta', 'Soğuk'], true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, sPotIdx + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+
+        // Add validation for Yeni Takip Tarihi (date)
+        const yeniTakipIdx = headers.indexOf('Yeni Takip Tarihi');
+        if (yeniTakipIdx !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireDate()
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, yeniTakipIdx + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        break;
+    }
+    
+    console.log(`✅ Data validation applied to ${sheetName}`);
+    
+  } catch (error) {
+    console.error(`❌ Error applying data validation to ${sheetName}:`, error);
+  }
+}
+
+// ========================================
+// 🔄 SYNCHRONIZATION SYSTEM - DATA CONSOLIDATION
+// ========================================
+
+/**
+ * 🔄 Complete Data Collection - Master Synchronization
+ * @returns {Object} - Complete synchronization results
+ */
+// collectAllData fonksiyonu kaldırıldı - artık gerekli değil
+// Dashboard sistemi direkt temsilci dosyalarından veri çekiyor
+// Senkronizasyon işlemleri için "Sırayla Ekle" ve "Odak" fonksiyonları kullanılıyor
+
+/**
+ * 🔄 Employee Data Collection - Individual Processing
+ * @param {Spreadsheet} managerFile - Manager file
+ * @param {string} employeeCode - Employee code
+ * @returns {Object} - Employee data by sheet
+ */
+function collectEmployeeData(managerFile, employeeCode) {
+  try {
+    const employeeFile = findEmployeeFile(employeeCode);
+    if (!employeeFile) {
+      return {};
+    }
+    const employeeData = {};
+    const sheets = employeeFile.getSheets();
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      const lower = String(sheetName || '').toLowerCase();
+      let targetSheetName = '';
+      if (lower.includes('randevu')) targetSheetName = 'Randevular';
+      else if (lower.includes('fırsat') || lower.includes('firsat')) targetSheetName = 'Fırsatlar';
+      else if (lower.includes('toplant')) targetSheetName = 'Toplantılar';
+      else continue;
+
+      const sheetData = collectSheetData(sheet, employeeCode);
+      if (sheetData && sheetData.length > 0) {
+        employeeData[targetSheetName] = sheetData;
+      }
+    }
+    return employeeData;
+  } catch (error) {
+    console.error(`❌ Error collecting employee data for ${employeeCode}:`, error);
+    return {};
+  }
+}
+
+/**
+ * 🔄 Sheet Data Collection - Raw Data Extraction
+ * @param {Sheet} sheet - Source sheet
+ * @param {string} employeeCode - Employee code
+ * @returns {Array} - Sheet data
+ */
+function collectSheetData(sheet, employeeCode) {
+  try {
+    if (!sheet) {
+      return [];
+    }
+    const values = sheet.getDataRange().getValues();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (!values || values.length <= 1) {
+      return [];
+    }
+    const data = [];
+
+    // Determine target columns based on source sheet name (tolerant)
+    const sourceName = sheet.getName();
+    const sourceLower = String(sourceName || '').toLowerCase();
+    let targetColumns = [];
+    if (sourceLower.includes('randevu')) {
+      targetColumns = [
+        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+        'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
+        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+        'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+      ];
+    } else if (sourceLower.includes('fırsat') || sourceLower.includes('firsat')) {
+      // Meeting-only columns removed for opportunities target
+      targetColumns = [
+        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+        'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Fırsat Durumu', 'Fırsat Tarihi',
+        'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+        'Rating count', 'Review', 'Maplink'
+      ];
+    } else if (sourceLower.includes('toplant')) {
+      targetColumns = [
+        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
+        'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
+        'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
+        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+        'Rating count', 'Review'
+      ];
+    } else {
+      // Fallback (keep previous default)
+      targetColumns = [
+        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+        'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
+        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+        'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+      ];
+    }
+
+    const columnIndices = {};
+    headers.forEach((header, index) => {
+      columnIndices[header] = index;
+    });
+
+    function normalizeOpportunityStatus(value) {
+      const v = String(value || '').toLowerCase();
+      if (!v) return '';
+      if (v.indexOf('ilet') !== -1) return 'Fırsat İletildi';
+      if (v.indexOf('bilgi') !== -1) return 'Bilgi Verildi';
+      if (v.indexOf('yeniden') !== -1 || v.indexOf('ara') !== -1) return 'Yeniden Aranacak';
+      return '';
+    }
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      if (row.some(cell => cell !== '' && cell !== null && cell !== undefined && cell !== 'undefined' && cell !== 'null')) {
+        const orderedRow = [];
+        let hasValidDate = false;
+        
+        // Start from index 1 to skip 'Kod' (employee code is added later)
+        for (let j = 1; j < targetColumns.length; j++) {
+          const columnName = targetColumns[j];
+          let columnIndex = columnIndices[columnName];
+          
+          // Fallback mapping for common column name variations
+          if (columnIndex === undefined) {
+            const fallbackMappings = {
+              'Company name': ['Company', 'Firma', 'Şirket'],
+              'İsim Soyisim': ['İsim', 'Soyisim', 'Name', 'Contact'],
+              'Randevu Tarihi': ['Tarih', 'Date', 'Randevu Tarih'],
+              'Toplantı Tarihi': ['Tarih', 'Date', 'Toplantı Tarih'],
+              'Saat': ['Time', 'Zaman'],
+              'Randevu durumu': ['Durum', 'Status', 'Randevu Durum'],
+              'Toplantı durumu': ['Durum', 'Status', 'Toplantı Durum'],
+              'Phone': ['Telefon', 'Tel', 'Phone Number'],
+              'Yetkili Tel': ['Yetkili Telefon', 'Contact Phone'],
+              'Mail': ['Email', 'E-mail', 'E-posta'],
+              'Location': ['Konum', 'Lokasyon'],
+              'Website': ['URL', 'Web Site', 'Site'],
+              'Category': ['Kategori', 'Kategorisi'],
+              'Yorum': ['Comment', 'Not', 'Açıklama'],
+              'Yönetici Not': ['Manager Note', 'Yönetici Notu'],
+              'CMS Adı': ['CMS', 'CMS Name'],
+              'CMS Grubu': ['CMS Group', 'CMS Kategorisi'],
+              'E-Ticaret İzi': ['E-commerce', 'E-ticaret'],
+              'Site Hızı': ['Site Speed', 'Hız'],
+              'Site Trafiği': ['Site Traffic', 'Trafik'],
+              'Toplantı formatı': ['Meeting Format', 'Format'],
+              'Address': ['Adres', 'Adres'],
+              'City': ['Şehir', 'İl'],
+              'Rating count': ['Rating', 'Değerlendirme'],
+              'Review': ['Yorum', 'İnceleme'],
+              'Log': ['Activity Log', 'Aktivite Log']
+            };
+            
+            if (fallbackMappings[columnName]) {
+              for (const fallback of fallbackMappings[columnName]) {
+                if (columnIndices[fallback] !== undefined) {
+                  columnIndex = columnIndices[fallback];
+                  break;
+                }
+              }
+            }
+          }
+          
+          if (columnIndex !== undefined) {
+            let cellValue = row[columnIndex];
+            if (columnName === 'Saat') {
+              cellValue = formatTimeValue(cellValue);
+            }
+            if (columnName && columnName.includes('Tarihi')) {
+              cellValue = formatDateValue(cellValue);
+              // Tarih varsa geçerli satır olarak işaretle
+              if (cellValue && cellValue !== '') {
+                hasValidDate = true;
+              }
+            }
+            if (columnName === 'Fırsat Durumu') {
+              cellValue = normalizeOpportunityStatus(cellValue);
+            }
+            orderedRow.push(cellValue);
+          } else {
+            orderedRow.push('');
+          }
+        }
+        
+        // Sadece geçerli tarihi olan satırları ekle
+        if (hasValidDate) {
+          const rowData = { temsilciKodu: employeeCode, rowIndex: i + 2, data: orderedRow };
+          data.push(rowData);
+        }
+      }
+    }
+    return data;
+  } catch (error) {
+    console.error(`❌ Error collecting sheet data from ${sheet.getName()}:`, error);
+    return [];
+  }
+}
+
+/**
+ * 🔄 Manager Sheet Update - Data Integration
+ * @param {Spreadsheet} managerFile - Manager file
+ * @param {string} sheetName - Sheet name
+ * @param {Array} data - Data to update
+ * @param {string} employeeCode - Employee code
+ */
+function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
+  try {
+    if (!managerFile || !sheetName || !data || !employeeCode) {
+      return;
+    }
+    const effectiveMode = mode || 'replace';
+
+    // In append mode, use aggregate sheets with 'T ' prefix (e.g., T Randevular)
+    const targetSheetName = effectiveMode === 'append' ? `T ${sheetName}` : sheetName;
+    const baseTypeForHeaders = sheetName; // Randevular | Fırsatlar | Toplantılar
+
+    let sheet = managerFile.getSheetByName(targetSheetName);
+    if (!sheet) {
+      sheet = managerFile.insertSheet(targetSheetName);
+      // Create headers according to base sheet type (not the prefixed name)
+      createManagerSheetHeaders(sheet, baseTypeForHeaders);
+    }
+
+    // Replace mode: Randevular'da yöneticinin girdiği alanları korumak için satırları silme
+    if (effectiveMode !== 'append') {
+      const baseLower = String(baseTypeForHeaders || '').toLowerCase();
+      const isRandevuBase = baseLower.includes('randevu') && String(targetSheetName) === 'Randevular';
+      if (!isRandevuBase) {
+        clearEmployeeData(sheet, employeeCode);
+      }
+    }
+
+    const opStats = { totalIncoming: data.length, sameCount: 0, updateCount: 0, newCount: 0 };
+
+    if (data.length > 0) {
+      const allData = [];
+      for (let i = 0; i < data.length; i++) {
+        const rowData = data[i];
+        const rowDataCopy = [...rowData.data];
+        rowDataCopy.unshift(rowData.temsilciKodu);
+        allData.push(rowDataCopy);
+      }
+
+      // Upsert logic (restricted to same employee code)
+      let rowsToAppend = [];
+      const lastCol = sheet.getLastColumn();
+      const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      const existing = sheet.getLastRow() > 1
+        ? sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues()
+        : [];
+
+      function findIdx(names) {
+        for (let i = 0; i < headers.length; i++) {
+          const h = String(headers[i] || '').trim().toLowerCase();
+          for (const name of names) {
+            if (h === String(name).trim().toLowerCase()) return i;
+          }
+        }
+        return -1;
+      }
+
+      const idxCode = findIdx(['Temsilci Kodu', 'Kod']);
+      const idxCompany = findIdx(['Company name', 'Company']);
+      const idxStatus = findIdx(['Fırsat Durumu', 'Randevu durumu', 'Toplantı durumu', 'Durum']);
+      const idxDate = findIdx(['Fırsat Tarihi', 'Randevu Tarihi', 'Toplantı Tarihi', 'Tarih']);
+
+      function canonicalCode(value) { return String(value || '').trim(); }
+      function canonicalCompany(value) { return String(value || '').replace(/\s+/g, ' ').trim(); }
+      function canonicalStatus(value) {
+        const v = String(value || '').toLowerCase();
+        if (v.includes('ilet')) return 'Fırsat İletildi';
+        if (v.includes('bilgi')) return 'Bilgi Verildi';
+        if (v.includes('yeniden') || v.includes('ara')) return 'Yeniden Aranacak';
+        return String(value || '').trim();
+      }
+      function canonicalDate(value) { return formatDateValue(value); }
+
+      function strictKey(row) {
+        return [
+          canonicalCode(idxCode >= 0 ? row[idxCode] : ''),
+          canonicalCompany(idxCompany >= 0 ? row[idxCompany] : ''),
+          canonicalStatus(idxStatus >= 0 ? row[idxStatus] : ''),
+          canonicalDate(idxDate >= 0 ? row[idxDate] : '')
+        ].join('||');
+      }
+      function softKey(row) {
+        return [
+          canonicalCode(idxCode >= 0 ? row[idxCode] : ''),
+          canonicalCompany(idxCompany >= 0 ? row[idxCompany] : '')
+        ].join('||');
+      }
+
+      // Normalized comparison helpers to avoid false updates
+      function normalizeForCompare(value, headerName) {
+        const name = String(headerName || '');
+        if (/tarih/i.test(name)) {
+          return String(formatDateValue(value) || '').trim();
+        }
+        if (/^saat$/i.test(name)) {
+          return String(formatTimeValue(value) || '').trim();
+        }
+        const s = String(value == null ? '' : value);
+        return s.replace(/\s+/g, ' ').trim();
+      }
+      const excludeCompareCols = ['Yönetici Not','Yonetici Not','CMS Adı','CMS Adi','CMS Grubu','E-Ticaret İzi','Site Hızı','Site Hizı','Site Hizi','Site Trafiği','Site Trafik','Log','Toplantı formatı','Address','City','Rating count','Review','Maplink','Toplantı Sonucu','Toplanti Sonucu','Teklif Detayı','Teklif Detayi','Satış Potansiyeli','Satis Potansiyeli','Toplantı Tarihi','Toplanti Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan','Toplantiyi Yapan'];
+      const loweredHeaders = headers.map(h => String(h || '').toLowerCase());
+      const excludeIdxSet = new Set(excludeCompareCols.map(n => loweredHeaders.indexOf(String(n).toLowerCase())).filter(i => i >= 0));
+      function areRowsEqualByColumns(currentDisplayRow, incomingRow) {
+        for (let i = 0; i < headers.length; i++) {
+          if (excludeIdxSet.has(i)) continue;
+          const curNorm = normalizeForCompare(currentDisplayRow[i], headers[i]);
+          const inNorm = normalizeForCompare(incomingRow[i], headers[i]);
+          if (curNorm !== inNorm) return false;
+        }
+        return true;
+      }
+
+      const codeNorm = canonicalCode(employeeCode);
+
+      // Build existing maps only for the same employee
+      const strictMap = new Map();              // strictKey -> rowIndex
+      const softMap = new Map();                // softKey -> rowIndex (or -1 if ambiguous)
+      for (let i = 0; i < existing.length; i++) {
+        const r = existing[i];
+        if (canonicalCode(r[idxCode]) !== codeNorm) continue; // restrict to same employee
+        const sKey = strictKey(r);
+        strictMap.set(sKey, i + 2); // 2-based
+        const soKey = softKey(r);
+        if (!softMap.has(soKey)) softMap.set(soKey, i + 2);
+        else softMap.set(soKey, i + 2); // prefer last occurrence (latest row) for update
+      }
+
+      const updates = []; // {rowIndex, values}
+
+      for (const r of allData) {
+        // ensure row's code is the intended employee code
+        r[idxCode] = codeNorm;
+        const sKey = strictKey(r);
+        if (strictMap.has(sKey)) {
+          const rowIndex = strictMap.get(sKey);
+          const currentDisplay = sheet.getRange(rowIndex, 1, 1, lastCol).getDisplayValues()[0];
+          const changed = !areRowsEqualByColumns(currentDisplay, r);
+          if (changed) {
+            try {
+              const diffs = [];
+              for (let i = 0; i < headers.length; i++) {
+                if (excludeIdxSet.has(i)) continue;
+                const curNorm = normalizeForCompare(currentDisplay[i], headers[i]);
+                const inNorm = normalizeForCompare(r[i], headers[i]);
+                if (curNorm !== inNorm) diffs.push({ col: headers[i], from: curNorm, to: inNorm });
+              }
+              if (diffs.length) console.log('🔍 Diff (strict match update)', { sheetName, employeeCode, rowIndex, diffs });
+            } catch (_) {}
+            updates.push({ rowIndex, values: r }); opStats.updateCount++;
+          } else { opStats.sameCount++; }
+          continue;
+        }
+        const soKey = softKey(r);
+        if (softMap.has(soKey)) {
+          const rowIndex = softMap.get(soKey);
+          const currentDisplay = sheet.getRange(rowIndex, 1, 1, lastCol).getDisplayValues()[0];
+          // Fırsatlar ve Randevular: tarih/statu değişimi olsa dahi append etme, mevcut satırı güncelle
+          const baseLower = String(baseTypeForHeaders || '').toLowerCase();
+          // Randevular: tarih/durum değişse bile mevcut satırı güncelle, append etme
+          if (baseLower.includes('randevu')) {
+            const changed = !areRowsEqualByColumns(currentDisplay, r);
+            if (changed) {
+              try {
+                const diffs = [];
+                for (let i = 0; i < headers.length; i++) {
+                  if (excludeIdxSet.has(i)) continue;
+                  const curNorm = normalizeForCompare(currentDisplay[i], headers[i]);
+                  const inNorm = normalizeForCompare(r[i], headers[i]);
+                  if (curNorm !== inNorm) diffs.push({ col: headers[i], from: curNorm, to: inNorm });
+                }
+                if (diffs.length) console.log('🔍 Diff (soft match update - Randevular)', { sheetName, employeeCode, rowIndex, diffs });
+              } catch (_) {}
+              updates.push({ rowIndex, values: r }); opStats.updateCount++;
+            } else { opStats.sameCount++; }
+            continue;
+          }
+          // Diğer sayfalar: tarih farklıysa yeni aktivite olarak ekle
+          if (!(baseLower.includes('fırsat') || baseLower.includes('firsat')) && idxDate >= 0) {
+            const existingDate = canonicalDate(currentDisplay[idxDate]);
+            const incomingDate = canonicalDate(r[idxDate]);
+            if (existingDate && incomingDate && existingDate !== incomingDate) {
+              rowsToAppend.push(r);
+              opStats.newCount++;
+              continue;
+            }
+          }
+          const changed = !areRowsEqualByColumns(currentDisplay, r);
+          if (changed) {
+            try {
+              const diffs = [];
+              for (let i = 0; i < headers.length; i++) {
+                if (excludeIdxSet.has(i)) continue;
+                const curNorm = normalizeForCompare(currentDisplay[i], headers[i]);
+                const inNorm = normalizeForCompare(r[i], headers[i]);
+                if (curNorm !== inNorm) diffs.push({ col: headers[i], from: curNorm, to: inNorm });
+              }
+              if (diffs.length) console.log('🔍 Diff (soft match update - others)', { sheetName, employeeCode, rowIndex, diffs });
+            } catch (_) {}
+            updates.push({ rowIndex, values: r }); opStats.updateCount++;
+          } else { opStats.sameCount++; }
+          continue;
+        }
+        rowsToAppend.push(r);
+        opStats.newCount++;
+      }
+
+      // Apply updates
+      for (const u of updates) {
+        sheet.getRange(u.rowIndex, 1, 1, lastCol).setValues([u.values]);
+      }
+
+      // Apply appends
+      if (rowsToAppend.length > 0 && rowsToAppend[0].length > 0) {
+        const startRow = sheet.getLastRow() + 1;
+        sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
+        
+        // Renk kodlaması uygula - TÜM SAYFALAR İÇİN
+        console.log(`🎨 Appended ${rowsToAppend.length} rows to ${sheet.getName()} (colors will be applied after all ops)`);
+      }
+
+      // Per-sheet formatting/validation only for touched sheet
+      optimizeColumnWidths(sheet, baseTypeForHeaders);
+      applyManagerSheetDataValidation(sheet, baseTypeForHeaders);
+
+      // Deduplicate only for Toplantılar to avoid collapsing distinct opportunity/appointment actions
+      try {
+        const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
+        if (lowerBase.includes('toplant')) {
+          removeDuplicatesInAggregateSheet(sheet, baseTypeForHeaders);
+        }
+      } catch (_) {}
+
+      // Sorting for aggregate sheets
+      try {
+        const lastRow = sheet.getLastRow();
+        if (lastRow > 2) {
+          const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
+          // For T Randevular and T Toplantılar: sort by date, but in meetings keep 'Satış Yapıldı' on top
+          if (lowerBase.includes('randevu')) {
+            const statusIdx = findIdx(['Randevu durumu','Durum']);
+            const dateIdx = findIdx(['Randevu Tarihi','Tarih']);
+            const timeIdx = findIdx(['Saat']);
+            const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+            const values = rng.getValues();
+            function getActDate(row){
+              if (dateIdx>=0) {
+                const v = row[dateIdx];
+                if (v instanceof Date && !isNaN(v.getTime())) return v;
+                const d1 = parseDdMmYyyy(v);
+                if (d1) return d1;
+                const d2 = new Date(v);
+                if (!isNaN(d2.getTime())) return d2;
+              }
+              return new Date('2099-12-31');
+            }
+            function parseTime(v){
+              if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
+              const s = String(v || '').trim();
+              const m = s.match(/^(\d{1,2}):(\d{2})/);
+              if (m) return Number(m[1])*60 + Number(m[2]);
+              return 0;
+            }
+            function groupRank(row){
+              const s = String(statusIdx>=0 ? row[statusIdx] : '').toLowerCase();
+              if (s.includes('iptal')) return 0; // Randevu İptal oldu
+              if (s.includes('erte')) return 1; // Randevu Ertelendi
+              if (s.includes('teyit')) return 2; // Randevu Teyitlendi
+              if (s.includes('randevu al')) return 3; // Randevu Alındı
+              if (s.includes('ileri')) return 4; // İleri Tarih Randevu
+              return 5; // diğerleri
+            }
+            values.sort(function(a,b){
+              const ra = groupRank(a);
+              const rb = groupRank(b);
+              if (ra !== rb) return ra - rb;
+              const da = getActDate(a);
+              const db = getActDate(b);
+              if (da.getTime() !== db.getTime()) return da - db;
+              if (timeIdx >= 0) return parseTime(a[timeIdx]) - parseTime(b[timeIdx]);
+              return 0;
+            });
+            rng.setValues(values);
+          } else if (lowerBase.includes('fırsat') || lowerBase.includes('firsat')) {
+            const dateIdx = findIdx(['Fırsat Tarihi','Firsat Tarihi','Tarih']);
+            const logIdx = findIdx(['Log']);
+            const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+            const values = rng.getValues();
+            function parseDd2(s){
+              const v = String(s||'').trim();
+              const m = v.match(/(\d{2}\.\d{2}\.\d{4})/);
+              if (m) {
+                const [dd,mm,yy] = m[1].split('.');
+                const d = new Date(Number(yy), Number(mm)-1, Number(dd));
+                if (!isNaN(d.getTime())) return d;
+              }
+              return null;
+            }
+            function getDate(row){
+              const dLog = logIdx>=0 ? parseDd2(row[logIdx]) : null;
+              if (dLog) return dLog;
+              if (dateIdx>=0) {
+                const d = parseDdMmYyyy(row[dateIdx]);
+                if (d) return d;
+              }
+              // Tarihsiz satırları en sona koy (2100 yerine 2099 kullan)
+              return new Date('2099-12-31');
+            }
+            values.sort(function(a,b){
+              const da = getDate(a);
+              const db = getDate(b);
+              return da - db;
+            });
+            rng.setValues(values);
+          } else if (lowerBase.includes('toplant')) {
+            // Sadece T Toplantılar için çalıştır
+            if (!/^T\s/i.test(sheet.getName())) {
+              // Yönetici ana Toplantılar sayfasında sıralama yapma
+            }
+            // Toplantılar (append): Öncelik: Satış Yapıldı > Yerinde Satış > Sıcak > Orta > Soğuk > Tarih
+            const resultIdx = findIdx(['Toplantı Sonucu']);
+            const dateIdx = findIdx(['Toplantı Tarihi']);
+            const potIdx = findIdx(['Satış Potansiyeli']);
+            if (resultIdx >= 0 && dateIdx >= 0) {
+              const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+              const values = rng.getValues();
+              function potRank(v){
+                const s = String(v||'').toLowerCase();
+                if (s === 'yerinde satış' || s === 'yerinde satis') return 1; // satıştan hemen sonra
+                if (s === 'sıcak' || s === 'sicak') return 2;
+                if (s === 'orta') return 3;
+                if (s === 'soğuk' || s === 'soguk') return 4;
+                return 9;
+              }
+              values.sort(function(a,b){
+                const aRes = String(a[resultIdx]||'');
+                const bRes = String(b[resultIdx]||'');
+                const aSale = aRes === 'Satış Yapıldı' ? 0 : 1;
+                const bSale = bRes === 'Satış Yapıldı' ? 0 : 1;
+                if (aSale !== bSale) return aSale - bSale; // Satış Yapıldı en üstte
+                if (potIdx >= 0) {
+                  const ar = potRank(a[potIdx]);
+                  const br = potRank(b[potIdx]);
+                  if (ar !== br) return ar - br;
+                }
+                const da = parseDdMmYyyy(a[dateIdx]) || new Date('2100-12-31');
+                const db = parseDdMmYyyy(b[dateIdx]) || new Date('2100-12-31');
+                return da - db;
+              });
+              rng.setValues(values);
+            }
+          } else if (idxCode >= 0) {
+            // Other aggregate sheets: keep grouped by code
+            sheet.getRange(2, 1, lastRow - 1, lastCol).sort([{ column: idxCode + 1, ascending: true }]);
+          }
+        }
+      } catch (sortErr) {
+        console.log('⚠️ Sorting skipped:', sortErr && sortErr.message);
+      }
+    }
+
+    // Final: apply colors after all operations to prevent late overrides
+    try {
+      const lr = sheet.getLastRow();
+      if (lr > 1) {
+        // Tüm sayfa için renklendirmeyi uygula (görünür olma şartı olmadan)
+        applyColorCodingToManagerData(sheet, sheet.getName(), 2, lr - 1);
+      }
+    } catch (finalColErr) {
+      console.log('⚠️ Final recolor skipped:', finalColErr && finalColErr.message);
+    }
+
+    return opStats;
+  } catch (error) {
+    console.error(`❌ Error updating manager sheet ${sheetName}:`, error);
+    return { totalIncoming: data ? data.length : 0, sameCount: 0, updateCount: 0, newCount: 0 };
+  }
+}
+
+/**
+ * 🎨 Manager Sheet Headers - Professional Structure
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetName - Sheet name
+ */
+function createManagerSheetHeaders(sheet, sheetName) {
+  try {
+    if (!sheet || !sheetName) {
+      return;
+    }
+    let headers = [];
+    switch (sheetName) {
+      case 'Randevular':
+        headers = [
+          'Temsilci Kodu', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
+          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+          'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+         ];
+         break;
+      case 'Fırsatlar':
+        headers = [
+          'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Fırsat Durumu', 'Fırsat Tarihi',
+          'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+          'Rating count', 'Review', 'Maplink'
+        ];
+        break;
+      case 'Toplantılar':
+        headers = [
+          'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
+          'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
+          'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
+          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+          'Rating count', 'Review'
+        ];
+        break;
+      default:
+        headers = [
+          'Temsilci Kodu', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Durum', 'Tarih',
+          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+          'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+        ];
+    }
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    applyHeaderStyling(sheet, sheetName);
+    optimizeColumnWidths(sheet, sheetName);
+  } catch (error) {
+    console.error(`❌ Error creating headers for ${sheetName}:`, error);
+  }
+}
+
+/**
+ * 🧹 Employee Data Clearing - Clean Slate
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} employeeCode - Employee code
+ */
+function clearEmployeeData(sheet, employeeCode) {
+  try {
+    if (!sheet || !employeeCode) {
+      return;
+    }
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length <= 1) {
+      return;
+    }
+    const headers = data[0];
+    // Support both 'Temsilci Kodu' and 'Kod' as first identifier column
+    let temsilciKoduIndex = headers.indexOf('Temsilci Kodu');
+    if (temsilciKoduIndex === -1) {
+      temsilciKoduIndex = headers.indexOf('Kod');
+    }
+    if (temsilciKoduIndex === -1) {
+      return;
+    }
+    let deletedRows = 0;
+    for (let i = data.length - 1; i > 0; i--) {
+      const row = data[i];
+      const rowTemsilciKodu = row[temsilciKoduIndex];
+      if (rowTemsilciKodu === employeeCode) {
+        sheet.deleteRow(i + 1);
+        deletedRows++;
+      }
+    }
+  } catch (error) {
+    console.error(`❌ Error clearing data for employee ${employeeCode}:`, error);
+  }
+}
+
+// ========================================
+// MANAGER SYNC - YÖNETİCİ AKIŞLARI
+// Version: 4.5
+// 
+// 📊 PERFORMANCE DASHBOARD SİSTEMİ DAHİL EDİLDİ
+// performance-dashboard.gs dosyasından import edildi
+// ========================================
+
+// ========================================
+// 🏗️ MANAGER CONFIGURATION - CENTRALIZED CONTROL
+// ========================================
+
+/* Duplicate CRM_CONFIG block removed */
+
+// 🔧 UTILITY FUNCTIONS - FOUNDATION LAYER
+// ========================================
+
+/**
+ * 🛡️ Input Validation - Data Integrity Guardian
+ * @param {Object} parameters - Input parameters to validate
+ * @returns {boolean} - Validation result
+ */
+function validateInput(parameters) {
+  if (!parameters || typeof parameters !== 'object') {
+    console.error('Invalid parameters object');
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 📝 Activity Logging - Audit Trail System
+ * @param {string} action - Action performed
+ * @param {Object} data - Additional data
+ */
+function logActivity(action, data = {}) {
+  const timestamp = new Date().toISOString();
+  console.log('Manager Activity Log:', { timestamp, action, data });
+}
+
+// ========================================
+// 🎨 STYLING SYSTEM - VISUAL EXCELLENCE
+// ========================================
+
+/**
+ * 🎨 Universal Color Application - Visual Consistency
+ * @param {Sheet} sheet - Target sheet
+ * @param {number} rowNumber - Row to color
+ * @param {string} color - RGB color code
+ */
+function applyRowColor(sheet, rowNumber, color) {
+  try {
+    if (!sheet || !rowNumber || !color) {
+      console.error('Invalid parameters for color application');
+      return;
+    }
+    const range = sheet.getRange(rowNumber, 1, 1, sheet.getMaxColumns());
+    range.setBackground(color);
+  } catch (error) {
+    console.error('Color application failed:', error);
+  }
+}
+
+/**
+ * 🎨 Header Styling - Professional Appearance
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetType - Type of sheet for color selection
+ */
+function applyHeaderStyling(sheet, sheetType) {
+  try {
+    if (!sheet) {
+      console.error('Invalid sheet for header styling');
+      return;
+    }
+    const headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+    const headerColor = CRM_CONFIG.SHEET_HEADER_COLORS[sheetType] || 'rgb(227, 242, 253)';
+    headerRange.setBackground(headerColor);
+    // Choose contrasting font color (black for light backgrounds)
+    const lightBg = /rgb\((2[0-9]{2}|1[5-9][0-9]),\s*(2[0-9]{2}|1[5-9][0-9]),\s*(2[0-9]{2}|1[5-9][0-9])\)/.test(headerColor);
+    headerRange.setFontColor(lightBg ? 'black' : 'white');
+    headerRange.setFontWeight('bold');
+  } catch (error) {
+    console.error('Header styling failed:', error);
+  }
+}
+
+// ========================================
+// 📅 DATE UTILITIES - TEMPORAL INTELLIGENCE
+// ========================================
+
+/**
+ * 📅 Date Validation - Temporal Integrity
+ * @param {*} date - Date to validate
+ * @returns {boolean} - Validation result
+ */
+function isValidDate(date) {
+  if (!date || date === '' || date === null || date === undefined || date === '30.12.1899') return false;
+  
+  if (date === 'Invalid Date' || date === 'NaN') return false;
+  
+  try {
+    // Handle Date objects directly
+    if (date instanceof Date) {
+      if (isNaN(date.getTime())) return false;
+      const year = date.getFullYear();
+      if (year < 1900 || year > 2100) return false;
+      return true;
+    }
+    
+    const testDate = new Date(date);
+    
+    if (isNaN(testDate.getTime())) return false;
+    
+    const year = testDate.getFullYear();
+    if (year < 1900 || year > 2100) return false;
+    
+    return true;
+  } catch (error) {
+    console.log('📅 Date validation error:', error, 'for date:', date);
+    return false;
+  }
+}
+
+/**
+ * 🕐 Time Value Formatting - Temporal Display
+ * @param {*} value - Time value to format
+ * @returns {string} - Formatted time
+ */
+function formatTimeValue(value) {
+  try {
+    if (!value || value === '' || value === null || value === undefined) return '';
+    
+    // Handle Date objects
+    if (value instanceof Date) {
+      const hours = value.getHours().toString().padStart(2, '0');
+      const minutes = value.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+    
+    // Handle string dates (like "30.12.1899")
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      if (!isNaN(date.getTime()) && date.getFullYear() !== 1899) {
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+    }
+    
+    // Handle invalid dates
+    if (value === '30.12.1899' || value === 'Invalid Date') {
+      return '';
+    }
+    
+    return value.toString();
+    
+  } catch (error) {
+    console.log('🕐 Time formatting error:', error, 'for value:', value);
+    return '';
+  }
+}
+
+/**
+ * 📅 Date Value Formatting - Temporal Display
+ * @param {*} value - Date value to format
+ * @returns {string} - Formatted date
+ */
+function formatDateValue(value) {
+  try {
+    if (!value || value === '' || value === null || value === undefined) return '';
+    
+    // Handle Date objects
+    if (value instanceof Date) {
+      const day = value.getDate().toString().padStart(2, '0');
+      const month = (value.getMonth() + 1).toString().padStart(2, '0');
+      const year = value.getFullYear();
+      return `${day}.${month}.${year}`;
+    }
+    
+    // Handle string dates
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      if (!isNaN(date.getTime()) && date.getFullYear() !== 1899) {
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}.${month}.${year}`;
+      }
+    }
+    
+    // Handle invalid dates
+    if (value === '30.12.1899' || value === 'Invalid Date') {
+      return '';
+    }
+    
+    return value.toString();
+    
+  } catch (error) {
+    console.log('📅 Date formatting error:', error, 'for value:', value);
+    return '';
+  }
+}
+
+// Parse dd.MM.yyyy to Date (global utility)
+function parseDdMmYyyy(str) {
+  try {
+    const s = String(str || '').trim();
+    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return null;
+    const [dd, mm, yyyy] = s.split('.').map(n => parseInt(n, 10));
+    const d = new Date(yyyy, mm - 1, dd);
+    return isNaN(d.getTime()) ? null : d;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ========================================
+// 📏 COLUMN WIDTH SYSTEM - OPTIMAL LAYOUT
+// ========================================
+
+/**
+ * 📏 Universal Column Width Optimizer - Professional Layout
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetType - Type of sheet for specific optimizations
+ */
+function optimizeColumnWidths(sheet, sheetType = 'default') {
+  console.log(`📏 Optimizing column widths for ${sheetType} sheet`);
+  
+  try {
+    if (!sheet) {
+      console.error('❌ Invalid sheet for column width optimization');
+      return;
+    }
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    headers.forEach((header, index) => {
+      const columnIndex = index + 1;
+      const optimalWidth = getOptimalColumnWidth(header, sheetType);
+      sheet.setColumnWidth(columnIndex, optimalWidth);
+    });
+    
+    console.log(`✅ Column widths optimized for ${sheetType} sheet`);
+    
+  } catch (error) {
+    console.error(`❌ Error optimizing column widths for ${sheetType}:`, error);
+  }
+}
+
+/**
+ * 📏 Get Optimal Column Width - Smart Sizing
+ * @param {string} header - Column header
+ * @param {string} sheetType - Sheet type
+ * @returns {number} - Optimal width in pixels
+ */
+function getOptimalColumnWidth(header, sheetType) {
+  // Base widths for different column types
+  const widthMap = {
+    // Employee/Manager Codes
+    'Kod': 120,
+    'Temsilci Kodu': 120,
+    
+    // Company Information
+    'Company name': 200,
+    'Kaynak': 100,
+    'Keyword': 150,
+    'Location': 120,
+    'Category': 120,
+    'Website': 200,
+    
+    // Contact Information
+    'Phone': 130,
+    'Yetkili Tel': 130,
+    'Mail': 180,
+    'İsim Soyisim': 150,
+    
+    // Status and Activity
+    'Aktivite': 140,
+    'Randevu durumu': 140,
+    'Fırsat Durumu': 140,
+    'Toplantı durumu': 140,
+    'Durum': 140,
+    
+    // Dates and Times
+    'Tarih': 100,
+    'Randevu Tarihi': 120,
+    'Fırsat Tarihi': 120,
+    'Toplantı Tarihi': 120,
+    'Aktivite Tarihi': 120,
+    'Saat': 80,
+    
+    // Notes and Comments
+    'Yorum': 250,
+    'Yönetici Not': 200,
+    
+    // Technical Information
+    'CMS Adı': 120,
+    'CMS Grubu': 120,
+    'E-Ticaret İzi': 120,
+    'Site Hızı': 100,
+    'Site Trafiği': 120,
+    'Log': 100,
+    'Toplantı formatı': 120,
+    
+    // Address Information
+    'Address': 300,
+    'City': 100,
+    
+    // Analytics
+    'Rating count': 100,
+    'Review': 100,
+    'Toplantı Sonucu': 150,
+    
+    // Links
+    'Maplink': 200
+  };
+  
+  // Return optimal width or default
+  return widthMap[header] || 100;
+}
+
+// ========================================
+// 🎨 COLOR CODING SYSTEM - VISUAL INTELLIGENCE
+// ========================================
+
+/**
+ * 🎨 Manager Data Color Coding - Visual Status
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetName - Sheet name
+ * @param {number} startRow - Starting row
+ * @param {number} rowCount - Number of rows
+ */
+function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
+  try {
+    if (!sheet || !sheetName || !startRow || !rowCount) {
+      console.error('Invalid parameters for color coding');
+      return;
+    }
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    let statusColumnIndex = -1;
+    const lowerName = String(sheetName || '').toLowerCase();
+    if (lowerName.includes('randevu')) {
+      statusColumnIndex = headers.indexOf('Randevu durumu');
+      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu Durumu');
+      var randevuMeetingResultIdx = headers.indexOf('Toplantı Sonucu');
+      if (randevuMeetingResultIdx === -1) randevuMeetingResultIdx = headers.indexOf('Toplantı sonucu');
+    } else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) {
+      statusColumnIndex = headers.indexOf('Fırsat Durumu');
+      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Aktivite');
+    } else if (lowerName.includes('toplant')) {
+      // Try multiple candidates for meeting status - T Toplantılar için
+      statusColumnIndex = headers.indexOf('Toplantı Sonucu');
+      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Toplantı durumu');
+      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu durumu');
+      // Ayrıca Toplantı Sonucu için indeks
+      var meetingResultIdx = headers.indexOf('Toplantı Sonucu');
+    } else {
+      statusColumnIndex = headers.indexOf('Aktivite');
+    }
+    
+    // Temsilci kodu rengi: yalnızca 'T Aktivite Özet' için (diğer sayfalar durum bazlı)
+    let employeeCodeColumnIndex = -1;
+    employeeCodeColumnIndex = headers.indexOf('Temsilci Kodu');
+    if (employeeCodeColumnIndex === -1) employeeCodeColumnIndex = headers.indexOf('Kod');
+    if (employeeCodeColumnIndex === -1) {
+      // Esnek arama (küçük/büyük, boşluk/aksan toleransı)
+      const lowered = headers.map(h => String(h || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,''));
+      employeeCodeColumnIndex = lowered.indexOf('temsilci kodu');
+      if (employeeCodeColumnIndex === -1) employeeCodeColumnIndex = lowered.indexOf('kod');
+      if (employeeCodeColumnIndex === -1) employeeCodeColumnIndex = 0; // Fallback: ilk sütun
+    }
+    console.log(`🎨 ${sheetName}: Temsilci Kodu sütunu bulundu: ${employeeCodeColumnIndex} (${headers[employeeCodeColumnIndex] || 'bulunamadı'})`);
+    
     // T Aktivite Özet/Tümü için status sütunu zorunlu değil
     if (statusColumnIndex === -1 && (sheetName !== 'T Aktivite Özet' && sheetName !== 'T Aktivite (Tümü)')) {
       console.log(`⚠️ ${sheetName}: Status column not found (${statusColumnIndex}), skipping color coding`);
