@@ -11,6 +11,7 @@
 // ========================================
 
 const CRM_CONFIG = {
+
   // 👥 Employee Management - Team Structure
   EMPLOYEE_CODES: {
     'LG 001': 'Lale Gül',
@@ -93,6 +94,7 @@ const CRM_CONFIG = {
   TIMEOUT_SECONDS: 5
 };
 
+var FAST_SYNC = false; // Hızlı mod: ağır adımları atla (renk/validation/auto-resize)
 
 // 🔧 UTILITY FUNCTIONS - FOUNDATION LAYER
 // ========================================
@@ -1102,6 +1104,34 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
  * @param {string} employeeCode - Employee code
  * @returns {Object} - Employee data by sheet
  */
+function collectEmployeeDataByTypes(managerFile, employeeCode, types) {
+  try {
+    const employeeFile = findEmployeeFile(employeeCode);
+    if (!employeeFile) return {};
+    const employeeData = {};
+    const wanted = new Set((types || []).map(t => String(t)));
+    const sheets = employeeFile.getSheets();
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      const lower = String(sheetName || '').toLowerCase();
+      let targetSheetName = '';
+      if (lower.includes('randevu')) targetSheetName = 'Randevular';
+      else if (lower.includes('fırsat') || lower.includes('firsat')) targetSheetName = 'Fırsatlar';
+      else if (lower.includes('toplant')) targetSheetName = 'Toplantılar';
+      else continue;
+      if (!wanted.has(targetSheetName)) continue;
+      const sheetData = collectSheetData(sheet, employeeCode);
+      if (sheetData && sheetData.length > 0) {
+        employeeData[targetSheetName] = sheetData;
+      }
+    }
+    return employeeData;
+  } catch (error) {
+    console.error(`❌ Error collectEmployeeDataByTypes for ${employeeCode}:`, error);
+    return {};
+  }
+}
+
 function collectEmployeeData(managerFile, employeeCode) {
   try {
     const employeeFile = findEmployeeFile(employeeCode);
@@ -1661,8 +1691,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
     // Final: apply colors after all operations to prevent late overrides
     try {
       const lr = sheet.getLastRow();
-      if (lr > 1) {
-        // Tüm sayfa için renklendirmeyi uygula (görünür olma şartı olmadan)
+      if (lr > 1 && !FAST_SYNC) {
         applyColorCodingToManagerData(sheet, sheet.getName(), 2, lr - 1);
       }
     } catch (finalColErr) {
@@ -3594,9 +3623,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         }
 
       // Per-sheet formatting/validation only for touched sheet
-      optimizeColumnWidths(sheet, baseTypeForHeaders);
-            applyManagerSheetDataValidation(sheet, baseTypeForHeaders);
-     try { sheet.setConditionalFormatRules([]); } catch (e) {}
+      if (!FAST_SYNC) { optimizeColumnWidths(sheet, baseTypeForHeaders); applyManagerSheetDataValidation(sheet, baseTypeForHeaders); try { sheet.setConditionalFormatRules([]); } catch (e) {} }
 
       // Deduplicate only for Toplantılar to avoid collapsing distinct opportunity/appointment actions
       try {
@@ -9932,6 +9959,7 @@ function applyColorCodingToAllManagerSheets() {
 }
 
 function syncAllEmployeesAppend_Randevular() {
+  FAST_SYNC = true;
   console.log('Function started:', { action: 'syncAllEmployeesAppend_Randevular' });
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
@@ -9957,6 +9985,7 @@ function syncAllEmployeesAppend_Randevular() {
 }
 
 function syncAllEmployeesAppend_Firsatlar() {
+  FAST_SYNC = true;
   console.log('Function started:', { action: 'syncAllEmployeesAppend_Firsatlar' });
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
@@ -9982,6 +10011,7 @@ function syncAllEmployeesAppend_Firsatlar() {
 }
 
 function syncAllEmployeesAppend_Toplantilar() {
+  FAST_SYNC = true;
   console.log('Function started:', { action: 'syncAllEmployeesAppend_Toplantilar' });
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
@@ -10007,6 +10037,7 @@ function syncAllEmployeesAppend_Toplantilar() {
 }
 
 function syncReportsAllEmployees() {
+  FAST_SYNC = true;
   console.log('Function started:', { action: 'syncReportsAllEmployees' });
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
