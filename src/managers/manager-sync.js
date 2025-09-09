@@ -2433,7 +2433,9 @@ function createManagerMenu() {
     appendSubmenu.addSeparator()
       .addItem('Tüm Kodlar - Randevular', 'syncAllEmployeesAppend_Randevular')
       .addItem('Tüm Kodlar - Fırsatlar', 'syncAllEmployeesAppend_Firsatlar')
-      .addItem('Tüm Kodlar - Toplantılar', 'syncAllEmployeesAppend_Toplantilar');
+      .addItem('Tüm Kodlar - Toplantılar', 'syncAllEmployeesAppend_Toplantilar')
+      .addSeparator()
+      .addItem('Raporları Güncelle - Tüm Kodlar', 'syncReportsAllEmployees');
     menu.addSubMenu(appendSubmenu)
         .addSeparator();
 
