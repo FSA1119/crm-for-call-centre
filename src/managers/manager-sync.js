@@ -830,6 +830,7 @@ function onOpen() {
   
   try {
     createManagerMenu();
+    createTypeBasedMenu();
     
     // Skip auto color coding on open (performance)
     console.log('⏭️ Skipping auto color coding on open');
