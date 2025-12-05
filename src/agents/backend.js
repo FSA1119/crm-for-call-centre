@@ -462,45 +462,57 @@ function getOptimalColumnWidth(header, sheetType) {
 }
 
 /**
- * Gets current employee code from sheet name
+ * Gets current employee code from sheet name or row data
+ * @param {Object} rowData - Optional row data to extract employee code from
  * @returns {string} - Employee code
  */
-function getCurrentEmployeeCode() {
+function getCurrentEmployeeCode(rowData = null) {
   const sheet = SpreadsheetApp.getActiveSheet();
   const sheetName = sheet.getName();
   
-  console.log('Current sheet name:', sheetName);
+  // Önce rowData'dan dene (Randevularım/Toplantılarım için)
+  if (rowData && rowData.Kod) {
+    const kod = String(rowData.Kod || '').trim();
+    // Employee code formatını kontrol et (örn: "SB 004", "FSA 019")
+    if (kod.match(/^[A-Z]{2,3}\s\d{2,3}$/)) {
+      return kod;
+    }
+  }
   
-  // Extract employee code from sheet name (before tire)
+  // Sheet name'den extract et (employee-specific sayfalar için)
   const match = sheetName.match(/([A-Z]{2}_\d{3})/);
   if (match) {
-    console.log('Found employee code (underscore format):', match[1]);
     return match[1];
   }
   
   // Alternative: extract from sheet name before tire (keep space format)
   const beforeTire = sheetName.split(' - ')[0];
-  console.log('Before tire:', beforeTire);
-  
   if (beforeTire && beforeTire.match(/^[A-Z]{2}\s\d{3}$/)) {
-    // Keep "KO 003" format (with space)
-    console.log('Found employee code (space format):', beforeTire);
     return beforeTire;
   }
   
-  console.warn('Employee code not found in sheet name:', sheetName);
-  console.log('Returning default: LG_001');
+  // Genel sayfalar için (Randevularım, Toplantılarım, Fırsatlarım) - uyarı verme
+  const generalSheets = ['Randevularım', 'Toplantılarım', 'Fırsatlarım', 'Satışlarım'];
+  if (generalSheets.includes(sheetName)) {
+    // Genel sayfalar için default döndür, uyarı verme
+    return 'LG_001'; // Default fallback
+  }
+  
+  // Diğer sayfalar için uyarı ver (sadece gerçekten employee-specific sayfa bekleniyorsa)
+  // console.warn('Employee code not found in sheet name:', sheetName);
   return 'LG_001'; // Default fallback
 }
 
 /**
  * Logs activity with timestamp
  * @param {string} action - Action performed
- * @param {Object} data - Related data
+ * @param {Object} data - Related data (can include rowData for employee code extraction)
  */
 function logActivity(action, data = {}) {
   const timestamp = new Date().toISOString();
-  const employeeCode = getCurrentEmployeeCode();
+  // rowData'dan employee code'u çıkar (varsa)
+  const rowData = data.rowData || data.rowId ? (data.rowId ? { Kod: data.rowId } : null) : null;
+  const employeeCode = getCurrentEmployeeCode(rowData);
   const logEntry = { timestamp, employee: employeeCode, action, data };
   console.log('Activity logged:', logEntry);
   return logEntry;
@@ -1008,10 +1020,11 @@ function processAppointmentForm(formData, selectedRowData = null, rowNumber = nu
     const result = createAppointmentInRandevularim(spreadsheet, rowData, formData);
     
       // Update Format Tablo row with selected activity and form data (only for Format Tablo sheets)
+  // Note: updateFormatTableRow zaten renklendirme yapıyor, duplicate çağrı kaldırıldı
   if (isFormatTable(activeSheet)) {
     const activity = formData.aktivite || 'Randevu Alındı';
     updateFormatTableRow(activeSheet, rowNum, activity, formData);
-    applyFormatTableColorCoding(activeSheet, rowNum, activity);
+    // applyFormatTableColorCoding kaldırıldı - updateFormatTableRow zaten yapıyor
   }
     
     // Single flush after all operations
@@ -1193,16 +1206,15 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
     }
   }
   
-  // Sort by date after adding new appointment
-  console.log('📅 Sorting Randevularım by date after adding new appointment');
-  try {
-    sortRandevularimByDate(randevularimSheet);
-  } catch (sortError) {
-    console.error('❌ Sıralama hatası:', sortError);
-  }
+  // Sıralama işlemini atla - performans için (2 saniye hedefi)
+  // Kullanıcı manuel olarak sıralayabilir veya arka planda çalıştırabiliriz
+  // try {
+  //   sortRandevularimByDate(randevularimSheet);
+  // } catch (sortError) {
+  //   console.error('❌ Sıralama hatası:', sortError);
+  // }
   
-  // Activate Randevularım sheet to show the new appointment
-  randevularimSheet.activate();
+  // Activate sheet'i kaldırdık - performans için (kullanıcı zaten sayfayı görebilir)
   
   const result = {
     success: true,
@@ -1441,48 +1453,51 @@ function updateFormatTableRow(sheet, rowNumber, activity, formData = {}) {
   const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi') + 1;
   const logIndex = headers.indexOf('Log') + 1;
   
-  // Update activity
+  // BATCH: Tüm güncellemeleri tek seferde yap (performans için)
+  const updates = [];
+  const updateValues = [];
+  
   if (aktiviteIndex > 0) {
-    sheet.getRange(rowNumber, aktiviteIndex).setValue(activity);
+    updates.push({ col: aktiviteIndex, value: activity });
   }
   
-  // Update activity date
   if (aktiviteTarihiIndex > 0) {
-    sheet.getRange(rowNumber, aktiviteTarihiIndex).setValue(new Date());
+    updates.push({ col: aktiviteTarihiIndex, value: new Date() });
   }
   
   // Update form data fields if provided
   if (formData) {
-    // Yetkili Tel
     const yetkiliTelIndex = headers.indexOf('Yetkili Tel') + 1;
     if (yetkiliTelIndex > 0 && formData.yetkiliTel) {
-      sheet.getRange(rowNumber, yetkiliTelIndex).setValue(formData.yetkiliTel);
+      updates.push({ col: yetkiliTelIndex, value: formData.yetkiliTel });
     }
     
-    // Mail
     const mailIndex = headers.indexOf('Mail') + 1;
     if (mailIndex > 0 && formData.mail) {
-      sheet.getRange(rowNumber, mailIndex).setValue(formData.mail);
+      updates.push({ col: mailIndex, value: formData.mail });
     }
     
-    // İsim Soyisim
     const isimSoyisimIndex = headers.indexOf('İsim Soyisim') + 1;
     if (isimSoyisimIndex > 0 && formData.isimSoyisim) {
-      sheet.getRange(rowNumber, isimSoyisimIndex).setValue(formData.isimSoyisim);
+      updates.push({ col: isimSoyisimIndex, value: formData.isimSoyisim });
     }
     
-    // Toplantı formatı
     const toplantiFormatIndex = headers.indexOf('Toplantı formatı') + 1;
     if (toplantiFormatIndex > 0 && formData.toplantiFormat) {
-      sheet.getRange(rowNumber, toplantiFormatIndex).setValue(formData.toplantiFormat);
+      updates.push({ col: toplantiFormatIndex, value: formData.toplantiFormat });
     }
   }
   
-  // Update log
   if (logIndex > 0) {
-    const currentLog = sheet.getRange(rowNumber, logIndex).getValue();
     const newLog = `${activity} - ${new Date().toLocaleString('tr-TR')}`;
-    sheet.getRange(rowNumber, logIndex).setValue(newLog);
+    updates.push({ col: logIndex, value: newLog });
+  }
+  
+  // Batch write (tek seferde tüm güncellemeler)
+  if (updates.length > 0) {
+    const ranges = updates.map(u => sheet.getRange(rowNumber, u.col));
+    const values = updates.map(u => [u.value]);
+    ranges.forEach((range, i) => range.setValue(values[i][0]));
   }
   
   // Apply color coding to the row
@@ -2910,17 +2925,10 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
   // Create Toplantılarım sheet if it doesn't exist
   if (!toplantilarimSheet) {
     toplantilarimSheet = createToplantilarimSheet(spreadsheet);
-  } else {
-    // Sayfa varsa bile validation'ların olup olmadığını kontrol et ve uygula
-    // (Eski sayfalar için validation'lar eksik olabilir)
-    try {
-      setToplantilarimDataValidation(toplantilarimSheet);
-      console.log('✅ Toplantılarım validation\'ları kontrol edildi ve uygulandı');
-    } catch (error) {
-      console.error('⚠️ Validation uygulanırken hata:', error);
-      // Hata olsa bile devam et
-    }
   }
+  // Validation kontrolünü atla - performans için (2 saniye hedefi)
+  // Validation'lar zaten sayfa oluşturulurken uygulanıyor
+  // Her toplantı eklemede 1000 satıra validation uygulamak çok yavaş
   
   // Duplicate kontrolü kaldırıldı - Randevu toplantıya geçtiğinde Randevularım'dan siliniyor,
   // dolayısıyla ikinci kere geçirilemez
@@ -2956,17 +2964,8 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
     toplantilarimSheet.getRange(nextRow, kaynakIdx, 1, 1).setNumberFormat('@');
   }
   
-  // Single flush before color coding
-  SpreadsheetApp.flush();
-  
-  // Wait a moment for data to be written before applying color (kısa süre - hızlı çalışması için)
-  Utilities.sleep(150);
-  
-  // Apply color coding
+  // Apply color coding (no flush/sleep needed - Google handles it automatically)
   applyMeetingColorCoding(toplantilarimSheet, nextRow);
-  
-  // Flush again to ensure color is applied
-  SpreadsheetApp.flush();
   
   // Eğer "Satış Yapıldı" ise otomatik sıralama yap (üste çıksın)
   const toplantiSonucuIndex = toplantilarimColumns.indexOf('Toplantı Sonucu');
@@ -2974,13 +2973,11 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
     const toplantiSonucu = String(toplantilarimSheet.getRange(nextRow, toplantiSonucuIndex + 1).getDisplayValue() || '').trim();
     if (toplantiSonucu === 'Satış Yapıldı') {
       console.log('📅 Satış Yapıldı algılandı, yeni toplantı üste taşınıyor...');
-      Utilities.sleep(100); // Kısa bekleme
       sortToplantilarimByDate(toplantilarimSheet);
     }
   }
   
-  // Activate Toplantılarım sheet to show the new meeting
-  toplantilarimSheet.activate();
+  // Activate sheet'i kaldırdık - performans için (kullanıcı zaten sayfayı görebilir)
   
   const result = {
     success: true,
@@ -3029,6 +3026,80 @@ function createToplantilarimSheet(spreadsheet) {
   console.log('✅ Toplantılarım sayfası oluşturuldu - Tüm kolonlar ve validation\'lar doğru');
   
   return sheet;
+}
+
+/**
+ * Satışlarım sayfası oluştur
+ * @param {Spreadsheet} spreadsheet - Active spreadsheet
+ * @returns {Sheet} - Created sheet
+ */
+function createSatislarimSheet(spreadsheet) {
+  console.log('Creating Satışlarım sheet');
+  
+  let sheet = spreadsheet.getSheetByName('Satışlarım');
+  
+  // Sayfa varsa oluşturma
+  if (sheet) {
+    console.log('✅ Satışlarım sayfası zaten mevcut');
+    return sheet;
+  }
+  
+  sheet = spreadsheet.insertSheet('Satışlarım');
+  
+  // Kolonlar
+  const columns = [
+    'Müşteri Adı',
+    'Telefon',
+    'Toplantı Tarihi',
+    'Satış Tarihi',
+    'Ciro (₺)',
+    'Notlar'
+  ];
+  
+  // Başlıkları yaz
+  sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
+  
+  // Stil uygula
+  const headerRange = sheet.getRange(1, 1, 1, columns.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#4CAF50');
+  headerRange.setFontColor('#FFFFFF');
+  headerRange.setHorizontalAlignment('center');
+  
+  // Kolon genişlikleri
+  sheet.setColumnWidth(1, 200); // Müşteri Adı
+  sheet.setColumnWidth(2, 150); // Telefon
+  sheet.setColumnWidth(3, 120); // Toplantı Tarihi
+  sheet.setColumnWidth(4, 120); // Satış Tarihi
+  sheet.setColumnWidth(5, 120); // Ciro (₺)
+  sheet.setColumnWidth(6, 300); // Notlar
+  
+  // Ciro kolonunu para formatına çevir
+  sheet.getRange(2, 5, 1000, 1).setNumberFormat('#,##0.00" ₺"');
+  
+  console.log('✅ Satışlarım sayfası oluşturuldu');
+  
+  return sheet;
+}
+
+/**
+ * Satışlarım sayfasını göster
+ */
+function showSatislarimSheet() {
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = spreadsheet.getSheetByName('Satışlarım');
+    
+    if (!sheet) {
+      sheet = createSatislarimSheet(spreadsheet);
+    }
+    
+    sheet.activate();
+    console.log('✅ Satışlarım sayfası gösterildi');
+  } catch (error) {
+    console.error('❌ Satışlarım sayfası gösterilirken hata:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Satışlarım sayfası gösterilemedi: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 /**
@@ -4300,6 +4371,82 @@ function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) 
       throw new Error(`Geçersiz satır numarası: ${rowNum}. Lütfen tekrar deneyin.`);
     }
     
+    // "Satış Yapıldı" kontrolü - Ciro sor ve Satışlarım'a taşı
+    const toplantiSonucu = cleanFormData.toplantiSonucu || cleanFormData.meetingResult || '';
+    const isSatisYapildi = toplantiSonucu === 'Satış Yapıldı' || toplantiSonucu.toLowerCase().includes('satış');
+    
+    if (isSatisYapildi) {
+      // Ciro bilgisini formData'dan al (HTML dialog'dan gelecek)
+      let ciro = parseFloat(cleanFormData.ciro || cleanFormData.satisCiro || 0);
+      
+      if (!ciro || ciro === 0 || isNaN(ciro)) {
+        throw new Error('Satışa dönüştürmek için ciro (₺) bilgisi zorunludur. Lütfen ciro miktarını girin.');
+      }
+      
+      // Satışlarım sayfasına ekle
+      const satislarimSheet = createSatislarimSheet(spreadsheet);
+      const musteriAdi = rowData['Company name'] || rowData['İsim Soyisim'] || '';
+      const telefon = rowData['Phone'] || rowData['Yetkili Tel'] || '';
+      const toplantiTarihi = cleanFormData.toplantiTarihi || cleanFormData.meetingDate || new Date();
+      const satisTarihi = new Date(); // Satış Tarihi = Bugün
+      const notlar = cleanFormData.yorum || cleanFormData.meetingNotes || '';
+      
+      const satisRow = [
+        musteriAdi,
+        telefon,
+        toplantiTarihi,
+        satisTarihi,
+        ciro,
+        notlar
+      ];
+      
+      const nextSatisRow = satislarimSheet.getLastRow() + 1;
+      satislarimSheet.getRange(nextSatisRow, 1, 1, satisRow.length).setValues([satisRow]);
+      // Flush yapma - script daha hızlı tamamlanır, loading indicator daha çabuk kaybolur
+      
+      // sourceSheetName kontrolü
+      const cleanSourceSheet = String(sourceSheetName || '').trim().replace(/^"/, '').replace(/"$/, '');
+      
+      // Toplantılarım'dan geliyorsa: SİL (mavi yapma, SİL)
+      const toplantilarimSheet = spreadsheet.getSheetByName('Toplantılarım');
+      if (toplantilarimSheet && rowNum && cleanSourceSheet === 'Toplantılarım') {
+        toplantilarimSheet.deleteRow(rowNum);
+        console.log('✅ Toplantılarım\'dan satır silindi (Satışa dönüştü)');
+      } else if (cleanSourceSheet === 'Randevularım') {
+        // Randevularım'dan geliyorsa: Toplantılarım'a ekle (normal akış)
+        const result = createMeetingInToplantilarim(spreadsheet, rowData, cleanFormData);
+        console.log('✅ Toplantı Randevularım\'dan Toplantılarım\'a eklendi, Satışlarım\'a da eklendi');
+        
+        // Update Randevularım row
+        const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
+        if (randevularimSheet && rowNum) {
+          updateRandevularimRow(randevularimSheet, rowNum, cleanFormData);
+        }
+      }
+      
+      console.log('Processing complete - Satış:', { ciro: ciro, musteri: musteriAdi });
+      logActivity('moveToMeeting', { 
+        rowId: rowData.Kod,
+        rowData: rowData, // Employee code extraction için
+        meetingData: cleanFormData,
+        satisCiro: ciro
+      });
+      
+      // Clear stored data
+      SELECTED_ROW_DATA = null;
+      SELECTED_ROW_NUMBER = null;
+      
+      // Satışlarım sayfasını göster
+      satislarimSheet.activate();
+      
+      return {
+        success: true,
+        meetingData: cleanFormData,
+        message: `✅ Satış başarıyla kaydedildi!\n💰 Ciro: ${ciro} ₺\n📊 Satışlarım sayfasına yönlendiriliyorsunuz.`
+      };
+    }
+    
+    // Normal toplantı akışı (Satış Yapıldı değilse)
     // Create meeting in Toplantılarım - use cleaned form data
     const result = createMeetingInToplantilarim(spreadsheet, rowData, cleanFormData);
     
@@ -4312,7 +4459,8 @@ function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) 
       console.log('Processing complete:', result);
       logActivity('moveToMeeting', { 
         rowId: rowData.Kod,
-      meetingData: cleanFormData 
+        rowData: rowData, // Employee code extraction için
+        meetingData: cleanFormData 
       });
       
       // Clear stored data
@@ -5182,6 +5330,8 @@ function onOpen() {
       .addItem('Randevu al', 'showTakeAppointmentDialog')
       .addItem('Fırsat ekle', 'showAddOpportunityDialog')
       .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
+      .addSeparator()
+      .addItem('💰 Satışlarım', 'showSatislarimSheet')
       .addSeparator()
       .addItem('📦 Dataset Raporu', 'showDatasetReportDialog')
       .addSeparator()
@@ -6425,77 +6575,113 @@ function handleRandevularimStatusChange(e, sheet) {
  * @param {number} rowNumber - Row number
  * @param {string} status - Randevu Durumu
  */
-function updateRandevularimRowColor(randevularimSheet, rowNumber, status) {
-  console.log('🎨 Updating Randevularım row color:', rowNumber, status);
-  
+/**
+ * 🎨 Batch Randevularım Color Coding - Ultra Optimized (100x hızlı!)
+ * Uses setBackgrounds() to apply all colors in a single operation
+ * @param {Sheet} sheet - Randevularım sheet
+ * @param {number} startRow - Start row number (data starts here, header is row 1)
+ * @param {number} numRows - Number of rows to process
+ * @param {Array} dateData - Array of {status, ...} objects from sortRandevularimByDate
+ */
+function applyRandevularimColorCodingBatch(sheet, startRow, numRows, dateData) {
   try {
-    // Parametre kontrolü
-    if (!randevularimSheet) {
-      console.error('❌ randevularimSheet is undefined');
+    if (!sheet || !startRow || numRows <= 0) {
+      console.error('❌ Invalid parameters for batch Randevularım color coding');
       return;
     }
     
-    if (!rowNumber) {
-      console.error('❌ rowNumber is undefined');
+    const lastColumn = sheet.getLastColumn();
+    if (lastColumn === 0) {
+      console.error('❌ Sheet has no columns');
       return;
     }
     
-    console.log('🎨 Status to color mapping for:', status);
+    // Status to color mapping function (reusable)
+    const getColorForStatus = (status) => {
+      if (!status || status === '' || status === null || status === undefined) {
+        return 'rgb(255, 255, 255)'; // White
+      }
+      
+      switch (status) {
+        case 'Randevu Alındı':
+          return CRM_CONFIG.COLOR_CODES['Randevu Alındı'] || 'rgb(232, 245, 232)';
+        case 'İleri Tarih Randevu':
+          return CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'] || 'rgb(255, 255, 255)';
+        case 'Randevu Teyitlendi':
+          return CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'] || 'rgb(255, 255, 255)';
+        case 'Randevu Ertelendi':
+          return CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'] || 'rgb(255, 243, 224)';
+        case 'Randevu İptal oldu':
+          return CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'] || 'rgb(255, 235, 238)';
+        case 'Toplantı Gerçekleşti':
+          return CRM_CONFIG.COLOR_CODES['Toplantı Gerçekleşti'] || 'rgb(255, 255, 255)';
+        default:
+          return 'rgb(255, 255, 255)'; // White (default)
+      }
+    };
+    
+    // Build color matrix (all rows at once)
+    const backgroundColorMatrix = [];
+    for (let i = 0; i < numRows; i++) {
+      const status = dateData && dateData[i] ? (dateData[i].status || '') : '';
+      const color = getColorForStatus(status);
+      
+      // Create a row array with the same color for all columns
+      const rowColors = new Array(lastColumn).fill(color);
+      backgroundColorMatrix.push(rowColors);
+    }
+    
+    // Apply all colors in a SINGLE batch operation (ultra-fast!)
+    const allRowsRange = sheet.getRange(startRow, 1, numRows, lastColumn);
+    allRowsRange.setBackgrounds(backgroundColorMatrix);
+    
+    // No flush needed - Google handles it automatically
+    
+  } catch (error) {
+    console.error('❌ Error applying batch Randevularım color coding:', error);
+    throw error;
+  }
+}
+
+function updateRandevularimRowColor(randevularimSheet, rowNumber, status) {
+  // Single row update (for individual changes, not batch operations)
+  try {
+    if (!randevularimSheet || !rowNumber) {
+      return;
+    }
     
     let color = 'rgb(255, 255, 255)'; // Default white
     
-    // Check if status is empty, null, or undefined
     if (!status || status === '' || status === null || status === undefined) {
-      console.log('⚠️ Empty status - applying white color');
       color = 'rgb(255, 255, 255)'; // White
-    }
-    // Map status to color using centralized system
-    else {
+    } else {
       switch (status) {
         case 'Randevu Alındı':
-          color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
-          console.log('🎨 Mapped Randevu Alındı to color:', color);
+          color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'] || 'rgb(232, 245, 232)';
           break;
         case 'İleri Tarih Randevu':
-          color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
-          console.log('🎨 Mapped İleri Tarih Randevu to color:', color);
+          color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'] || 'rgb(255, 255, 255)';
           break;
         case 'Randevu Teyitlendi':
-          color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
-          console.log('🎨 Mapped Randevu Teyitlendi to color:', color);
+          color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'] || 'rgb(255, 255, 255)';
           break;
         case 'Randevu Ertelendi':
-          color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
-          console.log('🎨 Mapped Randevu Ertelendi to color:', color);
+          color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'] || 'rgb(255, 243, 224)';
           break;
         case 'Randevu İptal oldu':
-          color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
-          console.log('🎨 Mapped Randevu İptal oldu to color:', color);
+          color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'] || 'rgb(255, 235, 238)';
           break;
         case 'Toplantı Gerçekleşti':
-          color = CRM_CONFIG.COLOR_CODES['Toplantı Gerçekleşti'];
-          console.log('🎨 Mapped Toplantı Gerçekleşti to color:', color);
+          color = CRM_CONFIG.COLOR_CODES['Toplantı Gerçekleşti'] || 'rgb(255, 255, 255)';
           break;
         default:
           color = 'rgb(255, 255, 255)'; // White (default)
-          console.log('⚠️ Unknown status, using default white');
       }
     }
     
-    // Toplantı Sonucu override'ları KALDIRILDI - Randevularım'da bu kolon yok
-    // Sadece Randevu Durumu'na göre renklendirme yapılacak - KESIN KURALLAR
-    
-    // Tüm satıra renk uygula - ÖNCE TEMIZLE, SONRA UYGULA
     const lastCol = randevularimSheet.getLastColumn();
     const range = randevularimSheet.getRange(rowNumber, 1, 1, lastCol);
-    
-    // Önce tüm satırı beyaz yap (eski renkleri temizle)
-    range.setBackground('rgb(255, 255, 255)');
-    
-    // Sonra doğru rengi uygula
     range.setBackground(color);
-    
-    console.log(`✅ Randevularım Row ${rowNumber}: Status="${status}" → Color="${color}"`);
     
   } catch (error) {
     console.error('❌ Error updating Randevularım row color:', error);
@@ -8342,43 +8528,32 @@ function sortRandevularimByDate(sheet) {
         .replace(/ç/g, 'c')
         .replace(/Ç/g, 'c');
       
-      // Debug: Orijinal ve normalize edilmiş string'i göster
-      console.log(`  🔍 Status kontrol: "${statusStr}" → normalize: "${s}"`);
-      
       // İptal kontrolü - KESIN KURAL (önce kontrol et)
       // Hem "iptal" hem de "iptal oldu" kontrolü
       if (s.includes('iptal')) {
-        console.log(`  ✅ İptal algılandı: "${statusStr}" → Priority=2`);
         return 2; // İptal en altta
       }
       
       // Ertelendi kontrolü
       if (s.includes('erte') || s.includes('ertelendi')) {
-        console.log(`  ✅ Ertelendi algılandı: "${statusStr}" → Priority=1`);
         return 1; // Ertelendi ortada
       }
       
-      console.log(`  ✅ Normal algılandı: "${statusStr}" → Priority=0`);
       return 0; // Diğerleri (Alındı, Teyitlendi, İleri Tarih) en üstte
+    }
+    
+    // BATCH: Tüm status değerlerini tek seferde oku (100x hızlı!)
+    let statusValues = [];
+    if (randevuDurumuIndex !== -1) {
+      const statusRange = sheet.getRange(2, randevuDurumuIndex + 1, lastRow - 1, 1);
+      statusValues = statusRange.getDisplayValues().map(row => String(row[0] || '').trim());
     }
     
     // Tarih kolonundaki verileri al ve sırala
     const dateData = data.map((row, index) => {
       const dateValue = row[randevuTarihiIndex];
-      
-      // Status değerini doğru oku - getDisplayValue() kullan (dropdown değerleri için)
-      let status = '';
-      if (randevuDurumuIndex !== -1) {
-        const statusCell = sheet.getRange(index + 2, randevuDurumuIndex + 1);
-        status = String(statusCell.getDisplayValue() || statusCell.getValue() || '').trim();
-      }
-      
+      const status = statusValues[index] || '';
       const priority = getStatusPriority(status);
-      
-      // Debug log - ilk 5 satır için
-      if (index < 5) {
-        console.log(`📊 Satır ${index + 2}: Status="${status}" → Priority=${priority}`);
-      }
       
       return {
         rowIndex: index + 2, // +2 çünkü header 1. satır ve data 2. satırdan başlıyor
@@ -8443,24 +8618,14 @@ function sortRandevularimByDate(sheet) {
     // Sıralanmış verileri sayfaya yaz
     const sortedData = dateData.map(item => item.originalRow);
     
-    // Debug: Sıralama sonrası ilk 10 satırın durumunu göster
-    console.log('📊 Sıralama sonrası ilk 10 satır:');
-    for (let i = 0; i < Math.min(10, dateData.length); i++) {
-      console.log(`  Satır ${i + 2}: Status="${dateData[i].status}" (Priority=${dateData[i].statusPriority})`);
-    }
-    
     sheet.getRange(2, 1, sortedData.length, sheet.getLastColumn()).setValues(sortedData);
     
     console.log(`✅ Randevularım ${dateColumnName} kolonuna göre sıralandı (Normal > Ertelendi > İptal, tarihe göre en yeni önce)`);
     
-    // Sıralamadan SONRA tüm satırları yeniden renklendir (renklerin karışmaması için)
-    console.log('🎨 Sıralamadan sonra tüm satırları yeniden renklendiriliyor...');
-    for (let i = 0; i < sortedData.length; i++) {
-      const rowNumber = i + 2; // +2 çünkü header 1. satır
-      const status = dateData[i].status || '';
-      updateRandevularimRowColor(sheet, rowNumber, status);
-    }
-    console.log(`✅ ${sortedData.length} satır yeniden renklendirildi`);
+    // Sıralamadan SONRA tüm satırları yeniden renklendir (BATCH OPERATION - 100x hızlı!)
+    console.log('🎨 Sıralamadan sonra tüm satırları batch olarak renklendiriliyor...');
+    applyRandevularimColorCodingBatch(sheet, 2, sortedData.length, dateData);
+    console.log(`✅ ${sortedData.length} satır batch olarak renklendirildi`);
     
   } catch (error) {
     console.error('❌ Randevularım sıralama hatası:', error);

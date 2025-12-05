@@ -362,6 +362,13 @@
         </select>
       </div>
       
+      <!-- CİRO ALANI (sadece "Satış Yapıldı" seçildiğinde) -->
+      <div class="form-group" id="ciroGroup" style="display: none;">
+        <label for="ciro">💰 Ciro (₺) <span class="required">*</span></label>
+        <input type="number" id="ciro" name="ciro" step="0.01" min="0" placeholder="Örn: 5000 veya 5000.50" required>
+        <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">Satışa dönüştürmek için ciro miktarını girin</small>
+      </div>
+      
       <!-- İSTEĞE BAĞLI ALANLAR (sadece "Toplantı Gerçekleşti" durumunda) -->
       <div class="form-row" id="extraFieldsGroup" style="display: none;">
         <div class="form-group">
@@ -449,6 +456,29 @@
       
       fillTimeDropdowns();
       fillDropdowns();
+      
+      // Toplantı Sonucu değiştiğinde ciro input'unu göster/gizle
+      const meetingResultSelect = document.getElementById('meetingResult');
+      if (meetingResultSelect) {
+        meetingResultSelect.addEventListener('change', function() {
+          const ciroGroup = document.getElementById('ciroGroup');
+          const ciroInput = document.getElementById('ciro');
+          const selectedValue = this.value.toLowerCase();
+          
+          if (selectedValue.includes('satış') || selectedValue === 'satış yapıldı') {
+            // "Satış Yapıldı" seçildiğinde ciro input'unu göster
+            if (ciroGroup) ciroGroup.style.display = 'block';
+            if (ciroInput) ciroInput.setAttribute('required', 'required');
+          } else {
+            // Diğer durumlarda gizle
+            if (ciroGroup) ciroGroup.style.display = 'none';
+            if (ciroInput) {
+              ciroInput.removeAttribute('required');
+              ciroInput.value = '';
+            }
+          }
+        });
+      }
       
       // Varsayılan değerleri dropdown'lar doldurulduktan sonra set et - HIZ için minimum gecikme
       setTimeout(function() {
@@ -840,7 +870,9 @@
         meetingNotes: document.getElementById('meetingNotes').value, // Backward compatibility
         yoneticiNot: document.getElementById('yoneticiNot').value,
         toplantiSonucu: document.getElementById('meetingResult').value,
-        meetingResult: document.getElementById('meetingResult').value // Backward compatibility
+        meetingResult: document.getElementById('meetingResult').value, // Backward compatibility
+        ciro: document.getElementById('ciro').value || 0, // Ciro (Satış Yapıldı için)
+        satisCiro: document.getElementById('ciro').value || 0 // Backward compatibility
       };
       
       // "Toplantı Gerçekleşti" durumunda ekstra alanlar
@@ -860,7 +892,16 @@
           .withSuccessHandler(function(result) {
             isSubmitting = false; // Reset flag
             if (result.success) {
-              google.script.host.close();
+              // Dialog'u kapat (Çalışıyor mesajı sorununu önlemek için daha uzun setTimeout)
+              // Google Sheets'in loading indicator'ının kaybolması için yeterli süre ver
+              // Script'in tamamlanması için 1 saniye bekle
+              setTimeout(function() {
+                try {
+                  google.script.host.close();
+                } catch (e) {
+                  // Dialog zaten kapalıysa hata verme
+                }
+              }, 1000);
             } else {
               if (submitButton) {
                 submitButton.disabled = false;
