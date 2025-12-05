@@ -12,14 +12,13 @@
 | Ertelendi | rgb(255, 243, 224) | Randevularım | Açık Turuncu (Мягкий оранжевый) |
 | İptal | rgb(255, 235, 238) | Randevularım | Açık Kırmızı (Светло-красный) |
 | Fırsat İletildi | rgb(255, 235, 238) | Format Tablo, Fırsatlarım | Açık Kırmızı (Светло-красный) |
-| Toplantı Tamamlandı | rgb(200, 230, 201) | Toplantılarım | Açık Yeşil (Светло-зеленый) |
+| Toplantı Tamamlandı | rgb(200, 230, 201) | Format Tablo, Toplantılarım | Açık Yeşil (Светло-зеленый) |
 | İlgilenmiyor | rgb(255, 248, 225) | Format Tablo | Açık Sarı (Светло-желтый) |
 | Ulaşılamadı | rgb(255, 235, 238) | Format Tablo | Açık Kırmızı (Светло-красный) |
 | Geçersiz Numara | rgb(255, 224, 178) | Format Tablo | Açık Turuncu (Светло-оранжевый) |
 | Kurumsal | rgb(225, 190, 231) | Format Tablo | Açık Mor (Светло-фиолетовый) |
 | Yeniden Aranacak | rgb(227, 242, 253) | Fırsatlarım | Açık Mavi (Светло-голубой) |
 | Bilgi Verildi | rgb(243, 229, 245) | Fırsatlarım | Açık Mor (Светло-фиолетовый) |
-| Toplantı Tamamlandı | rgb(200, 230, 201) | Format Tablo, Toplantılarım | Açık Yeşil (Светло-зеленый) |
 | Satış Yapıldı | rgb(129, 212, 250) | Format Tablo, Toplantılarım | Orta Mavi (Средний голубой) |
 
 ### 📊 SAYFA BAŞLIK RENKLERI (Цвета заголовков страниц)
@@ -55,15 +54,14 @@ CRM_CONFIG = {
     'Ertelendi': 'rgb(255, 243, 224)',           // #FFF3E0 - Açık Turuncu
     'İptal': 'rgb(255, 235, 238)',               // #FFEBEE - Açık Kırmızı
     'Fırsat İletildi': 'rgb(255, 235, 238)',     // #FFEBEE - Açık Kırmızı
-    'Toplantı Tamamlandı': 'rgb(200, 230, 201)', // #C8E6C9 - Açık Yeşil
+    'Toplantı Tamamlandı': 'rgb(200, 230, 201)', // #C8E6C9 - Açık Yeşil (Format Tablo, Toplantılarım)
     'İlgilenmiyor': 'rgb(255, 248, 225)',        // #FFF8E1 - Açık Sarı
     'Ulaşılamadı': 'rgb(255, 235, 238)',         // #FFEBEE - Açık Kırmızı
     'Geçersiz Numara': 'rgb(255, 224, 178)',     // #FFE0B2 - Açık Turuncu
     'Kurumsal': 'rgb(225, 190, 231)',             // #E1BEE7 - Açık Mor
     'Yeniden Aranacak': 'rgb(227, 242, 253)',    // #E3F2FD - Açık Mavi
     'Bilgi Verildi': 'rgb(243, 229, 245)',       // #F3E5F5 - Açık Mor
-    'Toplantı Tamamlandı': 'rgb(200, 230, 201)', // #C8E6C9 - Açık Yeşil
-    'Satış Yapıldı': 'rgb(129, 212, 250)'        // #81D4FA - Orta Mavi
+    'Satış Yapıldı': 'rgb(129, 212, 250)'        // #81D4FA - Orta Mavi (Format Tablo, Toplantılarım)
   },
   
   // Page header colors (Цвета заголовков страниц)
