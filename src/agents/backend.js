@@ -7418,7 +7418,12 @@ function analyzeCMS(website) {
  * @param {Object} parameters - Fonksiyon parametreleri
  * @returns {Object} - Sonuç objesi
  */
-/* function detectEcommerceIzi(parameters) {  // removed old menu item
+/**
+ * 🛒 E-ticaret İzi Tespiti - Batch Operations (Google Best Practice)
+ * @param {Object} parameters - Fonksiyon parametreleri
+ * @returns {Object} - Sonuç objesi
+ */
+function detectEcommerceIzi(parameters) {
   console.log('🛒 E-ticaret İzi tespiti başlatılıyor:', parameters);
   
   try {
@@ -7483,62 +7488,69 @@ function analyzeCMS(website) {
       console.log('⚠️ CMS Adı kolonu bulunamadı, E-ticaret analizi yapılacak');
     }
     
-    // Performans optimizasyonu
-    const BATCH_SIZE = Math.min(25, rowCount);
+    // ✅ BATCH OPERATIONS: Tüm verileri tek seferde oku (Google best practice)
+    console.log(`📊 [BATCH] ${rowCount} satır için batch operations başlatılıyor...`);
+    
+    // ✅ BATCH READ: Tüm website ve CMS Adı değerlerini tek seferde oku
+    const dataRange = sheet.getRange(startRow, 1, rowCount, sheet.getLastColumn());
+    const allData = dataRange.getValues(); // 1 API call!
+    
+    // Memory'de analiz yap ve sonuçları hazırla
+    const ecommerceResults = [];
     let processedCount = 0;
     let errorCount = 0;
     
-    // Her batch için
-    for (let i = 0; i < rowCount; i += BATCH_SIZE) {
-      const batchEnd = Math.min(i + BATCH_SIZE, rowCount);
-      const batchSize = batchEnd - i;
+    for (let i = 0; i < rowCount; i++) {
+      const currentRow = startRow + i;
+      const row = allData[i];
       
-      console.log(`🔄 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${batchSize} satır işleniyor`);
-      
-      // Batch içindeki her satır için
-      for (let j = 0; j < batchSize; j++) {
-        const currentRow = startRow + i + j;
+      try {
+        const website = String(row[websiteIndex] || '').trim();
         
-        try {
-          const website = sheet.getRange(currentRow, websiteIndex + 1).getValue();
-          
-          if (website && website.toString().trim() !== '') {
-            // CMS tespit edilmişse E-ticaret analizi yap
-            const cmsAdi = sheet.getRange(currentRow, cmsAdiIndex + 1).getValue();
-            
-            if (cmsAdi && cmsAdi !== 'Erişilemiyor' && cmsAdi !== 'Sayfa Bulunamadı') {
-              // CMS tespit edilmiş, E-ticaret analizi yap
-              const ecommerceResult = analyzeEcommerce(website.toString());
-              sheet.getRange(currentRow, ecommerceIndex + 1).setValue(ecommerceResult);
-            } else {
-              // CMS tespit edilmemiş, E-ticaret analizi yapma
-              sheet.getRange(currentRow, ecommerceIndex + 1).setValue('CMS Tespit Edilmedi');
-            }
-            
-            processedCount++;
-          }
-          
-        } catch (error) {
-          console.error(`❌ Satır ${currentRow} analiz hatası:`, error);
-          
-          // CMS tespit edilmişse "Erişilemiyor" yazma
-          const cmsAdi = sheet.getRange(currentRow, cmsAdiIndex + 1).getValue();
-          if (cmsAdi && cmsAdi !== 'Erişilemiyor' && cmsAdi !== 'Sayfa Bulunamadı') {
-            sheet.getRange(currentRow, ecommerceIndex + 1).setValue('Analiz Hatası');
-          } else {
-            sheet.getRange(currentRow, ecommerceIndex + 1).setValue('Erişilemiyor');
-          }
-          errorCount++;
+        if (!website || website === '') {
+          // Boş website - boş değer ekle
+          ecommerceResults.push(['']);
+          continue;
         }
         
-        // Her 5 satırda bir progress
-        if ((processedCount + errorCount) % 5 === 0) {
-          console.log(`✅ ${processedCount} başarılı, ${errorCount} hatalı`);
+        // CMS Adı kontrolü (memory'den oku - API call YOK!)
+        const cmsAdi = (cmsAdiIndex !== -1) ? String(row[cmsAdiIndex] || '').trim() : '';
+        
+        if (cmsAdi && cmsAdi !== 'Erişilemiyor' && cmsAdi !== 'Sayfa Bulunamadı' && cmsAdi !== '') {
+          // CMS tespit edilmiş, E-ticaret analizi yap
+          const ecommerceResult = analyzeEcommerce(website);
+          ecommerceResults.push([ecommerceResult]);
+          processedCount++;
+        } else {
+          // CMS tespit edilmemiş, E-ticaret analizi yapma
+          ecommerceResults.push(['CMS Tespit Edilmedi']);
         }
+        
+      } catch (error) {
+        console.error(`❌ Satır ${currentRow} analiz hatası:`, error);
+        
+        // CMS tespit edilmişse "Erişilemiyor" yazma
+        const cmsAdi = (cmsAdiIndex !== -1) ? String(allData[i][cmsAdiIndex] || '').trim() : '';
+        if (cmsAdi && cmsAdi !== 'Erişilemiyor' && cmsAdi !== 'Sayfa Bulunamadı' && cmsAdi !== '') {
+          ecommerceResults.push(['Analiz Hatası']);
+        } else {
+          ecommerceResults.push(['Erişilemiyor']);
+        }
+        errorCount++;
       }
       
-      // Batch arası bekleme
-      Utilities.sleep(200);
+      // Her 5 satırda bir progress
+      if ((processedCount + errorCount) % 5 === 0 && (processedCount + errorCount) > 0) {
+        console.log(`✅ ${processedCount} başarılı, ${errorCount} hatalı`);
+      }
+    }
+    
+    // ✅ BATCH WRITE: Tüm sonuçları tek seferde yaz (Google best practice)
+    if (ecommerceResults.length > 0) {
+      const ecommerceRange = sheet.getRange(startRow, ecommerceIndex + 1, rowCount, 1);
+      ecommerceRange.setValues(ecommerceResults); // 1 API call!
+      
+      console.log(`✅ [BATCH] ${processedCount} başarılı, ${errorCount} hatalı (2 API call: 1 read + 1 write)`);
     }
     
     console.log(`✅ E-ticaret Analizi tamamlandı: ${processedCount} başarılı, ${errorCount} hatalı`);
@@ -7556,7 +7568,7 @@ function analyzeCMS(website) {
     SpreadsheetApp.getUi().alert('E-ticaret Analizi sırasında hata oluştu: ' + error.message);
     throw error;
   }
-*/
+}
 
 /**
  * 🛒 Tekil E-ticaret Analizi - Güven Skoru
