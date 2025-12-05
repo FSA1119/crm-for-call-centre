@@ -7726,7 +7726,12 @@ function analyzeEcommerce(website) {
  * @param {Object} parameters - Fonksiyon parametreleri
  * @returns {Object} - Sonuç objesi
  */
-/* function testSiteHizi(parameters) {  // removed old menu item (disabled)
+/**
+ * ⚡ Site Hız Testi - Batch Operations (Google Best Practice)
+ * @param {Object} parameters - Fonksiyon parametreleri
+ * @returns {Object} - Sonuç objesi
+ */
+function testSiteHizi(parameters) {
   console.log('⚡ Site Hız Testi başlatılıyor:', parameters);
   
   try {
@@ -7785,48 +7790,54 @@ function analyzeEcommerce(website) {
       console.log('✅ Site Hızı kolonu eklendi');
     }
     
-    // Performans optimizasyonu
-    const BATCH_SIZE = Math.min(25, rowCount);
+    // ✅ BATCH OPERATIONS: Tüm verileri tek seferde oku (Google best practice)
+    console.log(`📊 [BATCH] ${rowCount} satır için batch operations başlatılıyor...`);
+    
+    // ✅ BATCH READ: Tüm website değerlerini tek seferde oku
+    const dataRange = sheet.getRange(startRow, 1, rowCount, sheet.getLastColumn());
+    const allData = dataRange.getValues(); // 1 API call!
+    
+    // Memory'de analiz yap ve sonuçları hazırla
+    const speedResults = [];
     let processedCount = 0;
     let errorCount = 0;
     
-    // Her batch için
-    for (let i = 0; i < rowCount; i += BATCH_SIZE) {
-      const batchEnd = Math.min(i + BATCH_SIZE, rowCount);
-      const batchSize = batchEnd - i;
+    for (let i = 0; i < rowCount; i++) {
+      const currentRow = startRow + i;
+      const row = allData[i];
       
-      console.log(`🔄 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${batchSize} satır işleniyor`);
-      
-      // Batch içindeki her satır için
-      for (let j = 0; j < batchSize; j++) {
-        const currentRow = startRow + i + j;
+      try {
+        const website = String(row[websiteIndex] || '').trim();
         
-        try {
-          const website = sheet.getRange(currentRow, websiteIndex + 1).getValue();
-          
-          if (website && website.toString().trim() !== '') {
-            const speedResult = measureSiteSpeed(website.toString());
-            
-            // Sonucu yaz
-            sheet.getRange(currentRow, speedIndex + 1).setValue(speedResult);
-            
-            processedCount++;
-          }
-          
-        } catch (error) {
-          console.error(`❌ Satır ${currentRow} test hatası:`, error);
-          sheet.getRange(currentRow, speedIndex + 1).setValue('Erişilemiyor');
-          errorCount++;
+        if (!website || website === '') {
+          // Boş website - boş değer ekle
+          speedResults.push(['']);
+          continue;
         }
         
-        // Her 5 satırda bir progress
-        if ((processedCount + errorCount) % 5 === 0) {
-          console.log(`✅ ${processedCount} başarılı, ${errorCount} hatalı`);
-        }
+        // Hız ölçümü yap (memory'de - API call YOK!)
+        const speedResult = measureSiteSpeed(website);
+        speedResults.push([speedResult]);
+        processedCount++;
+        
+      } catch (error) {
+        console.error(`❌ Satır ${currentRow} test hatası:`, error);
+        speedResults.push(['Erişilemiyor']);
+        errorCount++;
       }
       
-      // Batch arası bekleme
-      Utilities.sleep(200);
+      // Her 5 satırda bir progress
+      if ((processedCount + errorCount) % 5 === 0 && (processedCount + errorCount) > 0) {
+        console.log(`✅ ${processedCount} başarılı, ${errorCount} hatalı`);
+      }
+    }
+    
+    // ✅ BATCH WRITE: Tüm sonuçları tek seferde yaz (Google best practice)
+    if (speedResults.length > 0) {
+      const speedRange = sheet.getRange(startRow, speedIndex + 1, rowCount, 1);
+      speedRange.setValues(speedResults); // 1 API call!
+      
+      console.log(`✅ [BATCH] ${processedCount} başarılı, ${errorCount} hatalı (2 API call: 1 read + 1 write)`);
     }
     
     console.log(`✅ Hız Testi tamamlandı: ${processedCount} başarılı, ${errorCount} hatalı`);
@@ -7844,7 +7855,7 @@ function analyzeEcommerce(website) {
     SpreadsheetApp.getUi().alert('Hız Testi sırasında hata oluştu: ' + error.message);
     throw error;
   }
-*/
+}
 
 /**
  * ⚡ Tekil Site Hız Ölçümü - Basit Metrik
