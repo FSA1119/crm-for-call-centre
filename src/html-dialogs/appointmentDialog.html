@@ -189,10 +189,10 @@
           </select>
         </div>
         
-        <!-- 3. Aktivite Tarihi (Yarı Otomatik - Varsayılan: Yarınki tarih) -->
+        <!-- 3. Aktivite Tarihi (Yarı Otomatik - Varsayılan: Yarınki tarih - ZORUNLU) -->
         <div class="form-group">
-          <label for="randevuTarihi">3. Aktivite Tarihi</label>
-          <input type="date" id="randevuTarihi" name="randevuTarihi">
+          <label for="randevuTarihi">3. Aktivite Tarihi <span class="required">*</span></label>
+          <input type="date" id="randevuTarihi" name="randevuTarihi" required>
         </div>
         
         <!-- 4. Saat (Manuel - Zorunlu) -->
@@ -293,14 +293,18 @@
       
       if (!isimSoyisim) {
         showError('İsim Soyisim alanı zorunludur');
+        submitButton.disabled = false;
+        submitButton.textContent = 'Randevu Oluştur';
         return;
       }
       
-      // Tarih varsayılan olarak yarınki gün geldiği için zorunlu değil
-      // if (!randevuTarihi) {
-      //   showError('Randevu tarihi zorunludur');
-      //   return;
-      // }
+      // Randevu tarihi zorunlu kontrolü
+      if (!randevuTarihi || randevuTarihi.trim() === '') {
+        showError('Randevu Tarihi zorunludur. Lütfen bir tarih seçin.');
+        submitButton.disabled = false;
+        submitButton.textContent = 'Randevu Oluştur';
+        return;
+      }
       
       if (!aktivite) {
         showError('Aktivite durumu seçilmelidir');

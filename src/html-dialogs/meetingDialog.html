@@ -9,47 +9,56 @@
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
-      padding: 20px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 0;
+      background: rgba(0, 0, 0, 0.5);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
     
     .container {
       background: white;
-      border-radius: 15px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-      padding: 30px;
-      width: 100%;
-      max-width: 600px;
-      animation: slideIn 0.3s ease-out;
-    }
-    
-    @keyframes slideIn {
-      from { transform: translateY(-20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
+      border-radius: 12px;
+      box-shadow: 0 20px 25px rgba(0,0,0,0.15);
+      padding: 36px;
+      width: 98%;
+      max-width: 1200px;
+      animation: slideUp 0.3s ease;
+      position: relative;
     }
     
     .header {
       text-align: center;
-      margin-bottom: 30px;
-      border-bottom: 2px solid #f0f0f0;
-      padding-bottom: 20px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e5e7eb;
     }
     
     .header h1 {
-      color: #333;
-      margin: 0;
-      font-size: 28px;
-      font-weight: 600;
+      color: #1f2937;
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
     }
     
     .header p {
-      color: #666;
-      margin: 10px 0 0 0;
-      font-size: 16px;
+      color: #6b7280;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 400;
     }
     
     .form-group {
@@ -59,21 +68,41 @@
     .form-group label {
       display: block;
       margin-bottom: 8px;
-      color: #333;
-      font-weight: 500;
+      color: #374151;
+      font-weight: 600;
       font-size: 14px;
+      letter-spacing: -0.2px;
+    }
+    
+    .required {
+      color: #ef4444;
+      font-weight: 600;
+    }
+    
+    .optional {
+      color: #9ca3af;
+      font-size: 12px;
+      font-weight: 400;
     }
     
     .form-group input,
     .form-group textarea,
     .form-group select {
       width: 100%;
-      padding: 12px 15px;
-      border: 2px solid #e1e5e9;
+      padding: 10px 14px;
+      border: 2px solid #d1d5db;
       border-radius: 8px;
       font-size: 14px;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
       box-sizing: border-box;
+      background: #ffffff;
+      color: #111827;
+    }
+    
+    .form-group input:hover,
+    .form-group textarea:hover,
+    .form-group select:hover {
+      border-color: #9ca3af;
     }
     
     .form-group input:focus,
@@ -82,6 +111,7 @@
       outline: none;
       border-color: #667eea;
       box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      background: #ffffff;
     }
     
     .form-row {
@@ -93,42 +123,59 @@
       flex: 1;
     }
     
+    .form-row-3 {
+      display: flex;
+      gap: 15px;
+    }
+    
+    .form-row-3 .form-group {
+      flex: 1;
+    }
+    
+    .form-row-3 .form-group:first-child {
+      flex: 2;
+    }
+    
     .form-group textarea {
       resize: vertical;
-      min-height: 100px;
+      min-height: 90px;
+      font-family: inherit;
+      line-height: 1.6;
+      padding: 12px 14px;
     }
     
     .buttons {
       display: flex;
-      gap: 15px;
+      gap: 12px;
       justify-content: flex-end;
-      margin-top: 30px;
+      margin-top: 24px;
       padding-top: 20px;
-      border-top: 2px solid #f0f0f0;
+      border-top: 1px solid #e5e7eb;
     }
     
     .btn {
-      padding: 12px 25px;
+      padding: 10px 24px;
       border: none;
       border-radius: 8px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
       text-decoration: none;
       display: inline-block;
       text-align: center;
+      letter-spacing: -0.2px;
     }
     
     .btn-secondary {
-      background: #f8f9fa;
-      color: #6c757d;
-      border: 2px solid #e9ecef;
+      background: #6b7280;
+      color: white;
     }
     
     .btn-secondary:hover {
-      background: #e9ecef;
-      color: #495057;
+      background: #4b5563;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     
     .btn-primary {
@@ -138,37 +185,50 @@
     
     .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-primary:active {
+      transform: translateY(0);
     }
     
     .appointment-info {
-      background: #f8f9fa;
-      border-radius: 8px;
+      background: linear-gradient(135deg, #f8f9fa 0%, #f1f5f9 100%);
+      border-radius: 10px;
       padding: 20px;
-      margin-bottom: 25px;
+      margin-bottom: 24px;
       border-left: 4px solid #667eea;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     
     .appointment-info h3 {
-      margin: 0 0 15px 0;
-      color: #333;
-      font-size: 18px;
+      margin: 0 0 16px 0;
+      color: #1f2937;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
     }
     
     .info-row {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 8px;
+      align-items: center;
+      margin-bottom: 10px;
       font-size: 14px;
+      padding: 4px 0;
+    }
+    
+    .info-row:last-child {
+      margin-bottom: 0;
     }
     
     .info-label {
       font-weight: 500;
-      color: #666;
+      color: #6b7280;
     }
     
     .info-value {
-      color: #333;
+      color: #111827;
       font-weight: 600;
     }
     
@@ -208,37 +268,54 @@
       <h3>📋 Randevu Bilgileri</h3>
       <div class="info-row">
         <span class="info-label">Temsilci:</span>
-        <span class="info-value" id="employeeCode">-</span>
+        <span class="info-value"><?= rowData && rowData.Kod ? rowData.Kod : '-' ?></span>
       </div>
       <div class="info-row">
         <span class="info-label">Şirket:</span>
-        <span class="info-value" id="companyName">-</span>
+        <span class="info-value"><?= rowData && rowData['Company name'] ? rowData['Company name'] : '-' ?></span>
       </div>
       <div class="info-row">
         <span class="info-label">Tarih:</span>
-        <span class="info-value" id="appointmentDate">-</span>
+        <span class="info-value"><?= rowData && rowData['Randevu Tarihi'] ? rowData['Randevu Tarihi'] : '-' ?></span>
       </div>
       <div class="info-row">
         <span class="info-label">Saat:</span>
-        <span class="info-value" id="appointmentTime">-</span>
+        <span class="info-value"><?= rowData && rowData['Saat'] ? rowData['Saat'] : '-' ?></span>
       </div>
       <div class="info-row">
         <span class="info-label">Durum:</span>
         <span class="info-value">
-          <span class="status-badge status-confirmed" id="appointmentStatus">-</span>
+          <span class="status-badge status-confirmed"><?= rowData && rowData['Randevu durumu'] ? rowData['Randevu durumu'] : '-' ?></span>
         </span>
       </div>
     </div>
     
     <form id="meetingForm">
+      <!-- ZORUNLU ALAN: Toplantıyı Yapan (sadece "Toplantı Gerçekleşti" durumunda) -->
+      <div class="form-group" id="toplantiYapanGroup" style="display: none;">
+        <label for="toplantiYapan">👤 Toplantıyı Yapan <span class="required">*</span></label>
+        <select id="toplantiYapan" name="toplantiYapan">
+          <option value="">Seçiniz...</option>
+        </select>
+      </div>
+      
       <div class="form-row">
         <div class="form-group">
           <label for="meetingDate">📅 Toplantı Tarihi *</label>
-          <input type="date" id="meetingDate" name="meetingDate" required>
+          <input type="date" id="meetingDate" name="meetingDate" required value="<?= defaultMeetingDate || '' ?>">
         </div>
         <div class="form-group">
           <label for="meetingTime">🕐 Toplantı Saati *</label>
-          <input type="time" id="meetingTime" name="meetingTime" required>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="meetingHour" name="meetingHour" required style="flex: 1;">
+              <option value="">Saat</option>
+            </select>
+            <span style="font-size: 18px; font-weight: bold;">:</span>
+            <select id="meetingMinute" name="meetingMinute" required style="flex: 1;">
+              <option value="">Dakika</option>
+            </select>
+          </div>
+          <input type="hidden" id="meetingTime" name="meetingTime">
         </div>
       </div>
       
@@ -246,66 +323,474 @@
         <label for="meetingFormat">📋 Toplantı Formatı *</label>
         <select id="meetingFormat" name="meetingFormat" required>
           <option value="">Format seçin</option>
-          <option value="Yüz yüze">Yüz yüze</option>
-          <option value="Online">Online</option>
-          <option value="Telefon">Telefon</option>
-          <option value="WhatsApp">WhatsApp</option>
-          <option value="E-posta">E-posta</option>
         </select>
+        <script>
+          // Store HTML strings in JavaScript variables (will be set by backend via template)
+          var meetingFormatsHTML = <?= JSON.stringify(meetingFormatsHTML || '') ?>;
+          var toplantiYapanHTML = <?= JSON.stringify(toplantiYapanHTML || '') ?>;
+          var toplantiSonucuHTML = <?= JSON.stringify(toplantiSonucuHTML || '') ?>;
+          var teklifDetayiHTML = <?= JSON.stringify(teklifDetayiHTML || '') ?>;
+          var satisPotansiyeliHTML = <?= JSON.stringify(satisPotansiyeliHTML || '') ?>;
+          var isToplantiGerceklesti = <?= isToplantiGerceklesti ? 'true' : 'false' ?>;
+          var defaultMeetingDate = <?= defaultMeetingDate ? JSON.stringify(defaultMeetingDate) : 'null' ?>;
+          var defaultMeetingTime = <?= defaultMeetingTime ? JSON.stringify(defaultMeetingTime) : 'null' ?>;
+          var defaultMeetingHour = <?= defaultMeetingHour ? JSON.stringify(defaultMeetingHour) : 'null' ?>;
+          var defaultMeetingMinute = <?= defaultMeetingMinute ? JSON.stringify(defaultMeetingMinute) : 'null' ?>;
+          var defaultMeetingFormat = <?= defaultMeetingFormat ? JSON.stringify(defaultMeetingFormat) : 'null' ?>;
+          var defaultMeetingNotes = <?= defaultMeetingNotes ? JSON.stringify(defaultMeetingNotes) : '""' ?>;
+          var defaultYoneticiNot = <?= defaultYoneticiNot ? JSON.stringify(defaultYoneticiNot) : '""' ?>;
+          var defaultYeniTakipTarihi = <?= defaultYeniTakipTarihi ? JSON.stringify(defaultYeniTakipTarihi) : '""' ?>;
+          var rowNumber = <?= (rowNumber && typeof rowNumber === 'number') ? rowNumber : (rowNumber ? parseInt(rowNumber, 10) || 0 : 0) ?>;
+          var sourceSheetName = <?= JSON.stringify(sourceSheetName || '') ?>;
+        </script>
       </div>
       
       <div class="form-group">
-        <label for="meetingNotes">📝 Toplantı Notları</label>
-        <textarea id="meetingNotes" name="meetingNotes" placeholder="Toplantı ile ilgili notlarınızı buraya yazın..."></textarea>
+        <label for="meetingNotes">📝 Yorum</label>
+        <textarea id="meetingNotes" name="meetingNotes" placeholder="Toplantı ile ilgili yorumlarınızı buraya yazın..." rows="4"></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label for="yoneticiNot">👔 Yönetici Not</label>
+        <textarea id="yoneticiNot" name="yoneticiNot" placeholder="Yönetici notlarınızı buraya yazabilirsiniz..." rows="3"></textarea>
       </div>
       
       <div class="form-group">
         <label for="meetingResult">✅ Toplantı Sonucu</label>
         <select id="meetingResult" name="meetingResult">
           <option value="">Sonuç seçin</option>
-          <option value="Başarılı">Başarılı</option>
-          <option value="Kısmi Başarı">Kısmi Başarı</option>
-          <option value="Başarısız">Başarısız</option>
-          <option value="Ertelendi">Ertelendi</option>
-          <option value="İptal Edildi">İptal Edildi</option>
         </select>
+      </div>
+      
+      <!-- İSTEĞE BAĞLI ALANLAR (sadece "Toplantı Gerçekleşti" durumunda) -->
+      <div class="form-row" id="extraFieldsGroup" style="display: none;">
+        <div class="form-group">
+          <label for="teklifDetayi">📦 Teklif Detayı <span class="optional">(İsteğe Bağlı)</span></label>
+          <select id="teklifDetayi" name="teklifDetayi">
+            <option value="">Seçiniz...</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="form-row" id="extraFieldsGroup2" style="display: none;">
+        <div class="form-group">
+          <label for="satisPotansiyeli">🔥 Satış Potansiyeli <span class="optional">(İsteğe Bağlı)</span></label>
+          <select id="satisPotansiyeli" name="satisPotansiyeli">
+            <option value="">Seçiniz...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="yeniTakipTarihi">📆 Yeni Takip Tarihi <span class="optional">(İsteğe Bağlı)</span></label>
+          <input type="date" id="yeniTakipTarihi" name="yeniTakipTarihi">
+        </div>
       </div>
       
       <div class="buttons">
         <button type="button" class="btn btn-secondary" onclick="closeDialog()">❌ İptal</button>
-        <button type="submit" class="btn btn-primary">💾 Kaydet</button>
+        <button type="submit" class="btn btn-primary">💾 Kaydet ve Toplantıya Geç</button>
       </div>
     </form>
   </div>
   
   <script>
-    // Sayfa yüklendiğinde bugünün tarihini varsayılan olarak ayarla
+    // Sayfa yüklendiğinde
     window.onload = function() {
-      const today = new Date().toISOString().split('T')[0];
-      document.getElementById('meetingDate').value = today;
+      // Hızlı kayıt için gereksiz loglar kaldırıldı
       
-      // Randevu bilgilerini doldur
-      fillAppointmentInfo();
+      // ÖNCE tarihi direkt set et (input zaten var) - escape karakterlerini temizle
+      if (typeof defaultMeetingDate !== 'undefined' && defaultMeetingDate && defaultMeetingDate !== '' && defaultMeetingDate !== 'null' && defaultMeetingDate !== null) {
+        const meetingDateInput = document.getElementById('meetingDate');
+        if (meetingDateInput) {
+          let tarihDegeri = String(defaultMeetingDate)
+            .replace(/^"/, '').replace(/"$/, '') // Başındaki ve sonundaki çift tırnakları kaldır
+            .replace(/\\"/g, '"') // Escape edilmiş tırnakları düzelt
+            .trim();
+          meetingDateInput.value = tarihDegeri;
+          console.log('✅ Tarih direkt set edildi (onload, temizlenmiş):', tarihDegeri);
+        }
+      }
+      
+      // ÖNCE saati de direkt set et (dropdown'lar doldurulmadan önce)
+      const hourSelectOnLoad = document.getElementById('meetingHour');
+      const minuteSelectOnLoad = document.getElementById('meetingMinute');
+      if (hourSelectOnLoad && typeof defaultMeetingHour !== 'undefined' && defaultMeetingHour && defaultMeetingHour !== 'null' && defaultMeetingHour !== null) {
+        let hourValue = String(defaultMeetingHour)
+          .replace(/^"/, '').replace(/"$/, '')
+          .replace(/\\"/g, '"')
+          .trim();
+        const hourNum = parseInt(hourValue) || 9;
+        let finalHour = hourNum < 9 ? '09' : (hourNum > 21 ? '21' : hourNum.toString().padStart(2, '0'));
+        hourSelectOnLoad.value = finalHour;
+        console.log('✅ Saat (Hour) direkt set edildi (onload):', finalHour);
+      }
+      if (minuteSelectOnLoad && typeof defaultMeetingMinute !== 'undefined' && defaultMeetingMinute && defaultMeetingMinute !== 'null' && defaultMeetingMinute !== null) {
+        let minuteValue = String(defaultMeetingMinute)
+          .replace(/^"/, '').replace(/"$/, '')
+          .replace(/\\"/g, '"')
+          .trim();
+        const minute = parseInt(minuteValue) || 0;
+        let roundedMinute = minute <= 7 ? '00' : (minute <= 22 ? '15' : (minute <= 37 ? '30' : (minute <= 52 ? '45' : '00')));
+        minuteSelectOnLoad.value = roundedMinute;
+        console.log('✅ Dakika (Minute) direkt set edildi (onload):', roundedMinute);
+      }
+      
+      // ÖNCE Yeni Takip Tarihi'ni de direkt set et
+      if (typeof defaultYeniTakipTarihi !== 'undefined' && defaultYeniTakipTarihi && defaultYeniTakipTarihi !== 'null' && defaultYeniTakipTarihi !== null) {
+        const yeniTakipTarihiInput = document.getElementById('yeniTakipTarihi');
+        if (yeniTakipTarihiInput) {
+          let yeniTakipTarihiDegeri = String(defaultYeniTakipTarihi)
+            .replace(/^"/, '').replace(/"$/, '') // Başındaki ve sonundaki çift tırnakları kaldır
+            .replace(/\\"/g, '"') // Escape edilmiş tırnakları düzelt
+            .trim();
+          yeniTakipTarihiInput.value = yeniTakipTarihiDegeri;
+          console.log('✅ Yeni Takip Tarihi direkt set edildi (onload):', yeniTakipTarihiDegeri);
+        }
+      }
+      
+      fillTimeDropdowns();
+      fillDropdowns();
+      
+      // Varsayılan değerleri dropdown'lar doldurulduktan sonra set et - HIZ için minimum gecikme
+      setTimeout(function() {
+        fillDefaultValues();
+        toggleConditionalFields();
+      }, 100); // Hızlı kayıt için minimum gecikme
     };
     
-    function fillAppointmentInfo() {
-      // Google Apps Script'ten gelen verileri kullan
-      if (typeof google !== 'undefined' && google.script) {
-        google.script.run
-          .withSuccessHandler(function(appointmentData) {
-            if (appointmentData) {
-              document.getElementById('employeeCode').textContent = appointmentData.employeeCode || '-';
-              document.getElementById('companyName').textContent = appointmentData.companyName || '-';
-              document.getElementById('appointmentDate').textContent = appointmentData.appointmentDate || '-';
-              document.getElementById('appointmentTime').textContent = appointmentData.appointmentTime || '-';
-              document.getElementById('appointmentStatus').textContent = appointmentData.appointmentStatus || '-';
-            }
-          })
-          .withFailureHandler(function(error) {
-            console.error('Randevu bilgileri alınamadı:', error);
-          })
-          .getAppointmentInfo();
+    // Saat ve dakika dropdown'larını doldur
+    function fillTimeDropdowns() {
+      // Saat dropdown'u (09-21) - iş saatleri için
+      const hourSelect = document.getElementById('meetingHour');
+      if (hourSelect) {
+        for (let h = 9; h <= 21; h++) {
+          const hour = h.toString().padStart(2, '0');
+          const option = document.createElement('option');
+          option.value = hour;
+          option.textContent = hour;
+          hourSelect.appendChild(option);
+        }
       }
+      
+      // Dakika dropdown'u (00, 15, 30, 45) - hızlı seçim için
+      const minuteSelect = document.getElementById('meetingMinute');
+      if (minuteSelect) {
+        const minutes = ['00', '15', '30', '45'];
+        minutes.forEach(min => {
+          const option = document.createElement('option');
+          option.value = min;
+          option.textContent = min;
+          minuteSelect.appendChild(option);
+        });
+      }
+      
+      // Saat değiştiğinde hidden input'u güncelle
+      if (hourSelect && minuteSelect) {
+        const updateTimeInput = () => {
+          const hour = hourSelect.value;
+          const minute = minuteSelect.value;
+          if (hour && minute) {
+            document.getElementById('meetingTime').value = `${hour}:${minute}`;
+          }
+        };
+        hourSelect.addEventListener('change', updateTimeInput);
+        minuteSelect.addEventListener('change', updateTimeInput);
+      }
+    }
+    
+    // Conditional fields göster/gizle
+    function toggleConditionalFields() {
+      if (typeof isToplantiGerceklesti !== 'undefined' && isToplantiGerceklesti) {
+        // "Toplantı Gerçekleşti" durumunda ekstra alanları göster
+        const toplantiYapanGroup = document.getElementById('toplantiYapanGroup');
+        const extraFieldsGroup = document.getElementById('extraFieldsGroup');
+        const extraFieldsGroup2 = document.getElementById('extraFieldsGroup2');
+        
+        if (toplantiYapanGroup) {
+          toplantiYapanGroup.style.display = 'block';
+          // Zorunlu yap
+          const toplantiYapanSelect = document.getElementById('toplantiYapan');
+          if (toplantiYapanSelect) {
+            toplantiYapanSelect.setAttribute('required', 'required');
+          }
+        }
+        if (extraFieldsGroup) extraFieldsGroup.style.display = 'flex';
+        if (extraFieldsGroup2) extraFieldsGroup2.style.display = 'flex';
+      } else {
+        // Normal durumda gizle
+        const toplantiYapanGroup = document.getElementById('toplantiYapanGroup');
+        const extraFieldsGroup = document.getElementById('extraFieldsGroup');
+        const extraFieldsGroup2 = document.getElementById('extraFieldsGroup2');
+        
+        if (toplantiYapanGroup) {
+          toplantiYapanGroup.style.display = 'none';
+          // Zorunluluğu kaldır
+          const toplantiYapanSelect = document.getElementById('toplantiYapan');
+          if (toplantiYapanSelect) {
+            toplantiYapanSelect.removeAttribute('required');
+          }
+        }
+        if (extraFieldsGroup) extraFieldsGroup.style.display = 'none';
+        if (extraFieldsGroup2) extraFieldsGroup2.style.display = 'none';
+      }
+    }
+    
+    // Dropdown'ları JavaScript değişkenlerinden doldur
+    function fillDropdowns() {
+      // Meeting Formats
+      if (typeof meetingFormatsHTML !== 'undefined' && meetingFormatsHTML) {
+        const meetingFormatSelect = document.getElementById('meetingFormat');
+        if (meetingFormatSelect) {
+          // HTML string'i direkt ekle (zaten escape edilmiş)
+          meetingFormatSelect.innerHTML = meetingFormatSelect.innerHTML + meetingFormatsHTML;
+        }
+      }
+      
+      // Toplantıyı Yapan (sadece "Toplantı Gerçekleşti" durumunda)
+      if (typeof toplantiYapanHTML !== 'undefined' && toplantiYapanHTML) {
+        const toplantiYapanSelect = document.getElementById('toplantiYapan');
+        if (toplantiYapanSelect) {
+          toplantiYapanSelect.innerHTML += toplantiYapanHTML;
+        }
+      }
+      
+      // Toplantı Sonucu
+      if (typeof toplantiSonucuHTML !== 'undefined' && toplantiSonucuHTML) {
+        const meetingResultSelect = document.getElementById('meetingResult');
+        if (meetingResultSelect) {
+          meetingResultSelect.innerHTML += toplantiSonucuHTML;
+        }
+      }
+      
+      // Teklif Detayı (sadece "Toplantı Gerçekleşti" durumunda) - normal select
+      if (typeof teklifDetayiHTML !== 'undefined' && teklifDetayiHTML) {
+        const teklifDetayiSelect = document.getElementById('teklifDetayi');
+        if (teklifDetayiSelect) {
+          teklifDetayiSelect.innerHTML += teklifDetayiHTML;
+        }
+      }
+      
+      // Satış Potansiyeli (sadece "Toplantı Gerçekleşti" durumunda)
+      if (typeof satisPotansiyeliHTML !== 'undefined' && satisPotansiyeliHTML) {
+        const satisPotansiyeliSelect = document.getElementById('satisPotansiyeli');
+        if (satisPotansiyeliSelect) {
+          satisPotansiyeliSelect.innerHTML += satisPotansiyeliHTML;
+        }
+      }
+    }
+    
+    // Varsayılan değerleri doldur - HIZ için gereksiz loglar kaldırıldı
+    function fillDefaultValues() {
+      
+      // Toplantı Tarihi: Randevu Tarihi veya bugün - ÖNCE SET ET
+      const meetingDateInput = document.getElementById('meetingDate');
+      if (meetingDateInput) {
+        // Önce defaultMeetingDate'i kontrol et - escape karakterlerini temizle
+        let tarihDegeri = '';
+        if (typeof defaultMeetingDate !== 'undefined' && defaultMeetingDate && defaultMeetingDate !== '' && defaultMeetingDate !== 'null' && defaultMeetingDate !== null) {
+          tarihDegeri = String(defaultMeetingDate)
+            .replace(/^"/, '').replace(/"$/, '') // Başındaki ve sonundaki çift tırnakları kaldır
+            .replace(/\\"/g, '"') // Escape edilmiş tırnakları düzelt
+            .trim();
+          console.log('🔍 defaultMeetingDate bulundu (temizlenmiş):', tarihDegeri);
+        }
+        
+        // Eğer hala boşsa, bugünün tarihini kullan
+        if (!tarihDegeri || tarihDegeri === '') {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = (today.getMonth() + 1).toString().padStart(2, '0');
+          const day = today.getDate().toString().padStart(2, '0');
+          tarihDegeri = `${year}-${month}-${day}`;
+          console.log('🔍 defaultMeetingDate boştu, bugünün tarihi kullanıldı:', tarihDegeri);
+        }
+        
+        // Input'a set et - HIZ için retry'lar kaldırıldı (zaten onload'da set ediliyor)
+        if (tarihDegeri) {
+          meetingDateInput.value = tarihDegeri;
+        }
+      } else {
+        console.error('❌ meetingDate input bulunamadı!');
+      }
+      
+      // Toplantı Formatı: Randevu'daki format - dropdown doldurulduktan SONRA set et
+      const meetingFormatSelect = document.getElementById('meetingFormat');
+      if (meetingFormatSelect) {
+        console.log('🔍 Format dropdown bulundu, options:', meetingFormatSelect.options.length);
+        console.log('🔍 defaultMeetingFormat:', typeof defaultMeetingFormat !== 'undefined' ? defaultMeetingFormat : 'UNDEFINED');
+        
+        // Dropdown'un doldurulduğundan emin ol (en az 1 option olmalı - "Format seçin" + formatlar)
+        if (meetingFormatSelect.options.length > 1) {
+          if (typeof defaultMeetingFormat !== 'undefined' && defaultMeetingFormat && defaultMeetingFormat !== '' && defaultMeetingFormat !== null && defaultMeetingFormat !== 'null') {
+            // Escape karakterlerini temizle ve normalize et
+            const cleanHtmlEntity = (val) => val ? val
+              .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+              .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+              .replace(/^"/, '').replace(/"$/, '') // Başındaki ve sonundaki çift tırnakları kaldır
+              .replace(/\\"/g, '"') // Escape edilmiş tırnakları düzelt
+              .trim() : '';
+            
+            let formatValue = cleanHtmlEntity(String(defaultMeetingFormat));
+            console.log('🔍 Format değeri temizlendi:', formatValue);
+            
+            // Tüm option'ları ve değerlerini logla
+            const allOptions = Array.from(meetingFormatSelect.options);
+            console.log('🔍 ALL OPTIONS (value, text):', allOptions.map(opt => ({ 
+              value: opt.value, 
+              valueClean: cleanHtmlEntity(opt.value),
+              text: opt.text, 
+              textClean: cleanHtmlEntity(opt.text)
+            })));
+            
+            // Dropdown'da bu değer var mı kontrol et - hem value hem text hem de temizlenmiş hallerini kontrol et
+            let optionExists = allOptions.some(opt => {
+              const optValueClean = cleanHtmlEntity(opt.value);
+              const optTextClean = cleanHtmlEntity(opt.text);
+              return opt.value === formatValue || opt.text === formatValue || 
+                     optValueClean === formatValue || optTextClean === formatValue ||
+                     optValueClean.toLowerCase() === formatValue.toLowerCase() ||
+                     optTextClean.toLowerCase() === formatValue.toLowerCase();
+            });
+            console.log('🔍 Format option exists (exact)?', optionExists, 'Looking for:', formatValue);
+            console.log('🔍 Available option values (raw):', allOptions.map(opt => opt.value));
+            console.log('🔍 Available option values (clean):', allOptions.map(opt => cleanHtmlEntity(opt.value)));
+            
+            if (optionExists) {
+              // Bulunan option'ı set et
+              const matchedOption = allOptions.find(opt => {
+                const optValueClean = cleanHtmlEntity(opt.value);
+                const optTextClean = cleanHtmlEntity(opt.text);
+                return opt.value === formatValue || opt.text === formatValue || 
+                       optValueClean === formatValue || optTextClean === formatValue ||
+                       optValueClean.toLowerCase() === formatValue.toLowerCase() ||
+                       optTextClean.toLowerCase() === formatValue.toLowerCase();
+              });
+              
+              if (matchedOption) {
+                meetingFormatSelect.value = matchedOption.value;
+                console.log('✅ Default meeting format set (exact match):', formatValue, '→', matchedOption.value, 'Current value:', meetingFormatSelect.value);
+              } else {
+                meetingFormatSelect.value = formatValue;
+                console.log('✅ Default meeting format set (direct):', formatValue, 'Current value:', meetingFormatSelect.value);
+              }
+            } else {
+              // Eğer tam eşleşme yoksa, benzer bir değer ara (büyük/küçük harf duyarsız)
+              const similarOption = allOptions.find(opt => {
+                const optValueClean = cleanHtmlEntity(opt.value);
+                const optTextClean = cleanHtmlEntity(opt.text);
+                return optValueClean.toLowerCase() === formatValue.toLowerCase() ||
+                       optTextClean.toLowerCase() === formatValue.toLowerCase();
+              });
+              
+              if (similarOption) {
+                meetingFormatSelect.value = similarOption.value;
+                console.log('✅ Benzer format bulundu ve set edildi:', formatValue, '→', similarOption.value);
+              } else {
+                // Son çare: İlk geçerli option'ı seç (boş olmayan)
+                const firstValidOption = allOptions.find(opt => opt.value && opt.value !== '');
+                if (firstValidOption) {
+                  meetingFormatSelect.value = firstValidOption.value;
+                  console.log('⚠️ Varsayılan format bulunamadı, ilk geçerli option seçildi:', formatValue, '→', firstValidOption.value);
+                } else {
+                  console.log('⚠️ Default format not found in dropdown (exact or similar):', formatValue);
+                }
+              }
+            }
+          } else {
+            console.log('⚠️ defaultMeetingFormat boş veya undefined:', defaultMeetingFormat);
+          }
+        }
+      } else {
+        console.error('❌ meetingFormat select bulunamadı!');
+      }
+      
+      // Toplantı Saati: Randevu'daki saat - saat ve dakika dropdown'larına ayır
+      const hourSelect = document.getElementById('meetingHour');
+      const minuteSelect = document.getElementById('meetingMinute');
+      
+      if (hourSelect && typeof defaultMeetingHour !== 'undefined' && defaultMeetingHour && defaultMeetingHour !== 'null' && defaultMeetingHour !== null) {
+        // Escape karakterlerini temizle
+        let hourValue = String(defaultMeetingHour)
+          .replace(/^"/, '').replace(/"$/, '') // Başındaki ve sonundaki çift tırnakları kaldır
+          .replace(/\\"/g, '"') // Escape edilmiş tırnakları düzelt
+          .trim();
+        
+        const hourNum = parseInt(hourValue) || 9;
+        // Saati 09-21 aralığına sınırla
+        let finalHour = '09';
+        if (hourNum < 9) {
+          finalHour = '09';
+        } else if (hourNum > 21) {
+          finalHour = '21';
+        } else {
+          finalHour = hourNum.toString().padStart(2, '0');
+        }
+        
+        hourSelect.value = finalHour;
+        console.log('✅ Toplantı Saati (Hour) set edildi:', finalHour, 'Input value:', hourSelect.value);
+      }
+      
+      if (minuteSelect && typeof defaultMeetingMinute !== 'undefined' && defaultMeetingMinute && defaultMeetingMinute !== 'null' && defaultMeetingMinute !== null) {
+        // Escape karakterlerini temizle
+        let minuteValue = String(defaultMeetingMinute)
+          .replace(/^"/, '').replace(/"$/, '') // Başındaki ve sonundaki çift tırnakları kaldır
+          .replace(/\\"/g, '"') // Escape edilmiş tırnakları düzelt
+          .trim();
+        
+        // Dakika değerini en yakın 15 dakikalık aralığa yuvarla
+        const minute = parseInt(minuteValue) || 0;
+        let roundedMinute = '00';
+        if (minute > 0 && minute <= 7) {
+          roundedMinute = '00';
+        } else if (minute > 7 && minute <= 22) {
+          roundedMinute = '15';
+        } else if (minute > 22 && minute <= 37) {
+          roundedMinute = '30';
+        } else if (minute > 37 && minute <= 52) {
+          roundedMinute = '45';
+        } else {
+          roundedMinute = '00';
+        }
+        document.getElementById('meetingMinute').value = roundedMinute;
+      }
+      
+      // Hidden time input'u güncelle
+      const hour = document.getElementById('meetingHour').value;
+      const minute = document.getElementById('meetingMinute').value;
+      if (hour && minute) {
+        document.getElementById('meetingTime').value = `${hour}:${minute}`;
+      }
+      
+      // Toplantı Notları: Randevu'daki Yorum
+      if (typeof defaultMeetingNotes !== 'undefined' && defaultMeetingNotes) {
+        document.getElementById('meetingNotes').value = defaultMeetingNotes;
+      }
+      
+      // Yönetici Not: Randevu'daki Yönetici Not
+      if (typeof defaultYoneticiNot !== 'undefined' && defaultYoneticiNot && defaultYoneticiNot !== 'null' && defaultYoneticiNot !== '' && defaultYoneticiNot !== null) {
+        const yoneticiNotValue = String(defaultYoneticiNot).replace(/^"/, '').replace(/"$/, '').replace(/\\"/g, '"');
+        if (yoneticiNotValue && yoneticiNotValue !== 'null') {
+          document.getElementById('yoneticiNot').value = yoneticiNotValue;
+        }
+      }
+      
+      // Yeni Takip Tarihi: Toplantı tarihinden 3 gün sonra (eğer set edilmemişse)
+      const yeniTakipTarihiInput = document.getElementById('yeniTakipTarihi');
+      if (yeniTakipTarihiInput && (!yeniTakipTarihiInput.value || yeniTakipTarihiInput.value === '')) {
+        if (typeof defaultYeniTakipTarihi !== 'undefined' && defaultYeniTakipTarihi && defaultYeniTakipTarihi !== 'null' && defaultYeniTakipTarihi !== null) {
+          let yeniTakipTarihiDegeri = String(defaultYeniTakipTarihi)
+            .replace(/^"/, '').replace(/"$/, '') // Başındaki ve sonundaki çift tırnakları kaldır
+            .replace(/\\"/g, '"') // Escape edilmiş tırnakları düzelt
+            .trim();
+          yeniTakipTarihiInput.value = yeniTakipTarihiDegeri;
+          console.log('✅ Yeni Takip Tarihi set edildi (fillDefaultValues):', yeniTakipTarihiDegeri);
+        }
+      }
+    }
+    
+    // Randevu bilgilerini göster - Artık server-side'dan direkt gösteriliyor
+    function fillAppointmentInfo() {
+      // Bu fonksiyon artık gerekli değil, bilgiler server-side'dan direkt gösteriliyor
+      // Ama hala dropdown'lar ve varsayılan değerler için kullanılabilir
     }
     
     function closeDialog() {
@@ -314,35 +799,94 @@
       }
     }
     
-    // Form gönderimi
+    // Form gönderimi - Çoklu submit'i önle
+    let isSubmitting = false;
     document.getElementById('meetingForm').addEventListener('submit', function(e) {
       e.preventDefault();
       
+      // Çoklu submit kontrolü
+      if (isSubmitting) {
+        console.log('⚠️ Form zaten gönderiliyor, tekrar gönderim engellendi');
+        return;
+      }
+      
+      // "Toplantı Gerçekleşti" durumunda Toplantıyı Yapan zorunlu kontrolü
+      if (typeof isToplantiGerceklesti !== 'undefined' && isToplantiGerceklesti) {
+        const toplantiYapan = document.getElementById('toplantiYapan').value;
+        if (!toplantiYapan) {
+          alert('⚠️ Lütfen "Toplantıyı Yapan" kişiyi seçin!');
+          return;
+        }
+      }
+      
+      // Submit flag'ini set et
+      isSubmitting = true;
+      const submitButton = document.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = '⏳ Kaydediliyor...';
+      }
+      
+      // Form verilerini topla (unified format)
       const formData = {
-        meetingDate: document.getElementById('meetingDate').value,
-        meetingTime: document.getElementById('meetingTime').value,
-        meetingFormat: document.getElementById('meetingFormat').value,
-        meetingNotes: document.getElementById('meetingNotes').value,
-        meetingResult: document.getElementById('meetingResult').value
+        // Support both old and new field names
+        toplantiTarihi: document.getElementById('meetingDate').value,
+        meetingDate: document.getElementById('meetingDate').value, // Backward compatibility
+        toplantiSaati: document.getElementById('meetingTime').value || (document.getElementById('meetingHour').value + ':' + document.getElementById('meetingMinute').value),
+        meetingTime: document.getElementById('meetingTime').value || (document.getElementById('meetingHour').value + ':' + document.getElementById('meetingMinute').value), // Backward compatibility
+        toplantiFormat: document.getElementById('meetingFormat').value,
+        meetingFormat: document.getElementById('meetingFormat').value, // Backward compatibility
+        yorum: document.getElementById('meetingNotes').value,
+        meetingNotes: document.getElementById('meetingNotes').value, // Backward compatibility
+        yoneticiNot: document.getElementById('yoneticiNot').value,
+        toplantiSonucu: document.getElementById('meetingResult').value,
+        meetingResult: document.getElementById('meetingResult').value // Backward compatibility
       };
+      
+      // "Toplantı Gerçekleşti" durumunda ekstra alanlar
+      if (typeof isToplantiGerceklesti !== 'undefined' && isToplantiGerceklesti) {
+        formData.toplantiYapan = document.getElementById('toplantiYapan').value;
+        
+        // Teklif Detayı - normal select
+        formData.teklifDetayi = document.getElementById('teklifDetayi').value;
+        
+        formData.satisPotansiyeli = document.getElementById('satisPotansiyeli').value;
+        formData.yeniTakipTarihi = document.getElementById('yeniTakipTarihi').value;
+      }
       
       // Google Apps Script'e veriyi gönder
       if (typeof google !== 'undefined' && google.script) {
         google.script.run
           .withSuccessHandler(function(result) {
+            isSubmitting = false; // Reset flag
             if (result.success) {
-              alert('✅ Toplantı başarıyla kaydedildi!');
-              closeDialog();
+              google.script.host.close();
             } else {
-              alert('❌ Hata: ' + result.error);
+              if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = '💾 Kaydet ve Toplantıya Geç';
+              }
+              alert('❌ Hata: ' + (result.message || 'Bilinmeyen hata'));
             }
           })
           .withFailureHandler(function(error) {
+            isSubmitting = false; // Reset flag
+            if (submitButton) {
+              submitButton.disabled = false;
+              submitButton.textContent = '💾 Kaydet ve Toplantıya Geç';
+            }
             alert('❌ Hata: ' + error.message);
           })
-          .saveMeetingData(formData);
+          .processMeetingForm(formData, rowNumber, sourceSheetName);
+      } else {
+        // Reset flag if google.script is not available
+        isSubmitting = false;
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = '💾 Kaydet ve Toplantıya Geç';
+        }
       }
     });
   </script>
 </body>
-</html> 
+</html>

@@ -13,15 +13,14 @@
 const CRM_CONFIG = {
 
   // 👥 Employee Management - Team Structure
+  // Mevcut 6 aktif personel
   EMPLOYEE_CODES: {
-    'LG 001': 'Lale Gül',
     'NT 002': 'Neslihan Türk', 
-    'KO 003': 'Kadir Öztürk',
     'SB 004': 'Sinem Bakalcı',
     'KM 005': 'Kübra Murat',
-    'GŞ 006': 'Gamze Şafaklıoğlu',
     'BH 007': 'Bilge Hin',
-    'TD 008': 'Tuğçe Duman'
+    'MK 009': 'Merve Kılıç',
+    'NT 012': 'Nazlı Tutuşan'
   },
   
   // 📁 File Management - Data Sources
@@ -42,17 +41,21 @@ const CRM_CONFIG = {
     
     // Negative Status Colors - Görseldeki Renkler
     'İlgilenmiyor': 'rgb(255, 248, 225)',        // #FFF8E1 - Light Yellow
-    'Ulaşılamadı': 'rgb(255, 235, 238)',         // #FFEBEE - Light Red (Yeniden arama için farklı)
+    'Ulaşılamadı': 'rgb(255, 235, 238)',         // #FFEBEE - Light Red
+    'Geçersiz Numara': 'rgb(255, 224, 178)',     // #FFE0B2 - Light Orange (mavi değil, farklı)
+    'Kurumsal': 'rgb(225, 190, 231)',             // #E1BEE7 - Light Purple (farklı ton)
     
     // Meeting Colors
-    'Toplantı Tamamlandı': 'rgb(200, 230, 201)',  // Light Green
-    'Toplantı Teklif': 'rgb(165, 214, 167)',      // Darker Green
-    'Toplantı Beklemede': 'rgb(255, 243, 224)',   // Soft Orange
-    'Toplantı İptal': 'rgb(255, 235, 238)',       // Light Red
-    'Satış Yapıldı': 'rgb(187, 222, 251)',        // Light Blue
-    'Potansiyel Sıcak': '#FFE0B2',                // Light Orange
-    'Potansiyel Orta': '#E1F5FE',                 // Light Blue
-    'Potansiyel Soğuk': '#ECEFF1'                 // Light Gray
+    'Toplantı Tamamlandı': 'rgb(200, 230, 201)',  // #C8E6C9 - Light Green
+    'Toplantı Gerçekleşti': 'rgb(200, 230, 201)', // #C8E6C9 - Light Green (aynı)
+    'Toplantı Teklif': 'rgb(165, 214, 167)',      // #A5D6A7 - Darker Green
+    'Toplantı Beklemede': 'rgb(255, 243, 224)',   // #FFF3E0 - Soft Orange
+    'Toplantı İptal': 'rgb(255, 235, 238)',       // #FFEBEE - Light Red
+    'Satış Yapıldı': 'rgb(129, 212, 250)',        // #81D4FA - Medium Blue (farklı ton, #BBDEFB yerine)
+    'Potansiyel Sıcak': 'rgb(255, 224, 178)',     // #FFE0B2 - Light Orange
+    'Potansiyel Orta': 'rgb(225, 245, 254)',      // #E1F5FE - Light Blue
+    'Potansiyel Soğuk': 'rgb(236, 239, 241)',     // #ECEFF1 - Light Gray
+    'Çift Kayıt': 'rgb(255, 249, 196)'            // #FFF9C4 - Light Yellow for duplicate highlight
   },
   
   // 🎨 Manager Sheet Header Colors - Visual Hierarchy
@@ -145,104 +148,9 @@ function applyRowColor(sheet, rowNumber, color) {
   }
 }
 
-/**
- * 🎨 Header Styling - Professional Appearance
- * @param {Sheet} sheet - Target sheet
- * @param {string} sheetType - Type of sheet for color selection
- */
-function applyHeaderStyling(sheet, sheetType) {
-  try {
-    if (!sheet) {
-      console.error('Invalid sheet for header styling');
-      return;
-    }
-    const headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
-    const headerColor = CRM_CONFIG.SHEET_HEADER_COLORS[sheetType] || 'rgb(227, 242, 253)';
-    headerRange.setBackground(headerColor);
-    // Choose contrasting font color (black for light backgrounds)
-    const lightBg = /rgb\((2[0-9]{2}|1[5-9][0-9]),\s*(2[0-9]{2}|1[5-9][0-9]),\s*(2[0-9]{2}|1[5-9][0-9])\)/.test(headerColor);
-    headerRange.setFontColor(lightBg ? 'black' : 'white');
-    headerRange.setFontWeight('bold');
-  } catch (error) {
-    console.error('Header styling failed:', error);
-  }
-}
-
 // ========================================
 // 📅 DATE UTILITIES - TEMPORAL INTELLIGENCE
 // ========================================
-
-/**
- * 📅 Date Validation - Temporal Integrity
- * @param {*} date - Date to validate
- * @returns {boolean} - Validation result
- */
-function isValidDate(date) {
-  if (!date || date === '' || date === null || date === undefined || date === '30.12.1899') return false;
-  
-  if (date === 'Invalid Date' || date === 'NaN') return false;
-  
-  try {
-    // Handle Date objects directly
-    if (date instanceof Date) {
-      if (isNaN(date.getTime())) return false;
-      const year = date.getFullYear();
-      if (year < 1900 || year > 2100) return false;
-      return true;
-    }
-    
-    const testDate = new Date(date);
-    
-    if (isNaN(testDate.getTime())) return false;
-    
-    const year = testDate.getFullYear();
-    if (year < 1900 || year > 2100) return false;
-    
-    return true;
-  } catch (error) {
-    console.log('📅 Date validation error:', error, 'for date:', date);
-    return false;
-  }
-}
-
-/**
- * 🕐 Time Value Formatting - Temporal Display
- * @param {*} value - Time value to format
- * @returns {string} - Formatted time
- */
-function formatTimeValue(value) {
-  try {
-    if (!value || value === '' || value === null || value === undefined) return '';
-    
-    // Handle Date objects
-    if (value instanceof Date) {
-      const hours = value.getHours().toString().padStart(2, '0');
-      const minutes = value.getMinutes().toString().padStart(2, '0');
-      return `${hours}:${minutes}`;
-    }
-    
-    // Handle string dates (like "30.12.1899")
-    if (typeof value === 'string') {
-      const date = new Date(value);
-      if (!isNaN(date.getTime()) && date.getFullYear() !== 1899) {
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
-      }
-    }
-    
-    // Handle invalid dates
-    if (value === '30.12.1899' || value === 'Invalid Date') {
-      return '';
-    }
-    
-    return value.toString();
-    
-  } catch (error) {
-    console.log('🕐 Time formatting error:', error, 'for value:', value);
-    return '';
-  }
-}
 
 /**
  * 📅 Date Value Formatting - Temporal Display
@@ -285,17 +193,84 @@ function formatDateValue(value) {
   }
 }
 
-// Parse dd.MM.yyyy to Date (global utility)
-function parseDdMmYyyy(str) {
-  try {
-    const s = String(str || '').trim();
-    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return null;
-    const [dd, mm, yyyy] = s.split('.').map(n => parseInt(n, 10));
-    const d = new Date(yyyy, mm - 1, dd);
-    return isNaN(d.getTime()) ? null : d;
-  } catch (e) {
-    return null;
+
+
+/**
+* 📅 Ay sütunu için ARRAYFORMULA veya doğrudan değer ataması yapar
+* @param {Sheet} sheet - Çalışma sayfası
+* @param {Array} dateHeaderCandidates - Tarih sütunu başlık adayları
+*/
+function setMonthArrayFormulaIfAbsent(sheet, dateHeaderCandidates) {
+try {
+  if (!sheet) return;
+  
+  console.log('📅 setMonthArrayFormulaIfAbsent başlatıldı:', { sheet: sheet.getName(), dateHeaderCandidates });
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const ayIdx = headers.indexOf('Ay');
+  
+  if (ayIdx === -1) {
+    console.log('📅 Ay sütunu bulunamadı');
+    return;
   }
+  
+  // Tarih sütununu bul
+  let dateIdx = -1;
+  for (const candidate of dateHeaderCandidates) {
+    const idx = headers.indexOf(candidate);
+    if (idx !== -1) {
+      dateIdx = idx;
+      break;
+    }
+  }
+  
+  if (dateIdx === -1) {
+    console.log('📅 Tarih sütunu bulunamadı:', dateHeaderCandidates);
+    return;
+  }
+  
+  console.log('📅 Ay sütunu bulundu:', { ayIdx, dateIdx, dateHeader: headers[dateIdx] });
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+  
+  // Doğrudan değer atama yaklaşımı
+  const dateColumn = sheet.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  const ayValues = [];
+  
+  for (let i = 0; i < dateColumn.length; i++) {
+    const dateValue = dateColumn[i][0];
+    let monthName = '';
+    
+    if (dateValue) {
+      try {
+        let dateObj;
+        if (dateValue instanceof Date) {
+          dateObj = dateValue;
+        } else if (typeof dateValue === 'string') {
+          dateObj = parseDdMmYyyy(dateValue);
+        }
+        
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          monthName = getTurkishMonthName(dateObj.getMonth());
+        }
+      } catch (e) {
+        console.log('📅 Tarih dönüştürme hatası:', e);
+      }
+    }
+    
+    ayValues.push([monthName]);
+  }
+  
+  // Ay değerlerini yaz
+  if (ayValues.length > 0) {
+    sheet.getRange(2, ayIdx + 1, ayValues.length, 1).setValues(ayValues);
+    console.log('📅 Ay değerleri güncellendi:', { count: ayValues.length });
+  }
+  
+} catch (error) {
+  console.error('📅 setMonthArrayFormulaIfAbsent hatası:', error);
+}
 }
 
 // ========================================
@@ -756,67 +731,6 @@ function resetReadableView() {
  * 🔄 Synchronize a single employee
  * @param {string} employeeCode - Employee code to synchronize
  */
-function syncSingleEmployee(employeeCode, options) {
-  try {
-    const mode = options && options.mode ? options.mode : 'replace'; // replace | append
-    console.log(`🔄 syncSingleEmployee started for ${employeeCode} with mode=${mode}`);
-
-    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    if (!managerFile) {
-      throw new Error('Yönetici dosyası bulunamadı');
-    }
-    const totalStats = { totalRecords: 0, employeeStats: {}, errors: [] };
-    const employeeData = collectEmployeeData(managerFile, employeeCode);
-    const employeeStats = { employeeCode, totalRecords: 0, sheetStats: {} };
-    for (const [sheetName, data] of Object.entries(employeeData)) {
-      if (data && data.length > 0) {
-        const op = updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) || { totalIncoming: data.length };
-        employeeStats.sheetStats[sheetName] = op;
-        employeeStats.totalRecords += op.totalIncoming;
-      }
-    }
-
-    // Collect negatives from Format Tablo as summary counts
-    const employeeFile = findEmployeeFile(employeeCode);
-    const negRows = collectFormatTableNegativeSummary(employeeFile, employeeCode);
-    updateManagerActivitySummary(managerFile, negRows, employeeCode, 'replace');
-    try { employeeStats.sheetStats['T Aktivite Özet'] = Array.isArray(negRows) ? negRows.length : 0; } catch (_) {}
-    try {
-      const fullRows = computeFullActivityWideRows(managerFile, employeeCode);
-      updateManagerFullActivitySummaryWide(managerFile, fullRows, employeeCode, mode === 'append' ? 'append' : 'replace');
-      try { employeeStats.sheetStats['T Aktivite (Tümü)'] = Array.isArray(fullRows) ? fullRows.length : 0; } catch (_) {}
-      // Zorunlu renklendirme: Sadece T Aktivite (Tümü)
-      try {
-        const shTumu = managerFile.getSheetByName('T Aktivite (Tümü)');
-        if (shTumu && shTumu.getLastRow() > 1) {
-          applyColorCodingToManagerData(shTumu, 'T Aktivite (Tümü)', 2, shTumu.getLastRow() - 1);
-        }
-      } catch (colErr1) { console.log('⚠️ Recolor T Aktivite (Tümü) skipped:', colErr1 && colErr1.message); }
-    } catch (e) { console.log('⚠️ Full activity summary generation skipped:', e && e.message); }
-
-    totalStats.employeeStats[employeeCode] = employeeStats;
-    totalStats.totalRecords += employeeStats.totalRecords;
-
-    // Append modunda ilgili T sayfasına otomatik geçiş yap
-    if (mode === 'append') {
-      try {
-        const prefer = ['T Toplantılar', 'T Fırsatlar', 'T Randevular'];
-        for (const name of prefer) {
-          const sh = managerFile.getSheetByName(name);
-          if (sh && sh.getLastRow() > 1) { managerFile.setActiveSheet(sh); break; }
-        }
-      } catch (_) {}
-    }
-
-    showSyncResults(totalStats);
-    // Removed global recoloring/validation to avoid O(N) cost across all sheets
-    return totalStats;
-  } catch (error) {
-    console.error(`Error synchronizing employee ${employeeCode}:`, error);
-    const ui = SpreadsheetApp.getUi();
-    ui.alert('Hata', `${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`, ui.ButtonSet.OK);
-  }
-}
 
 
 
@@ -827,24 +741,6 @@ function syncSingleEmployee(employeeCode, options) {
 /**
  * 🚀 Manager System Initialization - Master Control
  */
-function onOpen() {
-  console.log('🚀 Manager spreadsheet opened - creating menus');
-  
-  try {
-    createManagerMenu();
-    
-    // Skip auto color coding on open (performance)
-    console.log('⏭️ Skipping auto color coding on open');
-    
-    // Apply data validation to all sheets
-    applyDataValidationToAllManagerSheets();
-    
-    console.log('✅ Manager system initialized');
-    
-  } catch (error) {
-    console.error('❌ Error initializing manager system:', error);
-  }
-}
 
 /**
  * 🎨 Apply Color Coding to All Manager Sheets - Automatic Styling
@@ -1027,15 +923,7 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
         break;
         
       case 'Toplantılar':
-        // Add validation for Toplantı durumu
-        const toplantiDurumuIndex = headers.indexOf('Toplantı durumu');
-        if (toplantiDurumuIndex !== -1) {
-          const validation = SpreadsheetApp.newDataValidation()
-            .requireValueInList(['Toplantı Tamamlandı'], true)
-            .setAllowInvalid(true)
-            .build();
-          sheet.getRange(2, toplantiDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
-        }
+        // NOT: Toplantı durumu, Randevu durumu, Randevu Tarihi, Saat validasyonları kaldırıldı - bu sütunlar artık yok
         
         // Add validation for Toplantı formatı
         const toplantiFormatiIndex = headers.indexOf('Toplantı formatı');
@@ -1104,62 +992,7 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
  * @param {string} employeeCode - Employee code
  * @returns {Object} - Employee data by sheet
  */
-function collectEmployeeDataByTypes(managerFile, employeeCode, types) {
-  try {
-    const employeeFile = findEmployeeFile(employeeCode);
-    if (!employeeFile) return {};
-    const employeeData = {};
-    const wanted = new Set((types || []).map(t => String(t)));
-    const sheets = employeeFile.getSheets();
-    for (const sheet of sheets) {
-      const sheetName = sheet.getName();
-      const lower = String(sheetName || '').toLowerCase();
-      let targetSheetName = '';
-      if (lower.includes('randevu')) targetSheetName = 'Randevular';
-      else if (lower.includes('fırsat') || lower.includes('firsat')) targetSheetName = 'Fırsatlar';
-      else if (lower.includes('toplant')) targetSheetName = 'Toplantılar';
-      else continue;
-      if (!wanted.has(targetSheetName)) continue;
-      const sheetData = collectSheetData(sheet, employeeCode);
-      if (sheetData && sheetData.length > 0) {
-        employeeData[targetSheetName] = sheetData;
-      }
-    }
-    return employeeData;
-  } catch (error) {
-    console.error(`❌ Error collectEmployeeDataByTypes for ${employeeCode}:`, error);
-    return {};
-  }
-}
 
-function collectEmployeeData(managerFile, employeeCode) {
-  try {
-    const employeeFile = findEmployeeFile(employeeCode);
-    if (!employeeFile) {
-      return {};
-    }
-    const employeeData = {};
-    const sheets = employeeFile.getSheets();
-    for (const sheet of sheets) {
-      const sheetName = sheet.getName();
-      const lower = String(sheetName || '').toLowerCase();
-      let targetSheetName = '';
-      if (lower.includes('randevu')) targetSheetName = 'Randevular';
-      else if (lower.includes('fırsat') || lower.includes('firsat')) targetSheetName = 'Fırsatlar';
-      else if (lower.includes('toplant')) targetSheetName = 'Toplantılar';
-      else continue;
-
-      const sheetData = collectSheetData(sheet, employeeCode);
-      if (sheetData && sheetData.length > 0) {
-        employeeData[targetSheetName] = sheetData;
-      }
-    }
-    return employeeData;
-  } catch (error) {
-    console.error(`❌ Error collecting employee data for ${employeeCode}:`, error);
-    return {};
-  }
-}
 
 /**
  * 🔄 Sheet Data Collection - Raw Data Extraction
@@ -1184,30 +1017,26 @@ function collectSheetData(sheet, employeeCode) {
     const sourceLower = String(sourceName || '').toLowerCase();
     let targetColumns = [];
     if (sourceLower.includes('randevu')) {
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
       targetColumns = [
-        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-        'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-        'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Randevu durumu', 'Randevu Tarihi',
+        'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
       ];
     } else if (sourceLower.includes('fırsat') || sourceLower.includes('firsat')) {
-      // Meeting-only columns removed for opportunities target
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
       targetColumns = [
-        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-        'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Fırsat Durumu', 'Fırsat Tarihi',
-        'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-        'Rating count', 'Review', 'Maplink'
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Fırsat Durumu', 'Fırsat Tarihi',
+        'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
       ];
     } else if (sourceLower.includes('toplant')) {
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
       targetColumns = [
-        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
-        'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
-        'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
-        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-        'Rating count', 'Review'
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Toplantıyı Yapan', 'Toplantı Tarihi',
+        'Ay', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Yeni Takip Tarihi',
+        'Yorum', 'Yönetici Not', 'Address', 'Maplink'
       ];
     } else {
       // Fallback (keep previous default)
@@ -1329,9 +1158,11 @@ function collectSheetData(sheet, employeeCode) {
  * @param {string} employeeCode - Employee code
  */
 function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
+  console.log('Function started:', { action: 'updateManagerSheet', sheetName, employeeCode, mode, dataLength: data ? data.length : 0 });
   try {
     if (!managerFile || !sheetName || !data || !employeeCode) {
-      return;
+      console.error('Invalid parameters for updateManagerSheet');
+      return { totalIncoming: data ? data.length : 0, sameCount: 0, updateCount: 0, newCount: 0 };
     }
     const effectiveMode = mode || 'replace';
 
@@ -1346,11 +1177,16 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       createManagerSheetHeaders(sheet, baseTypeForHeaders);
     }
 
-    // Replace mode: Randevular'da yöneticinin girdiği alanları korumak için satırları silme
+    // Replace mode: Tüm veriyi temizle ve yeniden yükle (duplicate önleme)
     if (effectiveMode !== 'append') {
-      const baseLower = String(baseTypeForHeaders || '').toLowerCase();
-      const isRandevuBase = baseLower.includes('randevu') && String(targetSheetName) === 'Randevular';
-      if (!isRandevuBase) {
+      // Tüm sayfalar için çalışan bazında temizleme yap (duplicate önleme)
+      if (employeeCode === 'ALL') {
+        // Tüm çalışan verilerini temizle
+        const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+        for (const code of codes) {
+          clearEmployeeData(sheet, code);
+        }
+      } else {
         clearEmployeeData(sheet, employeeCode);
       }
     }
@@ -1445,25 +1281,60 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       // Build existing maps only for the same employee
       const strictMap = new Map();              // strictKey -> rowIndex
       const softMap = new Map();                // softKey -> rowIndex (or -1 if ambiguous)
+      const rowIndexToExistingIndex = new Map(); // rowIndex -> existing array index
       for (let i = 0; i < existing.length; i++) {
         const r = existing[i];
         if (canonicalCode(r[idxCode]) !== codeNorm) continue; // restrict to same employee
+        const rowIndex = i + 2; // 2-based
         const sKey = strictKey(r);
-        strictMap.set(sKey, i + 2); // 2-based
+        strictMap.set(sKey, rowIndex);
+        rowIndexToExistingIndex.set(rowIndex, i);
         const soKey = softKey(r);
-        if (!softMap.has(soKey)) softMap.set(soKey, i + 2);
-        else softMap.set(soKey, i + 2); // prefer last occurrence (latest row) for update
+        if (!softMap.has(soKey)) softMap.set(soKey, rowIndex);
+        else softMap.set(soKey, rowIndex); // prefer last occurrence (latest row) for update
       }
 
+      // OPTIMIZATION: Batch read all display values for rows that might need updates
+      const allRowIndices = new Set();
       const updates = []; // {rowIndex, values}
+      
+      // First pass: collect all row indices that might need comparison
+      for (const r of allData) {
+        r[idxCode] = codeNorm;
+        const sKey = strictKey(r);
+        if (strictMap.has(sKey)) {
+          allRowIndices.add(strictMap.get(sKey));
+        }
+        const soKey = softKey(r);
+        if (softMap.has(soKey)) {
+          allRowIndices.add(softMap.get(soKey));
+        }
+      }
+      
+      // Batch read all display values at once
+      const displayValuesCache = new Map();
+      const valuesCache = new Map();
+      if (allRowIndices.size > 0) {
+        const sortedRowIndices = Array.from(allRowIndices).sort((a, b) => a - b);
+        const minRow = sortedRowIndices[0];
+        const maxRow = sortedRowIndices[sortedRowIndices.length - 1];
+        const batchRange = sheet.getRange(minRow, 1, maxRow - minRow + 1, lastCol);
+        const batchDisplayValues = batchRange.getDisplayValues();
+        const batchValues = batchRange.getValues();
+        
+        sortedRowIndices.forEach((rowIndex, idx) => {
+          displayValuesCache.set(rowIndex, batchDisplayValues[rowIndex - minRow]);
+          valuesCache.set(rowIndex, batchValues[rowIndex - minRow]);
+        });
+      }
 
       for (const r of allData) {
-        // ensure row's code is the intended employee code
+        // ensure row\'s code is the intended employee code
         r[idxCode] = codeNorm;
         const sKey = strictKey(r);
         if (strictMap.has(sKey)) {
           const rowIndex = strictMap.get(sKey);
-          const currentDisplay = sheet.getRange(rowIndex, 1, 1, lastCol).getDisplayValues()[0];
+          const currentDisplay = displayValuesCache.get(rowIndex) || [];
           const changed = !areRowsEqualByColumns(currentDisplay, r);
           if (changed) {
             try {
@@ -1483,7 +1354,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         const soKey = softKey(r);
         if (softMap.has(soKey)) {
           const rowIndex = softMap.get(soKey);
-          const currentDisplay = sheet.getRange(rowIndex, 1, 1, lastCol).getDisplayValues()[0];
+          const currentDisplay = displayValuesCache.get(rowIndex) || [];
           // Fırsatlar ve Randevular: tarih/statu değişimi olsa dahi append etme, mevcut satırı güncelle
           const baseLower = String(baseTypeForHeaders || '').toLowerCase();
           // Randevular: tarih/durum değişse bile mevcut satırı güncelle, append etme
@@ -1534,9 +1405,55 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
         opStats.newCount++;
       }
 
-      // Apply updates
-      for (const u of updates) {
-        sheet.getRange(u.rowIndex, 1, 1, lastCol).setValues([u.values]);
+      // OPTIMIZATION: Batch process updates - apply protected columns and write in batches
+      const baseLower = String(baseTypeForHeaders || '').toLowerCase();
+      const isManagerRandevular = baseLower.includes('randevu') && String(targetSheetName) === 'Randevular';
+      let protectedIdx = [];
+      let headersNow = [];
+      
+      if (isManagerRandevular && updates.length > 0) {
+        // Read headers once
+        headersNow = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+        const lowered = headersNow.map(h => String(h||'').toLowerCase());
+        const protectCols = ['Toplantı Sonucu','Toplanti Sonucu','Toplantı sonucu','Toplanti sonucu','Teklif Detayı','Teklif Detayi','Satış Potansiyeli','Satis Potansiyeli','Toplantı Tarihi','Toplanti Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan','Toplantiyi Yapan','Yönetici Not','Yonetici Not'];
+        protectedIdx = protectCols.map(n => lowered.indexOf(String(n).toLowerCase())).filter(i => i >= 0);
+        
+        // Batch read protected columns from cache (already read earlier)
+        if (protectedIdx.length > 0) {
+          for (const u of updates) {
+            const currentRow = valuesCache.get(u.rowIndex);
+            if (currentRow) {
+              protectedIdx.forEach(i => { u.values[i] = currentRow[i]; });
+            }
+          }
+        }
+      }
+      
+      // OPTIMIZATION: Batch write all updates - group consecutive rows for maximum performance
+      if (updates.length > 0) {
+        updates.sort((a, b) => a.rowIndex - b.rowIndex);
+        
+        let batchStart = 0;
+        for (let i = 1; i <= updates.length; i++) {
+          const isLast = i === updates.length;
+          const isConsecutive = !isLast && updates[i].rowIndex === updates[i-1].rowIndex + 1;
+          
+          if (!isConsecutive || isLast) {
+            const batchEnd = isLast && isConsecutive ? i : i;
+            const batch = updates.slice(batchStart, batchEnd);
+            
+            if (batch.length === 1) {
+              // Single row update
+              sheet.getRange(batch[0].rowIndex, 1, 1, lastCol).setValues([batch[0].values]);
+            } else {
+              // Multiple consecutive rows - batch write for maximum performance
+              const firstRow = batch[0].rowIndex;
+              const batchValues = batch.map(u => u.values);
+              sheet.getRange(firstRow, 1, batch.length, lastCol).setValues(batchValues);
+            }
+            batchStart = i;
+          }
+        }
       }
 
       // Apply appends
@@ -1549,15 +1466,11 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       }
 
       // Per-sheet formatting/validation only for touched sheet
-      optimizeColumnWidths(sheet, baseTypeForHeaders);
-      applyManagerSheetDataValidation(sheet, baseTypeForHeaders);
+      if (!FAST_SYNC) { optimizeColumnWidths(sheet, baseTypeForHeaders); applyManagerSheetDataValidation(sheet, baseTypeForHeaders); try { sheet.setConditionalFormatRules([]); } catch (e) {} }
 
-      // Deduplicate only for Toplantılar to avoid collapsing distinct opportunity/appointment actions
+      // Deduplicate for ALL sheets to prevent duplicate records
       try {
-        const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
-        if (lowerBase.includes('toplant')) {
           removeDuplicatesInAggregateSheet(sheet, baseTypeForHeaders);
-        }
       } catch (_) {}
 
       // Sorting for aggregate sheets
@@ -1617,7 +1530,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
             const values = rng.getValues();
             function parseDd2(s){
               const v = String(s||'').trim();
-              const m = v.match(/(\d{2}\.\d{2}\.\d{4})/);
+              const m = v.match(/(\\d{2}\\.\\d{2}\\.\\d{4})/);
               if (m) {
                 const [dd,mm,yy] = m[1].split('.');
                 const d = new Date(Number(yy), Number(mm)-1, Number(dd));
@@ -1643,7 +1556,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
             rng.setValues(values);
           } else if (lowerBase.includes('toplant')) {
             // Sadece T Toplantılar için çalıştır
-            if (!/^T\s/i.test(sheet.getName())) {
+            if (!/^T\\s/i.test(sheet.getName())) {
               // Yönetici ana Toplantılar sayfasında sıralama yapma
             }
             // Toplantılar (append): Öncelik: Satış Yapıldı > Yerinde Satış > Sıcak > Orta > Soğuk > Tarih
@@ -1686,7 +1599,7 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       } catch (sortErr) {
         console.log('⚠️ Sorting skipped:', sortErr && sortErr.message);
       }
-    }
+    } // if (data.length > 0) bloğunu kapatıyor
 
     // Final: apply colors after all operations to prevent late overrides
     try {
@@ -1698,167 +1611,11 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
       console.log('⚠️ Final recolor skipped:', finalColErr && finalColErr.message);
     }
 
+    console.log('Function complete, returning opStats:', opStats);
     return opStats;
   } catch (error) {
     console.error(`❌ Error updating manager sheet ${sheetName}:`, error);
     return { totalIncoming: data ? data.length : 0, sameCount: 0, updateCount: 0, newCount: 0 };
-  }
-}
-
-/**
- * 🎨 Manager Sheet Headers - Professional Structure
- * @param {Sheet} sheet - Target sheet
- * @param {string} sheetName - Sheet name
- */
-function createManagerSheetHeaders(sheet, sheetName) {
-  try {
-    if (!sheet || !sheetName) {
-      return;
-    }
-    let headers = [];
-    switch (sheetName) {
-      case 'Randevular':
-        headers = [
-          'Temsilci Kodu', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
-         ];
-         break;
-      case 'Fırsatlar':
-        headers = [
-          'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Fırsat Durumu', 'Fırsat Tarihi',
-          'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review', 'Maplink'
-        ];
-        break;
-      case 'Toplantılar':
-        headers = [
-          'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
-          'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
-          'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
-          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review'
-        ];
-        break;
-      default:
-        headers = [
-          'Temsilci Kodu', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Durum', 'Tarih',
-          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
-        ];
-    }
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    applyHeaderStyling(sheet, sheetName);
-    optimizeColumnWidths(sheet, sheetName);
-  } catch (error) {
-    console.error(`❌ Error creating headers for ${sheetName}:`, error);
-  }
-}
-
-/**
- * 🧹 Employee Data Clearing - Clean Slate
- * @param {Sheet} sheet - Target sheet
- * @param {string} employeeCode - Employee code
- */
-function clearEmployeeData(sheet, employeeCode) {
-  try {
-    if (!sheet || !employeeCode) {
-      return;
-    }
-    const data = sheet.getDataRange().getValues();
-    if (!data || data.length <= 1) {
-      return;
-    }
-    const headers = data[0];
-    // Support both 'Temsilci Kodu' and 'Kod' as first identifier column
-    let temsilciKoduIndex = headers.indexOf('Temsilci Kodu');
-    if (temsilciKoduIndex === -1) {
-      temsilciKoduIndex = headers.indexOf('Kod');
-    }
-    if (temsilciKoduIndex === -1) {
-      return;
-    }
-    let deletedRows = 0;
-    for (let i = data.length - 1; i > 0; i--) {
-      const row = data[i];
-      const rowTemsilciKodu = row[temsilciKoduIndex];
-      if (rowTemsilciKodu === employeeCode) {
-        sheet.deleteRow(i + 1);
-        deletedRows++;
-      }
-    }
-  } catch (error) {
-    console.error(`❌ Error clearing data for employee ${employeeCode}:`, error);
-  }
-}
-
-// ========================================
-// MANAGER SYNC - YÖNETİCİ AKIŞLARI
-// Version: 4.5
-// 
-// 📊 PERFORMANCE DASHBOARD SİSTEMİ DAHİL EDİLDİ
-// performance-dashboard.gs dosyasından import edildi
-// ========================================
-
-// ========================================
-// 🏗️ MANAGER CONFIGURATION - CENTRALIZED CONTROL
-// ========================================
-
-/* Duplicate CRM_CONFIG block removed */
-
-// 🔧 UTILITY FUNCTIONS - FOUNDATION LAYER
-// ========================================
-
-/**
- * 🛡️ Input Validation - Data Integrity Guardian
- * @param {Object} parameters - Input parameters to validate
- * @returns {boolean} - Validation result
- */
-function validateInput(parameters) {
-  if (!parameters || typeof parameters !== 'object') {
-    console.error('Invalid parameters object');
-    return false;
-  }
-  return true;
-}
-
-/**
- * 📝 Activity Logging - Audit Trail System
- * @param {string} action - Action performed
- * @param {Object} data - Additional data
- */
-function logActivity(action, data = {}) {
-  const timestamp = new Date().toISOString();
-  console.log('Manager Activity Log:', { timestamp, action, data });
-}
-
-// ========================================
-// 🎨 STYLING SYSTEM - VISUAL EXCELLENCE
-// ========================================
-
-/**
- * 🎨 Universal Color Application - Visual Consistency
- * @param {Sheet} sheet - Target sheet
- * @param {number} rowNumber - Row to color
- * @param {string} color - RGB color code
- */
-function applyRowColor(sheet, rowNumber, color) {
-  try {
-    if (!sheet || !rowNumber || !color) {
-      console.error('Invalid parameters for color application');
-      return;
-    }
-    const range = sheet.getRange(rowNumber, 1, 1, sheet.getMaxColumns());
-    range.setBackground(color);
-  } catch (error) {
-    console.error('Color application failed:', error);
   }
 }
 
@@ -1966,54 +1723,102 @@ function formatTimeValue(value) {
  * @param {*} value - Date value to format
  * @returns {string} - Formatted date
  */
-function formatDateValue(value) {
-  try {
-    if (!value || value === '' || value === null || value === undefined) return '';
-    
-    // Handle Date objects
-    if (value instanceof Date) {
-      const day = value.getDate().toString().padStart(2, '0');
-      const month = (value.getMonth() + 1).toString().padStart(2, '0');
-      const year = value.getFullYear();
-      return `${day}.${month}.${year}`;
+
+
+
+/**
+* 📅 Ay sütunu için ARRAYFORMULA veya doğrudan değer ataması yapar
+* @param {Sheet} sheet - Çalışma sayfası
+* @param {Array} dateHeaderCandidates - Tarih sütunu başlık adayları
+*/
+function setMonthArrayFormulaIfAbsent(sheet, dateHeaderCandidates) {
+try {
+  if (!sheet) return;
+  
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const ayIdx = headers.indexOf('Ay');
+  
+  if (ayIdx === -1) {
+    console.log('📅 Ay sütunu bulunamadı');
+    return;
+  }
+  
+  // Tarih sütununu bul
+  let dateIdx = -1;
+  for (const candidate of dateHeaderCandidates) {
+    const idx = headers.indexOf(candidate);
+    if (idx !== -1) {
+      dateIdx = idx;
+      break;
     }
+  }
+  
+  if (dateIdx === -1) {
+    console.log('📅 Tarih sütunu bulunamadı:', dateHeaderCandidates);
+    return;
+  }
+  
+  console.log('📅 Ay sütunu bulundu:', { ayIdx, dateIdx, dateHeader: headers[dateIdx] });
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+  
+  // Doğrudan değer atama yaklaşımı
+  const dateColumn = sheet.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  const ayValues = [];
+  
+  for (let i = 0; i < dateColumn.length; i++) {
+    const dateValue = dateColumn[i][0];
+    let monthName = '';
     
-    // Handle string dates
-    if (typeof value === 'string') {
-      const date = new Date(value);
-      if (!isNaN(date.getTime()) && date.getFullYear() !== 1899) {
-        const day = date.getDate().toString().padStart(2, '0');
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}.${month}.${year}`;
+    if (dateValue) {
+      try {
+        let dateObj;
+        if (dateValue instanceof Date) {
+          dateObj = dateValue;
+        } else if (typeof dateValue === 'string') {
+          dateObj = parseDdMmYyyy(dateValue);
+        }
+        
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          monthName = getTurkishMonthName(dateObj.getMonth());
+        }
+      } catch (e) {
+        console.log('📅 Tarih dönüştürme hatası:', e);
       }
     }
     
-    // Handle invalid dates
-    if (value === '30.12.1899' || value === 'Invalid Date') {
-      return '';
-    }
-    
-    return value.toString();
-    
-  } catch (error) {
-    console.log('📅 Date formatting error:', error, 'for value:', value);
-    return '';
+    ayValues.push([monthName]);
   }
+  
+  // Ay değerlerini yaz
+  if (ayValues.length > 0) {
+    sheet.getRange(2, ayIdx + 1, ayValues.length, 1).setValues(ayValues);
+    console.log('📅 Ay değerleri güncellendi:', { count: ayValues.length });
+  }
+  
+} catch (error) {
+  console.error('📅 setMonthArrayFormulaIfAbsent hatası:', error);
+}
 }
 
-// Parse dd.MM.yyyy to Date (global utility)
+/**
+* 📅 Date parsing utility for dd.MM.yyyy format
+* @param {string} str - Date string in dd.MM.yyyy format
+* @returns {Date|null} - Parsed date or null if invalid
+*/
 function parseDdMmYyyy(str) {
   try {
     const s = String(str || '').trim();
-    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return null;
+  if (!/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return null;
     const [dd, mm, yyyy] = s.split('.').map(n => parseInt(n, 10));
     const d = new Date(yyyy, mm - 1, dd);
     return isNaN(d.getTime()) ? null : d;
   } catch (e) {
     return null;
-  }
 }
+  }
 
 // ========================================
 // 📏 COLUMN WIDTH SYSTEM - OPTIMAL LAYOUT
@@ -2131,482 +1936,6 @@ function getOptimalColumnWidth(header, sheetType) {
  * @param {number} startRow - Starting row
  * @param {number} rowCount - Number of rows
  */
-function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
-  try {
-    if (!sheet || !sheetName || !startRow || !rowCount) {
-      console.error('Invalid parameters for color coding');
-      return;
-    }
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-    let statusColumnIndex = -1;
-    const lowerName = String(sheetName || '').toLowerCase();
-    if (lowerName.includes('randevu')) {
-      statusColumnIndex = headers.indexOf('Randevu durumu');
-      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu Durumu');
-      var randevuMeetingResultIdx = headers.indexOf('Toplantı Sonucu');
-      if (randevuMeetingResultIdx === -1) randevuMeetingResultIdx = headers.indexOf('Toplantı sonucu');
-    } else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) {
-      statusColumnIndex = headers.indexOf('Fırsat Durumu');
-      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Aktivite');
-    } else if (lowerName.includes('toplant')) {
-      // Try multiple candidates for meeting status - T Toplantılar için
-      statusColumnIndex = headers.indexOf('Toplantı Sonucu');
-      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Toplantı durumu');
-      if (statusColumnIndex === -1) statusColumnIndex = headers.indexOf('Randevu durumu');
-      // Ayrıca Toplantı Sonucu için indeks
-      var meetingResultIdx = headers.indexOf('Toplantı Sonucu');
-    } else {
-      statusColumnIndex = headers.indexOf('Aktivite');
-    }
-    
-    // Temsilci kodu rengi: yalnızca 'T Aktivite Özet' için (diğer sayfalar durum bazlı)
-    let employeeCodeColumnIndex = -1;
-    employeeCodeColumnIndex = headers.indexOf('Temsilci Kodu');
-    if (employeeCodeColumnIndex === -1) employeeCodeColumnIndex = headers.indexOf('Kod');
-    if (employeeCodeColumnIndex === -1) {
-      // Esnek arama (küçük/büyük, boşluk/aksan toleransı)
-      const lowered = headers.map(h => String(h || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,''));
-      employeeCodeColumnIndex = lowered.indexOf('temsilci kodu');
-      if (employeeCodeColumnIndex === -1) employeeCodeColumnIndex = lowered.indexOf('kod');
-      if (employeeCodeColumnIndex === -1) employeeCodeColumnIndex = 0; // Fallback: ilk sütun
-    }
-    console.log(`🎨 ${sheetName}: Temsilci Kodu sütunu bulundu: ${employeeCodeColumnIndex} (${headers[employeeCodeColumnIndex] || 'bulunamadı'})`);
-    
-    // T Aktivite Özet/Tümü için status sütunu zorunlu değil
-    if (statusColumnIndex === -1 && (sheetName !== 'T Aktivite Özet' && sheetName !== 'T Aktivite (Tümü)')) {
-      console.log(`⚠️ ${sheetName}: Status column not found (${statusColumnIndex}), skipping color coding`);
-      return;
-    }
-    
-    // T sayfaları için özel debug
-    if (lowerName.includes('toplant')) {
-      console.log(`🎨 T Toplantılar Debug: StatusCol=${statusColumnIndex}, MeetingResultIdx=${meetingResultIdx}, Headers=${headers.join(', ')}`);
-    } else if (lowerName.includes('fırsat') || lowerName.includes('firsat')) {
-      console.log(`🎨 T Fırsatlar Debug: StatusCol=${statusColumnIndex}, Headers=${headers.join(', ')}`);
-    } else if (lowerName.includes('randevu')) {
-      console.log(`🎨 T Randevular Debug: StatusCol=${statusColumnIndex}, RandevuMeetingResultIdx=${randevuMeetingResultIdx}, Headers=${headers.join(', ')}`);
-    }
-    
-    console.log(`🎨 applyColorCodingToManagerData: Sheet=${sheetName}, StatusCol=${statusColumnIndex}, EmployeeCol=${employeeCodeColumnIndex}, Rows=${rowCount}`);
-    for (let i = 0; i < rowCount; i++) {
-      const rowNumber = startRow + i;
-      console.log(`🎨 Processing row ${rowNumber} for ${sheetName}`);
-      
-      // T Aktivite Özet için status kontrolü yapma
-      let status = '';
-      let normStatusStr = '';
-      if (!(sheetName === 'T Aktivite Özet' || sheetName === 'T Aktivite (Tümü)')) {
-        const statusCell = sheet.getRange(rowNumber, statusColumnIndex + 1);
-        status = String(statusCell.getDisplayValue() || '').trim();
-        normStatusStr = status.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-        console.log(`Manager color coding - Row ${rowNumber}, Status: "${status}", Sheet: ${sheetName}`);
-      }
-      
-      // Her satır için color değişkeni tanımla
-      let color = 'rgb(255, 255, 255)';
-      
-      // T Aktivite Özet için sadece temsilci koduna göre renk
-      console.log(`🔍 Row ${rowNumber}: sheetName="${sheetName}", lowerName="${lowerName}"`);
-      
-                         if (sheetName === 'T Aktivite Özet' || sheetName === 'T Aktivite (Tümü)') {
-        // T Aktivite Özet/Tümü: durum dikkate alınmaz, temsilci kodu görsel kimlik
-        color = 'rgb(255, 255, 255)';
-        console.log(`🎨 ${sheetName} row ${rowNumber}: Status bypassed, using employee code`);
-      }
-      if (status && status !== '' && !(sheetName === 'T Aktivite Özet' || sheetName === 'T Aktivite (Tümü)')) {
-        if (lowerName.includes('toplant')) {
-          var resultVal = '';
-          try { if (typeof meetingResultIdx === 'number' && meetingResultIdx >= 0) { resultVal = String(sheet.getRange(rowNumber, meetingResultIdx + 1).getDisplayValue() || ''); } } catch(e) {}
-          const rv = String(resultVal).toLowerCase();
-          const isSale = (rv === 'satış yapıldı' || rv === 'satis yapildi');
-          const isOffer = (!isSale && rv.indexOf('teklif') !== -1);
-          const isCancel = (!isSale && rv.indexOf('iptal') !== -1);
-          
-          console.log(`🎨 T Toplantılar Row ${rowNumber}: resultVal="${resultVal}", rv="${rv}", isSale=${isSale}, isOffer=${isOffer}, isCancel=${isCancel}`);
-          // Potansiyel rengi oku (Satış/Teklif/İptal değilse)
-          let potentialColor = '';
-          try {
-            const potIdx = headers.indexOf('Satış Potansiyeli');
-            if (potIdx !== -1) {
-              const pot = String(sheet.getRange(rowNumber, potIdx + 1).getDisplayValue() || '').toLowerCase();
-              if (pot === 'sıcak' || pot === 'sicak') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Sıcak'];
-              else if (pot === 'orta') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Orta'];
-              else if (pot === 'soğuk' || pot === 'soguk') potentialColor = CRM_CONFIG.COLOR_CODES['Potansiyel Soğuk'];
-              console.log(`🎨 T Toplantılar Row ${rowNumber}: pot="${pot}", potentialColor="${potentialColor}"`);
-            } else {
-              console.log(`🎨 T Toplantılar Row ${rowNumber}: Satış Potansiyeli sütunu bulunamadı (potIdx=${potIdx})`);
-            }
-          } catch(e) {
-            console.log(`🎨 T Toplantılar Row ${rowNumber}: Potansiyel renk okuma hatası:`, e && e.message);
-          }
-          if (isSale) {
-            color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
-          } else if (isOffer) {
-            // Teklif: potansiyele göre renklendir (varsa), yoksa koyu yeşil
-            color = potentialColor || CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
-          } else if (isCancel) {
-            color = CRM_CONFIG.COLOR_CODES['Toplantı İptal'];
-          } else if (potentialColor) {
-            color = potentialColor;
-          } else {
-            color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
-          }
-          
-          console.log(`🎨 T Toplantılar Row ${rowNumber}: Final color determined: ${color}`);
-        } else if (lowerName.includes('randevu')) {
-          // Randevular: kesin eşleşme (TR başlıklar)
-          const raw = String(status || '').trim();
-          const n = normStatusStr;
-          
-          console.log(`🎨 T Randevular Row ${rowNumber}: raw="${raw}", n="${n}"`);
-          
-          if (raw === 'Randevu Alındı' || n.indexOf('randevu alindi') !== -1) {
-            color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
-          } else if (raw === 'İleri Tarih Randevu' || (n.indexOf('ileri') !== -1 && n.indexOf('tarih') !== -1)) {
-            color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
-          } else if (raw === 'Randevu Teyitlendi' || n.indexOf('teyit') !== -1) {
-            color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
-          } else if (raw === 'Randevu Ertelendi' || n.indexOf('erte') !== -1) {
-            color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
-          } else if (raw === 'Randevu İptal oldu' || n.indexOf('iptal') !== -1) {
-            color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
-          }
-          
-          console.log(`🎨 T Randevular Row ${rowNumber}: Initial color determined: ${color}`);
-          // Toplantı Sonucu override'ları
-          if (typeof randevuMeetingResultIdx === 'number' && randevuMeetingResultIdx >= 0) {
-            try {
-              const res = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getDisplayValue() || '').trim();
-              const resLower = res.toLowerCase();
-              
-              console.log(`🎨 T Randevular Row ${rowNumber}: Toplantı Sonucu="${res}", resLower="${resLower}"`);
-              
-              if (res === 'Satış Yapıldı') {
-                color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
-                console.log(`🎨 T Randevular Row ${rowNumber}: Override to Satış Yapıldı: ${color}`);
-              } else if (resLower.indexOf('teklif') !== -1) {
-                color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'];
-                console.log(`🎨 T Randevular Row ${rowNumber}: Override to Toplantı Teklif: ${color}`);
-              }
-            } catch (e) {
-              console.log(`🎨 T Randevular Row ${rowNumber}: Toplantı Sonucu okuma hatası:`, e && e.message);
-            }
-          }
-          
-          console.log(`🎨 T Randevular Row ${rowNumber}: Final color determined: ${color}`);
-        } else {
-          // Fırsatlar ve diğerleri
-          console.log(`🎨 T Fırsatlar Row ${rowNumber}: status="${status}", normStatusStr="${normStatusStr}"`);
-          
-          if (status === 'Fırsat İletildi' || String(status).toLowerCase().includes('teklif')) {
-            color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
-          } else if (status === 'Bilgi Verildi') {
-            color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
-          } else if (status === 'Yeniden Aranacak') {
-            color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
-          } else if (status === 'İlgilenmiyor') {
-            color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
-          } else if (status === 'Ulaşılamadı') {
-            color = CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
-          } else if (status === 'Toplantı Tamamlandı') {
-            color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
-          }
-          
-          console.log(`🎨 T Fırsatlar Row ${rowNumber}: Final color determined: ${color}`);
-        }
-      }
-      
-      // Her satır için final color belirle
-      let finalColor = color;
-      
-      // T Aktivite Özet için her satırda employee code işle
-      console.log(`🔍 Row ${rowNumber}: Employee code check - sheetName="${sheetName}"`);
-      
-      // T Aktivite Özet için employee code işle
-      if (sheetName === 'T Aktivite Özet') {
-        console.log(`🎨 T Aktivite Özet row ${rowNumber}: Processing employee code...`);
-        
-        if (employeeCodeColumnIndex !== -1) {
-          try {
-            const employeeCode = String(sheet.getRange(rowNumber, employeeCodeColumnIndex + 1).getDisplayValue() || '').trim();
-            console.log(`🔍 Row ${rowNumber}: Employee code found: "${employeeCode}"`);
-            
-            if (employeeCode) {
-              const employeeColor = getEmployeeColor(employeeCode);
-              console.log(`🎨 Row ${rowNumber}: getEmployeeColor("${employeeCode}") = ${employeeColor}`);
-              
-              if (employeeColor) {
-                finalColor = employeeColor;
-                console.log(`🎨 Employee color applied: ${employeeCode} → ${employeeColor}`);
-              } else {
-                console.log(`⚠️ Row ${rowNumber}: No color found for employee code "${employeeCode}"`);
-              }
-            } else {
-              console.log(`⚠️ Row ${rowNumber}: Empty employee code`);
-            }
-          } catch (e) {
-            console.log('Employee color lookup failed:', e && e.message);
-          }
-        } else {
-          console.log(`⚠️ Row ${rowNumber}: employeeCodeColumnIndex = ${employeeCodeColumnIndex}`);
-        }
-      } else if (employeeCodeColumnIndex !== -1 && sheetName === 'T Aktivite Özet') {
-        // Sadece T Aktivite Özet için employee color uygula
-        try {
-          const employeeCode = String(sheet.getRange(rowNumber, employeeCodeColumnIndex + 1).getDisplayValue() || '').trim();
-          if (employeeCode) {
-            const employeeColor = getEmployeeColor(employeeCode);
-            if (employeeColor) {
-              finalColor = employeeColor;
-              console.log(`🎨 Employee color applied: ${employeeCode} → ${employeeColor}`);
-            }
-          }
-        } catch (e) {
-          console.log('Employee color lookup failed:', e && e.message);
-        }
-      }
-      
-      // Renk uygulama
-      try {
-        if (sheetName === 'T Aktivite Özet' || sheetName === 'T Aktivite (Tümü)') {
-          // Sadece 'Kod' hücresini temsilci rengine boya, diğer hücreleri beyaz bırak
-          const rowRange = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
-          rowRange.setBackground('white');
-          try {
-            const codeCell = sheet.getRange(rowNumber, (employeeCodeColumnIndex > -1 ? employeeCodeColumnIndex : 0) + 1);
-            const empCode = String(codeCell.getDisplayValue() || '').trim();
-            const empColor = empCode ? getEmployeeColor(empCode) : null;
-            if (empColor) codeCell.setBackground(empColor);
-          } catch (ecErr) { console.log('Employee cell color failed:', ecErr && ecErr.message); }
-          console.log(`🎨 Row ${rowNumber}: ${sheetName} → only Kod colored`);
-        } else {
-          // Diğer sayfalarda tüm satıra durum rengi uygula
-          const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
-          range.setBackground(finalColor);
-          console.log(`🎨 Row ${rowNumber}: Background color set: ${finalColor} (Sheet: ${sheetName})`);
-          
-          // T sayfaları için özel debug
-          if (lowerName.includes('toplant') || lowerName.includes('fırsat') || lowerName.includes('firsat') || lowerName.includes('randevu')) {
-            console.log(`🎨 T Sayfa Row ${rowNumber}: finalColor="${finalColor}", sheetName="${sheetName}"`);
-          }
-        }
-      } catch(e) {
-        console.log('setBackground fail', e && e.message);
-      }
-
-      // Yeni: Randevular'da Toplantı Sonucu doluysa kursiv+kalın; boşsa normal
-      try {
-        if (lowerName.includes('randevu') && typeof randevuMeetingResultIdx === 'number' && randevuMeetingResultIdx >= 0) {
-          const resDisp = String(sheet.getRange(rowNumber, randevuMeetingResultIdx + 1).getDisplayValue() || '').trim();
-          const rowRange = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
-          if (resDisp) {
-            rowRange.setFontStyle('italic');
-            rowRange.setFontWeight('bold');
-          } else {
-            rowRange.setFontStyle('normal');
-            rowRange.setFontWeight('normal');
-          }
-        }
-      } catch (styleErr) {
-        console.log('⚠️ Font style apply skipped:', styleErr && styleErr.message);
-      }
-    }
-  } catch (error) {
-    console.error('Error applying color coding to manager data:', error);
-  }
-}
-
-/**
- * 🎨 Get Employee Color by Code - Visual Identity
- * @param {string} employeeCode - Employee code (e.g., 'LG 001')
- * @returns {string} - RGB color code
- */
-function getEmployeeColor(employeeCode) {
-  const employeeColors = {
-    'LG 001': 'rgb(173, 216, 230)',    // Light Blue
-    'NT 002': 'rgb(144, 238, 144)',    // Light Green
-    'KO 003': 'rgb(255, 165, 0)',      // Orange
-    'SB 004': 'rgb(221, 160, 221)',    // Plum
-    'KM 005': 'rgb(255, 182, 193)',    // Light Red
-    'GŞ 006': 'rgb(178, 235, 242)'     // Light Cyan (distinct from KM 005)
-  };
-  
-  console.log(`🎨 getEmployeeColor("${employeeCode}") called, returning: ${employeeColors[employeeCode] || 'null'}`);
-  return employeeColors[employeeCode] || null;
-}
-
-// Bu fonksiyon kaldırıldı - kullanılmıyor
-
-// ========================================
-// 🎨 MANAGER MENU SYSTEM - CONTROL CENTER
-// ========================================
-
-/**
- * 🎨 Manager Menu Creation - Control Panel
- */
-function createManagerMenu() {
-  try {
-    const ui = SpreadsheetApp.getUi();
-    const menu = ui.createMenu('YÖNETİCİ');
-    // "Tüm Verileri Senkronize Et" kaldırıldı - artık gerekli değil
-    // Dashboard sistemi direkt temsilci dosyalarından veri çekiyor
-
-    // Bu menü kaldırıldı - kullanılmıyor
-
-    // Sırayla (Üstüne Ekle) - Kullanılıyor
-    const appendSubmenu = ui.createMenu('➕ Sırayla (Üstüne Ekle)');
-    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
-      const functionName = `syncSingleEmployeeAppend_${employeeCode.replace(/\s+/g, '_')}`;
-      appendSubmenu.addItem(`${employeeCode} - ${employeeName}`, functionName);
-    }
-    appendSubmenu.addSeparator()
-      .addItem('Tüm Kodlar - Randevular', 'syncAllEmployeesAppend_Randevular')
-      .addItem('Tüm Kodlar - Fırsatlar', 'syncAllEmployeesAppend_Firsatlar')
-      .addItem('Tüm Kodlar - Toplantılar', 'syncAllEmployeesAppend_Toplantilar')
-      .addSeparator()
-      .addItem('Raporları Güncelle - Tüm Kodlar', 'syncReportsAllEmployees');
-    menu.addSubMenu(appendSubmenu)
-        .addSeparator();
-
-    // 📊 Log Özeti - Sadece log analizi
-    const logAnalysisSubmenu = ui.createMenu('📊 Log Özeti');
-    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
-      // Boşlukları alt çizgi ile değiştir ve doğru fonksiyon ismini oluştur
-      const functionName = `logAnalysis_${employeeCode.replace(/\s+/g, '_')}`;
-      logAnalysisSubmenu.addItem(`📊 ${employeeCode} - ${employeeName}`, functionName);
-    }
-    menu.addSubMenu(logAnalysisSubmenu)
-        .addSeparator();
-
-    // Performans
-    const perfSubmenu = ui.createMenu('⚡ Performans');
-    const onlyTouched = getOnlyColorTouchedRowsFlag();
-    perfSubmenu.addItem(`Renkleme: Yalnızca Yeni/Güncellenen (Şu an: ${onlyTouched ? 'Açık' : 'Kapalı'})`, 'toggleOnlyColorTouchedRows');
-    menu.addSubMenu(perfSubmenu)
-        .addSeparator();
-
-    // Sıralama
-    menu.addItem('↕️ T Randevular: Tarihe Göre Sırala (Artan)', 'sortTRandevularByDateAscending')
-        .addSeparator();
-
-    // Seçili randevuyu toplantıya taşı
-    menu.addItem('📥 Seçili Randevuyu Toplantıya Taşı', 'moveSelectedRandevuToMeeting')
-        .addSeparator();
-
-    // Test fonksiyonları kaldırıldı - kullanılmıyor
-
-    // Aktivite özeti
-    menu.addItem('📊 Aktivite Özeti Yenile', 'refreshActivitySummaryAll')
-        .addSeparator();
-
-    // Karşılaştırma raporları
-    addReportsComparisonMenu(menu);
-
-    // Raporlar (Genel)
-    const reportsGeneral = ui.createMenu('Raporlar (Genel)');
-    reportsGeneral.addItem('Günlük', 'generateDailyReportAutoSeriesManager')
-                  .addItem('Haftalık', 'generateReportsGeneralWeekly')
-                  .addItem('Aylık', 'generateReportsGeneralMonthly');
-    menu.addSubMenu(reportsGeneral);
-
-    // Raporlar (Seçili Temsilci)
-    const reportsPerEmployee = ui.createMenu('Raporlar (Seçili Temsilci)');
-    reportsPerEmployee.addItem('Günlük', 'generateReportsForEmployeeDailyPrompt')
-                      .addItem('Haftalık', 'generateReportsForEmployeeWeeklyPrompt')
-                      .addItem('Aylık', 'generateReportsForEmployeeMonthlyPrompt');
-    menu.addSubMenu(reportsPerEmployee)
-        .addSeparator();
-
-    // Bakım
-    const maintenance = ui.createMenu('🧼 Bakım');
-    maintenance.addItem('🎨 (Yönetici) Renk Kodlaması – Tüm Sayfalar', 'forceRefreshManagerColorCoding')
-               .addItem('🎨 (Yönetici) Bu Sayfayı Yenile', 'applyManualManagerColorCoding')
-               .addItem('🎨 Tüm T Sayfalarında Renklendirme', 'applyColorCodingToAllManagerSheets')
-               .addItem('🧭 Sadece Sırala (Toplantılar)', 'sortMeetingsManual')
-               .addSeparator()
-               .addItem('🎨 (Temsilci) Renkleri Yenile – Tümü', 'refreshAgentColorCodingAll')
-               .addItem('🎨 (Temsilci) Renkleri Yenile – Seçili Kod', 'refreshAgentColorCodingPrompt')
-               .addSeparator()
-               .addItem('📊 Özet (Tek Kod)', 'refreshActivitySummaryForCodePrompt')
-               .addItem('📊 Özet (Hızlı Parti)', 'refreshActivitySummaryAllFast');
-    menu.addSubMenu(maintenance)
-        .addSeparator();
-
-    // Görünüm
-    const viewMenu = ui.createMenu('👁️ Görünüm');
-    viewMenu.addItem('Okunabilir Yap (Bu Sayfa)', 'applyReadableView')
-            .addItem('Görünümü Sıfırla (Bu Sayfa)', 'resetReadableView');
-    menu.addSubMenu(viewMenu)
-        .addSeparator();
-
-    // 🔄 DASHBOARD SENKRONİZASYON - TEK BUTON
-    menu.addItem('🔄 Dashboard Senkronize Et & Göster', 'syncAllEmployeesAndShowDashboard')
-        .addSeparator();
-    
-    
-    menu.addItem('Senkronizasyon Durumu', 'showSyncStatus')
-        .addSeparator()
-        .addItem('Verileri Temizle', 'cleanManagerData')
-        .addSeparator()
-        // Bu menü öğesi kaldırıldı - kullanılmıyor
-        .addToUi();
-  } catch (error) {
-    console.error('Error creating manager menu:', error);
-  }
-}
-
-function applyReadableView() {
-  console.log('Function started:', { action: 'applyReadableView' });
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getActiveSheet();
-    if (!sheet) {
-      throw new Error('Aktif sayfa bulunamadı');
-    }
-    const lastRow = sheet.getLastRow();
-    const lastCol = sheet.getLastColumn();
-    if (lastCol === 0) {
-      SpreadsheetApp.getUi().alert('Uyarı', 'Bu sayfada kolon bulunmuyor.', SpreadsheetApp.getUi().ButtonSet.OK);
-      return;
-    }
-    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-    const lowered = headers.map(h => String(h || '').toLowerCase());
-    function idxOf(cands){ for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; } return -1; }
-
-    const idxYorum = idxOf(['Yorum']);
-    const idxYonNot = idxOf(['Yönetici Not','Yonetici Not']);
-    const idxLog   = idxOf(['Log']);
-
-    const targets = [];
-    if (idxYorum !== -1) targets.push({ idx: idxYorum + 1, width: 280 });
-    if (idxYonNot !== -1) targets.push({ idx: idxYonNot + 1, width: 300 });
-    if (idxLog   !== -1) targets.push({ idx: idxLog + 1,   width: 360 });
-
-    for (const t of targets) {
-      try {
-        sheet.setColumnWidth(t.idx, t.width);
-        if (lastRow > 1) {
-          const rng = sheet.getRange(2, t.idx, lastRow - 1, 1);
-          rng.setWrap(true);
-          rng.setVerticalAlignment('TOP');
-        }
-      } catch (colErr) {
-        console.log('⚠️ Column format skipped:', { col: t.idx, error: colErr && colErr.message });
-      }
-    }
-
-    if (lastRow > 1) {
-      try { sheet.setRowHeights(2, lastRow - 1, 54); } catch (rhErr) {}
-    }
-
-    console.log('Processing complete:', { wrappedCols: targets.map(t => t.idx) });
-    SpreadsheetApp.getUi().alert('Tamam', 'Bu sayfa okunabilir yapıldı (metin kaydırma ve sütun genişlikleri uygulandı).', SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
-  }
-}
 
 function resetReadableView() {
   console.log('Function started:', { action: 'resetReadableView' });
@@ -2661,77 +1990,10 @@ function resetReadableView() {
   }
 }
 
-// Bu fonksiyon kaldırıldı - kullanılmıyor
-
-
-
-// Bu fonksiyon kaldırıldı - kullanılmıyor
-
 /**
  * 🔄 Synchronize a single employee
  * @param {string} employeeCode - Employee code to synchronize
  */
-function syncSingleEmployee(employeeCode, options) {
-  try {
-    const mode = options && options.mode ? options.mode : 'replace'; // replace | append
-    console.log(`🔄 syncSingleEmployee started for ${employeeCode} with mode=${mode}`);
-
-    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    if (!managerFile) {
-      throw new Error('Yönetici dosyası bulunamadı');
-    }
-    const totalStats = { totalRecords: 0, employeeStats: {}, errors: [] };
-    const employeeData = collectEmployeeData(managerFile, employeeCode);
-    const employeeStats = { employeeCode, totalRecords: 0, sheetStats: {} };
-    for (const [sheetName, data] of Object.entries(employeeData)) {
-      if (data && data.length > 0) {
-        const op = updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) || { totalIncoming: data.length };
-        employeeStats.sheetStats[sheetName] = op;
-        employeeStats.totalRecords += op.totalIncoming;
-      }
-    }
-
-    // Collect negatives from Format Tablo as summary counts
-    const employeeFile = findEmployeeFile(employeeCode);
-    const negRows = collectFormatTableNegativeSummary(employeeFile, employeeCode);
-    updateManagerActivitySummary(managerFile, negRows, employeeCode, 'replace');
-    try { employeeStats.sheetStats['T Aktivite Özet'] = Array.isArray(negRows) ? negRows.length : 0; } catch (_) {}
-    try {
-      const fullRows = computeFullActivityWideRows(managerFile, employeeCode);
-      updateManagerFullActivitySummaryWide(managerFile, fullRows, employeeCode, mode === 'append' ? 'append' : 'replace');
-      try { employeeStats.sheetStats['T Aktivite (Tümü)'] = Array.isArray(fullRows) ? fullRows.length : 0; } catch (_) {}
-      // Zorunlu renklendirme: Sadece T Aktivite (Tümü)
-      try {
-        const shTumu = managerFile.getSheetByName('T Aktivite (Tümü)');
-        if (shTumu && shTumu.getLastRow() > 1) {
-          applyColorCodingToManagerData(shTumu, 'T Aktivite (Tümü)', 2, shTumu.getLastRow() - 1);
-        }
-      } catch (colErr1) { console.log('⚠️ Recolor T Aktivite (Tümü) skipped:', colErr1 && colErr1.message); }
-    } catch (e) { console.log('⚠️ Full activity summary generation skipped:', e && e.message); }
-
-    totalStats.employeeStats[employeeCode] = employeeStats;
-    totalStats.totalRecords += employeeStats.totalRecords;
-
-    // Append modunda ilgili T sayfasına otomatik geçiş yap
-    if (mode === 'append') {
-      try {
-        const prefer = ['T Toplantılar', 'T Fırsatlar', 'T Randevular'];
-        for (const name of prefer) {
-          const sh = managerFile.getSheetByName(name);
-          if (sh && sh.getLastRow() > 1) { managerFile.setActiveSheet(sh); break; }
-        }
-      } catch (_) {}
-    }
-
-    showSyncResults(totalStats);
-    // Removed global recoloring/validation to avoid O(N) cost across all sheets
-    return totalStats;
-  } catch (error) {
-    console.error(`Error synchronizing employee ${employeeCode}:`, error);
-    const ui = SpreadsheetApp.getUi();
-    ui.alert('Hata', `${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`, ui.ButtonSet.OK);
-  }
-}
 
 
 
@@ -2742,24 +2004,6 @@ function syncSingleEmployee(employeeCode, options) {
 /**
  * 🚀 Manager System Initialization - Master Control
  */
-function onOpen() {
-  console.log('🚀 Manager spreadsheet opened - creating menus');
-  
-  try {
-    createManagerMenu();
-    
-    // Skip auto color coding on open (performance)
-    console.log('⏭️ Skipping auto color coding on open');
-    
-    // Apply data validation to all sheets
-    applyDataValidationToAllManagerSheets();
-    
-    console.log('✅ Manager system initialized');
-    
-  } catch (error) {
-    console.error('❌ Error initializing manager system:', error);
-  }
-}
 
 /**
  * 🎨 Apply Color Coding to All Manager Sheets - Automatic Styling
@@ -2942,15 +2186,896 @@ function applyManagerSheetDataValidation(sheet, sheetName) {
         break;
         
       case 'Toplantılar':
-        // Add validation for Toplantı durumu
-        const toplantiDurumuIndex = headers.indexOf('Toplantı durumu');
-        if (toplantiDurumuIndex !== -1) {
+        // NOT: Toplantı durumu, Randevu durumu, Randevu Tarihi, Saat validasyonları kaldırıldı - bu sütunlar artık yok
+        
+        // Add validation for Toplantı formatı
+        const toplantiFormatiIndex = headers.indexOf('Toplantı formatı');
+        if (toplantiFormatiIndex !== -1) {
           const validation = SpreadsheetApp.newDataValidation()
-            .requireValueInList(['Toplantı Tamamlandı'], true)
+            .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
             .setAllowInvalid(true)
             .build();
-          sheet.getRange(2, toplantiDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+          sheet.getRange(2, toplantiFormatiIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
         }
+
+        // Add validation for Toplantı Sonucu
+        const toplantiSonucuIdx = headers.indexOf('Toplantı Sonucu');
+        if (toplantiSonucuIdx !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.MEETING_RESULT_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, toplantiSonucuIdx + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+
+        // Add validation for Satış Potansiyeli
+        const sPotIdx = headers.indexOf('Satış Potansiyeli');
+        if (sPotIdx !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(['Yerinde Satış', 'Sıcak', 'Orta', 'Soğuk'], true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, sPotIdx + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+
+        // Add validation for Yeni Takip Tarihi (date)
+        const yeniTakipIdx = headers.indexOf('Yeni Takip Tarihi');
+        if (yeniTakipIdx !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireDate()
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, yeniTakipIdx + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        break;
+    }
+    
+    console.log(`✅ Data validation applied to ${sheetName}`);
+    
+  } catch (error) {
+    console.error(`❌ Error applying data validation to ${sheetName}:`, error);
+  }
+}
+
+// ========================================
+// 🔄 SYNCHRONIZATION SYSTEM - DATA CONSOLIDATION
+// ========================================
+
+/**
+ * 🔄 Complete Data Collection - Master Synchronization
+ * @returns {Object} - Complete synchronization results
+ */
+// collectAllData fonksiyonu kaldırıldı - artık gerekli değil
+// Dashboard sistemi direkt temsilci dosyalarından veri çekiyor
+// Senkronizasyon işlemleri için "Sırayla Ekle" ve "Odak" fonksiyonları kullanılıyor
+
+/**
+ * 🔄 Employee Data Collection - Individual Processing
+ * @param {Spreadsheet} managerFile - Manager file
+ * @param {string} employeeCode - Employee code
+ * @returns {Object} - Employee data by sheet
+ */
+
+
+/**
+ * 🔄 Sheet Data Collection - Raw Data Extraction
+ * @param {Sheet} sheet - Source sheet
+ * @param {string} employeeCode - Employee code
+ * @returns {Array} - Sheet data
+ */
+function collectSheetData(sheet, employeeCode) {
+  try {
+    if (!sheet) {
+      return [];
+    }
+    const values = sheet.getDataRange().getValues();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (!values || values.length <= 1) {
+      return [];
+    }
+    const data = [];
+
+    // Determine target columns based on source sheet name (tolerant)
+    const sourceName = sheet.getName();
+    const sourceLower = String(sourceName || '').toLowerCase();
+    let targetColumns = [];
+    if (sourceLower.includes('randevu')) {
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
+      targetColumns = [
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Randevu durumu', 'Randevu Tarihi',
+        'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
+      ];
+    } else if (sourceLower.includes('fırsat') || sourceLower.includes('firsat')) {
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
+      targetColumns = [
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Fırsat Durumu', 'Fırsat Tarihi',
+        'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
+      ];
+    } else if (sourceLower.includes('toplant')) {
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
+      targetColumns = [
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Toplantıyı Yapan', 'Toplantı Tarihi',
+        'Ay', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Yeni Takip Tarihi',
+        'Yorum', 'Yönetici Not', 'Address', 'Maplink'
+      ];
+    } else {
+      // Fallback (keep previous default)
+      targetColumns = [
+        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+        'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
+        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
+        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
+        'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+      ];
+    }
+
+    const columnIndices = {};
+    headers.forEach((header, index) => {
+      columnIndices[header] = index;
+    });
+
+    function normalizeOpportunityStatus(value) {
+      const v = String(value || '').toLowerCase();
+      if (!v) return '';
+      if (v.indexOf('ilet') !== -1) return 'Fırsat İletildi';
+      if (v.indexOf('bilgi') !== -1) return 'Bilgi Verildi';
+      if (v.indexOf('yeniden') !== -1 || v.indexOf('ara') !== -1) return 'Yeniden Aranacak';
+      return '';
+    }
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      if (row.some(cell => cell !== '' && cell !== null && cell !== undefined && cell !== 'undefined' && cell !== 'null')) {
+        const orderedRow = [];
+        let hasValidDate = false;
+        
+        // Start from index 1 to skip 'Kod' (employee code is added later)
+        for (let j = 1; j < targetColumns.length; j++) {
+          const columnName = targetColumns[j];
+          let columnIndex = columnIndices[columnName];
+          
+          // Fallback mapping for common column name variations
+          if (columnIndex === undefined) {
+            const fallbackMappings = {
+              'Company name': ['Company', 'Firma', 'Şirket'],
+              'İsim Soyisim': ['İsim', 'Soyisim', 'Name', 'Contact'],
+              'Randevu Tarihi': ['Tarih', 'Date', 'Randevu Tarih'],
+              'Toplantı Tarihi': ['Tarih', 'Date', 'Toplantı Tarih'],
+              'Saat': ['Time', 'Zaman'],
+              'Randevu durumu': ['Durum', 'Status', 'Randevu Durum'],
+              'Toplantı durumu': ['Durum', 'Status', 'Toplantı Durum'],
+              'Phone': ['Telefon', 'Tel', 'Phone Number'],
+              'Yetkili Tel': ['Yetkili Telefon', 'Contact Phone'],
+              'Mail': ['Email', 'E-mail', 'E-posta'],
+              'Location': ['Konum', 'Lokasyon'],
+              'Website': ['URL', 'Web Site', 'Site'],
+              'Category': ['Kategori', 'Kategorisi'],
+              'Yorum': ['Comment', 'Not', 'Açıklama'],
+              'Yönetici Not': ['Manager Note', 'Yönetici Notu'],
+              'CMS Adı': ['CMS', 'CMS Name'],
+              'CMS Grubu': ['CMS Group', 'CMS Kategorisi'],
+              'E-Ticaret İzi': ['E-commerce', 'E-ticaret'],
+              'Site Hızı': ['Site Speed', 'Hız'],
+              'Site Trafiği': ['Site Traffic', 'Trafik'],
+              'Toplantı formatı': ['Meeting Format', 'Format'],
+              'Address': ['Adres', 'Adres'],
+              'City': ['Şehir', 'İl'],
+              'Rating count': ['Rating', 'Değerlendirme'],
+              'Review': ['Yorum', 'İnceleme'],
+              'Log': ['Activity Log', 'Aktivite Log']
+            };
+            
+            if (fallbackMappings[columnName]) {
+              for (const fallback of fallbackMappings[columnName]) {
+                if (columnIndices[fallback] !== undefined) {
+                  columnIndex = columnIndices[fallback];
+                  break;
+                }
+              }
+            }
+          }
+          
+          if (columnIndex !== undefined) {
+            let cellValue = row[columnIndex];
+            if (columnName === 'Saat') {
+              cellValue = formatTimeValue(cellValue);
+            }
+            if (columnName && columnName.includes('Tarihi')) {
+              cellValue = formatDateValue(cellValue);
+              // Tarih varsa geçerli satır olarak işaretle
+              if (cellValue && cellValue !== '') {
+                hasValidDate = true;
+              }
+            }
+            if (columnName === 'Fırsat Durumu') {
+              cellValue = normalizeOpportunityStatus(cellValue);
+            }
+            orderedRow.push(cellValue);
+          } else {
+            orderedRow.push('');
+          }
+        }
+        
+        // Sadece geçerli tarihi olan satırları ekle
+        if (hasValidDate) {
+          const rowData = { temsilciKodu: employeeCode, rowIndex: i + 2, data: orderedRow };
+          data.push(rowData);
+        }
+      }
+    }
+    return data;
+  } catch (error) {
+    console.error(`❌ Error collecting sheet data from ${sheet.getName()}:`, error);
+    return [];
+  }
+}
+
+/**
+ * 🔄 Manager Sheet Update - Data Integration
+ * @param {Spreadsheet} managerFile - Manager file
+ * @param {string} sheetName - Sheet name
+ * @param {Array} data - Data to update
+ * @param {string} employeeCode - Employee code
+ */
+
+/**
+* 📊 A1 formatında sütun harfini döndürür
+* @param {number} columnIndex - Sütun indeksi (0-tabanlı)
+* @returns {string} - Sütun harfi (A, B, C, ... AA, AB, ...)
+*/
+function columnToLetter(columnIndex) {
+let temp, letter = '';
+columnIndex++;
+while (columnIndex > 0) {
+  temp = (columnIndex - 1) % 26;
+  letter = String.fromCharCode(temp + 65) + letter;
+  columnIndex = (columnIndex - temp - 1) / 26;
+}
+return letter;
+}
+
+/**
+* 📅 Date parsing utility for dd.MM.yyyy format
+* @param {string} str - Date string in dd.MM.yyyy format
+* @returns {Date|null} - Parsed date or null if invalid
+*/
+function parseDdMmYyyy(str) {
+  try {
+    const s = String(str || '').trim();
+    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return null;
+    const [dd, mm, yyyy] = s.split('.').map(n => parseInt(n, 10));
+    const d = new Date(yyyy, mm - 1, dd);
+    return isNaN(d.getTime()) ? null : d;
+  } catch (e) {
+    return null;
+}
+  }
+
+// ========================================
+// 📏 COLUMN WIDTH SYSTEM - OPTIMAL LAYOUT
+// ========================================
+
+/**
+ * 📏 Universal Column Width Optimizer - Professional Layout
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetType - Type of sheet for specific optimizations
+ */
+function optimizeColumnWidths(sheet, sheetType = 'default') {
+  console.log(`📏 Optimizing column widths for ${sheetType} sheet`);
+  
+  try {
+    if (!sheet) {
+      console.error('❌ Invalid sheet for column width optimization');
+      return;
+    }
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    headers.forEach((header, index) => {
+      const columnIndex = index + 1;
+      const optimalWidth = getOptimalColumnWidth(header, sheetType);
+      sheet.setColumnWidth(columnIndex, optimalWidth);
+    });
+    
+    console.log(`✅ Column widths optimized for ${sheetType} sheet`);
+    
+  } catch (error) {
+    console.error(`❌ Error optimizing column widths for ${sheetType}:`, error);
+  }
+}
+
+/**
+ * 📏 Get Optimal Column Width - Smart Sizing
+ * @param {string} header - Column header
+ * @param {string} sheetType - Sheet type
+ * @returns {number} - Optimal width in pixels
+ */
+function getOptimalColumnWidth(header, sheetType) {
+  // Base widths for different column types
+  const widthMap = {
+    // Employee/Manager Codes
+    'Kod': 120,
+    'Temsilci Kodu': 120,
+    
+    // Company Information
+    'Company name': 200,
+    'Kaynak': 100,
+    'Keyword': 150,
+    'Location': 120,
+    'Category': 120,
+    'Website': 200,
+    
+    // Contact Information
+    'Phone': 130,
+    'Yetkili Tel': 130,
+    'Mail': 180,
+    'İsim Soyisim': 150,
+    
+    // Status and Activity
+    'Aktivite': 140,
+    'Randevu durumu': 140,
+    'Fırsat Durumu': 140,
+    'Toplantı durumu': 140,
+    'Durum': 140,
+    
+    // Dates and Times
+    'Tarih': 100,
+    'Randevu Tarihi': 120,
+    'Fırsat Tarihi': 120,
+    'Toplantı Tarihi': 120,
+    'Aktivite Tarihi': 120,
+    'Saat': 80,
+    
+    // Notes and Comments
+    'Yorum': 250,
+    'Yönetici Not': 200,
+    
+    // Technical Information
+    'CMS Adı': 120,
+    'CMS Grubu': 120,
+    'E-Ticaret İzi': 120,
+    'Site Hızı': 100,
+    'Site Trafiği': 120,
+    'Log': 100,
+    'Toplantı formatı': 120,
+    
+    // Address Information
+    'Address': 300,
+    'City': 100,
+    
+    // Analytics
+    'Rating count': 100,
+    'Review': 100,
+    'Toplantı Sonucu': 150,
+    
+    // Links
+    'Maplink': 200
+  };
+  
+  // Return optimal width or default
+  return widthMap[header] || 100;
+}
+
+// ========================================
+// 🎨 COLOR CODING SYSTEM - VISUAL INTELLIGENCE
+// ========================================
+
+/**
+ * 🎨 Manager Data Color Coding - Visual Status
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetName - Sheet name
+ * @param {number} startRow - Starting row
+ * @param {number} rowCount - Number of rows
+ */
+
+/**
+ * 🎨 Get Employee Color by Code - Visual Identity
+ * @param {string} employeeCode - Employee code (e.g., 'LG 001')
+ * @returns {string} - RGB color code
+ */
+function getEmployeeColor(employeeCode) {
+  const employeeColors = {
+    'LG 001': 'rgb(173, 216, 230)',    // Light Blue
+    'NT 002': 'rgb(144, 238, 144)',    // Light Green
+    'KO 003': 'rgb(255, 165, 0)',      // Orange
+    'SB 004': 'rgb(221, 160, 221)',    // Plum
+    'KM 005': 'rgb(255, 182, 193)',    // Light Red
+    'GŞ 006': 'rgb(178, 235, 242)'     // Light Cyan (distinct from KM 005)
+  };
+  
+  console.log(`🎨 getEmployeeColor("${employeeCode}") called, returning: ${employeeColors[employeeCode] || 'null'}`);
+  return employeeColors[employeeCode] || null;
+}
+
+// ========================================
+// 🎨 MANAGER MENU SYSTEM - CONTROL CENTER
+// ========================================
+
+/**
+ * 📋 onOpen - Menüyü otomatik oluştur
+ */
+function onOpen() {
+  try {
+    createManagerMenu();
+  } catch (error) {
+    console.error('Error in onOpen:', error);
+  }
+}
+
+/**
+ * 🎨 Manager Menu Creation - Control Panel
+ */
+function createManagerMenu() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const menu = ui.createMenu('YÖNETİCİ');
+    // "Tüm Verileri Senkronize Et" kaldırıldı - artık gerekli değil
+    // Dashboard sistemi direkt temsilci dosyalarından veri çekiyor
+
+    // Sırayla (Üstüne Ekle) - Kullanılıyor
+    const appendSubmenu = ui.createMenu('➕ Sırayla (Üstüne Ekle)');
+    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
+      const functionName = `syncSingleEmployeeAppend_${employeeCode.replace(/\s+/g, '_')}`;
+      appendSubmenu.addItem(`${employeeCode} - ${employeeName}`, functionName);
+    }
+    appendSubmenu.addSeparator()
+      .addItem('Tüm Kodlar - Randevular', 'syncAllEmployeesAppend_Randevular')
+      .addItem('Tüm Kodlar - Fırsatlar', 'syncAllEmployeesAppend_Firsatlar')
+      .addItem('Tüm Kodlar - Toplantılar', 'syncAllEmployeesAppend_Toplantilar')
+      .addSeparator()
+      .addItem('Raporları Güncelle - Tüm Kodlar', 'syncReportsAllEmployees');
+    menu.addSubMenu(appendSubmenu)
+        .addSeparator();
+
+    // 📊 Log Özeti - Sadece log analizi
+    const logAnalysisSubmenu = ui.createMenu('📊 Log Özeti');
+    logAnalysisSubmenu.addItem('🌐 Genel Log Analizi - Tüm Temsilciler', 'showGeneralLogAnalysis');
+    logAnalysisSubmenu.addSeparator();
+    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
+      // Boşlukları alt çizgi ile değiştir ve doğru fonksiyon ismini oluştur
+      const functionName = `logAnalysis_${employeeCode.replace(/\s+/g, '_')}`;
+      logAnalysisSubmenu.addItem(`📊 ${employeeCode} - ${employeeName}`, functionName);
+    }
+    menu.addSubMenu(logAnalysisSubmenu)
+        .addSeparator();
+
+    // Performans
+    const perfSubmenu = ui.createMenu('⚡ Performans');
+    const onlyTouched = getOnlyColorTouchedRowsFlag();
+    perfSubmenu.addItem(`Renkleme: Yalnızca Yeni/Güncellenen (Şu an: ${onlyTouched ? 'Açık' : 'Kapalı'})`, 'toggleOnlyColorTouchedRows');
+    menu.addSubMenu(perfSubmenu)
+        .addSeparator();
+
+    // Raporlar (Genel)
+    const reportsGeneral = ui.createMenu('Raporlar (Genel)');
+    reportsGeneral.addItem('Günlük', 'generateReportsGeneralDaily')
+                  .addItem('Haftalık', 'generateReportsGeneralWeekly')
+                  .addItem('Aylık', 'generateReportsGeneralMonthly');
+    menu.addSubMenu(reportsGeneral);
+
+    // Raporlar (Seçili Temsilci)
+    const reportsPerEmployee = ui.createMenu('Raporlar (Seçili Temsilci)');
+    reportsPerEmployee.addItem('Günlük', 'generateReportsForEmployeeDailyPrompt')
+                      .addItem('Haftalık', 'generateReportsForEmployeeWeeklyPrompt')
+                      .addItem('Aylık', 'generateReportsForEmployeeMonthlyPrompt');
+    menu.addSubMenu(reportsPerEmployee)
+        .addSeparator();
+
+    // Bakım
+    const maintenance = ui.createMenu('🧼 Bakım');
+    maintenance.addItem('🎨 (Yönetici) Renk Kodlaması – Tüm Sayfalar', 'forceRefreshManagerColorCoding')
+               .addItem('🎨 (Yönetici) Bu Sayfayı Yenile', 'applyManualManagerColorCoding')
+               .addItem('🎨 Tüm T Sayfalarında Renklendirme', 'applyColorCodingToAllManagerSheets')
+               .addSeparator()
+               .addItem('🎨 Sadece T Randevular Renkle', 'recolorTRandevularOnly')
+               .addItem('🎨 Sadece T Fırsatlar Renkle', 'recolorTFirsatlarOnly')
+               .addItem('🎨 Sadece T Toplantılar Renkle', 'recolorTToplantilarOnly')
+               .addSeparator()
+               .addItem('🧭 Sadece Sırala (Toplantılar)', 'sortMeetingsManual')
+               .addSeparator()
+               .addItem('🎨 (Temsilci) Renkleri Yenile – Tümü', 'refreshAgentColorCodingAll')
+               .addItem('🎨 (Temsilci) Renkleri Yenile – Seçili Kod', 'refreshAgentColorCodingPrompt')
+               .addSeparator()
+               .addItem('📊 Özet (Tek Kod)', 'refreshActivitySummaryForCodePrompt')
+               .addItem('📊 Özet (Hızlı Parti)', 'refreshActivitySummaryAllFast');
+    maintenance.addItem('🔎 Çift Toplantıları Bul (Company name)', 'highlightDuplicateMeetingsByCompany');
+    maintenance.addItem("🎨 Tüm Sayfayı Renklendir", "applyColorCodingToEntireSheet")
+               .addSeparator()
+               .addItem('🔧 T Randevular Sütun Sıralamasını Düzenle', 'fixTRandevularColumnOrder')
+               .addItem('🔧 T Toplantılar Sütun Sıralamasını Düzenle', 'fixTToplantilarColumnOrder')
+               .addItem('🔧 T Fırsatlar Sütun Sıralamasını Düzenle', 'fixTFirsatlarColumnOrder')
+    menu.addSubMenu(maintenance)
+        .addSeparator();
+
+    // Görünüm
+    const viewMenu = ui.createMenu('👁️ Görünüm');
+    viewMenu.addItem('Okunabilir Yap (Bu Sayfa)', 'applyReadableView')
+            .addItem('Görünümü Sıfırla (Bu Sayfa)', 'resetReadableView');
+    menu.addSubMenu(viewMenu)
+        .addSeparator();
+
+    // 🔄 DASHBOARD SENKRONİZASYON - TEK BUTON
+    menu.addItem('🔄 Dashboard Senkronize Et & Göster', 'syncAllEmployeesAndShowDashboard')
+        .addSeparator();
+    
+    
+    menu.addItem('Senkronizasyon Durumu', 'showSyncStatus')
+        .addSeparator()
+        .addItem('Verileri Temizle', 'cleanManagerData')
+        .addSeparator()
+        .addToUi();
+  } catch (error) {
+    console.error('Error creating manager menu:', error);
+  }
+}
+
+function applyReadableView() {
+  console.log('Function started:', { action: 'applyReadableView' });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+    if (!sheet) {
+      throw new Error('Aktif sayfa bulunamadı');
+    }
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastCol === 0) {
+      SpreadsheetApp.getUi().alert('Uyarı', 'Bu sayfada kolon bulunmuyor.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    const lowered = headers.map(h => String(h || '').toLowerCase());
+    function idxOf(cands){ for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; } return -1; }
+
+    const idxYorum = idxOf(['Yorum']);
+    const idxYonNot = idxOf(['Yönetici Not','Yonetici Not']);
+    const idxLog   = idxOf(['Log']);
+
+    const targets = [];
+    if (idxYorum !== -1) targets.push({ idx: idxYorum + 1, width: 280 });
+    if (idxYonNot !== -1) targets.push({ idx: idxYonNot + 1, width: 300 });
+    if (idxLog   !== -1) targets.push({ idx: idxLog + 1,   width: 360 });
+
+    for (const t of targets) {
+      try {
+        sheet.setColumnWidth(t.idx, t.width);
+        if (lastRow > 1) {
+          const rng = sheet.getRange(2, t.idx, lastRow - 1, 1);
+          rng.setWrap(true);
+          rng.setVerticalAlignment('TOP');
+        }
+      } catch (colErr) {
+        console.log('⚠️ Column format skipped:', { col: t.idx, error: colErr && colErr.message });
+      }
+    }
+
+    if (lastRow > 1) {
+      try { sheet.setRowHeights(2, lastRow - 1, 54); } catch (rhErr) {}
+    }
+
+    console.log('Processing complete:', { wrappedCols: targets.map(t => t.idx) });
+    SpreadsheetApp.getUi().alert('Tamam', 'Bu sayfa okunabilir yapıldı (metin kaydırma ve sütun genişlikleri uygulandı).', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+function resetReadableView() {
+  console.log('Function started:', { action: 'resetReadableView' });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+    if (!sheet) {
+      throw new Error('Aktif sayfa bulunamadı');
+    }
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastCol === 0) {
+      SpreadsheetApp.getUi().alert('Uyarı', 'Bu sayfada kolon bulunmuyor.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    const lowered = headers.map(h => String(h || '').toLowerCase());
+    function idxOf(cands){ for (const c of cands){ const i = lowered.indexOf(String(c).toLowerCase()); if (i!==-1) return i; } return -1; }
+
+    const idxYorum = idxOf(['Yorum']);
+    const idxYonNot = idxOf(['Yönetici Not','Yonetici Not']);
+    const idxLog   = idxOf(['Log']);
+
+    const targets = [];
+    if (idxYorum !== -1) targets.push(idxYorum + 1);
+    if (idxYonNot !== -1) targets.push(idxYonNot + 1);
+    if (idxLog   !== -1) targets.push(idxLog + 1);
+
+    for (const col of targets) {
+      try {
+        if (lastRow > 1) {
+          const rng = sheet.getRange(2, col, lastRow - 1, 1);
+          rng.setWrap(false);
+          rng.setVerticalAlignment('BOTTOM');
+        }
+        try { sheet.autoResizeColumn(col); } catch (arErr) {}
+      } catch (colErr) {
+        console.log('⚠️ Column reset skipped:', { col, error: colErr && colErr.message });
+      }
+    }
+
+    if (lastRow > 1) {
+      try { sheet.setRowHeights(2, lastRow - 1, 21); } catch (rhErr) {}
+    }
+
+    console.log('Processing complete:', { resetCols: targets });
+    SpreadsheetApp.getUi().alert('Tamam', 'Görünüm sıfırlandı (metin kaydırma kapatıldı ve sütunlar otomatik boyutlandı).', SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * 🔄 Synchronize a single employee
+ * @param {string} employeeCode - Employee code to synchronize
+ */
+function syncSingleEmployee(employeeCode, options) {
+  try {
+    const mode = options && options.mode ? options.mode : 'replace'; // replace | append
+    console.log(`🔄 syncSingleEmployee started for ${employeeCode} with mode=${mode}`);
+
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    if (!managerFile) {
+      throw new Error('Yönetici dosyası bulunamadı');
+    }
+    const totalStats = { totalRecords: 0, employeeStats: {}, errors: [] };
+    const employeeData = collectEmployeeData(managerFile, employeeCode);
+    const employeeStats = { employeeCode, totalRecords: 0, sheetStats: {} };
+    for (const [sheetName, data] of Object.entries(employeeData)) {
+      if (data && data.length > 0) {
+        const op = updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) || { totalIncoming: data.length };
+        employeeStats.sheetStats[sheetName] = op;
+        employeeStats.totalRecords += op.totalIncoming;
+      }
+    }
+
+    // Collect negatives from Format Tablo as summary counts
+    const employeeFile = findEmployeeFile(employeeCode);
+    const negRows = collectFormatTableNegativeSummary(employeeFile, employeeCode);
+    updateManagerActivitySummary(managerFile, negRows, employeeCode, 'replace');
+    try { employeeStats.sheetStats['T Aktivite Özet'] = Array.isArray(negRows) ? negRows.length : 0; } catch (_) {}
+    try {
+      const fullRows = computeFullActivityWideRows(managerFile, employeeCode);
+      updateManagerFullActivitySummaryWide(managerFile, fullRows, employeeCode, mode === 'append' ? 'append' : 'replace');
+      try { employeeStats.sheetStats['T Aktivite (Tümü)'] = Array.isArray(fullRows) ? fullRows.length : 0; } catch (_) {}
+      // Zorunlu renklendirme: Sadece T Aktivite (Tümü)
+      try {
+        const shTumu = managerFile.getSheetByName('T Aktivite (Tümü)');
+        if (shTumu && shTumu.getLastRow() > 1) {
+          applyColorCodingToManagerData(shTumu, 'T Aktivite (Tümü)', 2, shTumu.getLastRow() - 1);
+        }
+      } catch (colErr1) { console.log('⚠️ Recolor T Aktivite (Tümü) skipped:', colErr1 && colErr1.message); }
+    } catch (e) { console.log('⚠️ Full activity summary generation skipped:', e && e.message); }
+
+    totalStats.employeeStats[employeeCode] = employeeStats;
+    totalStats.totalRecords += employeeStats.totalRecords;
+
+    // Append modunda ilgili T sayfasına otomatik geçiş yap
+    if (mode === 'append') {
+      try {
+        const prefer = ['T Toplantılar', 'T Fırsatlar', 'T Randevular'];
+        for (const name of prefer) {
+          const sh = managerFile.getSheetByName(name);
+          if (sh && sh.getLastRow() > 1) { managerFile.setActiveSheet(sh); break; }
+        }
+      } catch (_) {}
+    }
+
+    showSyncResults(totalStats);
+    // Removed global recoloring/validation to avoid O(N) cost across all sheets
+    return totalStats;
+  } catch (error) {
+    console.error(`Error synchronizing employee ${employeeCode}:`, error);
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('Hata', `${employeeCode} senkronizasyonu başarısız oldu: ${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+
+
+// ========================================
+// 🚀 INITIALIZATION SYSTEM - SYSTEM STARTUP
+// ========================================
+
+/**
+ * 🚀 Manager System Initialization - Master Control
+ */
+
+/**
+ * 🎨 Apply Color Coding to All Manager Sheets - Automatic Styling
+ */
+function applyColorCodingToAllManagerSheets() {
+  console.log('🎨 Applying color coding to all manager sheets');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      
+      // Skip system sheets
+      if (sheetName.includes('Günlük Rapor') || 
+          sheetName.includes('Haftalık Rapor') || 
+          sheetName.includes('Detaylı Rapor')) {
+        continue;
+      }
+      
+      try {
+        const data = sheet.getDataRange().getValues();
+        if (data.length > 1) {
+          applyColorCodingToManagerData(sheet, sheetName, 2, data.length - 1);
+        }
+      } catch (error) {
+        console.error(`❌ Error applying color coding to ${sheetName}:`, error);
+      }
+    }
+    
+    console.log('✅ Color coding applied to all manager sheets');
+    
+  } catch (error) {
+    console.error('❌ Error applying color coding to manager sheets:', error);
+  }
+}
+
+/**
+ * ✅ Apply Data Validation to All Manager Sheets - Data Integrity
+ */
+function applyDataValidationToAllManagerSheets() {
+  console.log('✅ Applying data validation to all manager sheets');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      
+      // Skip system sheets
+      if (sheetName.includes('Günlük Rapor') || 
+          sheetName.includes('Haftalık Rapor') || 
+          sheetName.includes('Detaylı Rapor')) {
+        continue;
+      }
+      
+      try {
+        applyManagerSheetDataValidation(sheet, sheetName);
+      } catch (error) {
+        console.error(`❌ Error applying data validation to ${sheetName}:`, error);
+      }
+    }
+    
+    console.log('✅ Data validation applied to all manager sheets');
+    
+  } catch (error) {
+    console.error('❌ Error applying data validation to manager sheets:', error);
+  }
+}
+
+/**
+ * ✅ Apply Data Validation to Manager Sheet - Data Integrity
+ * @param {Sheet} sheet - Target sheet
+ * @param {string} sheetName - Sheet name
+ */
+function applyManagerSheetDataValidation(sheet, sheetName) {
+  console.log(`✅ Applying data validation to ${sheetName}`);
+  
+  try {
+    if (!sheet || !sheetName) {
+      console.error('❌ Invalid parameters for data validation');
+      return;
+    }
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    
+    // Serbest metin kolonlarındaki eski validasyonları temizle (ör. Kaynak)
+    try {
+      const idxKaynak = headers.indexOf('Kaynak');
+      if (idxKaynak !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxKaynak + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+      const idxLocation = headers.indexOf('Location');
+      if (idxLocation !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxLocation + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+      const idxKeyword = headers.indexOf('Keyword');
+      if (idxKeyword !== -1 && sheet.getLastRow() > 1) {
+        sheet.getRange(2, idxKeyword + 1, sheet.getLastRow() - 1, 1).clearDataValidations();
+      }
+    } catch (e) { console.log('Validation clear skipped:', e && e.message); }
+    
+    // Apply validation based on sheet type
+    switch (sheetName) {
+      case 'Randevular':
+        try { sheet.setConditionalFormatRules([]); } catch (cfErr) { console.log('⚠️ CF clear skipped:', cfErr && cfErr.message); }
+        // Add validation for Aktivite
+        const aktiviteIndex = headers.indexOf('Aktivite');
+        if (aktiviteIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, aktiviteIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Randevu durumu
+        const randevuDurumuIndex = headers.indexOf('Randevu durumu');
+        if (randevuDurumuIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(['Randevu Alındı', 'İleri Tarih Randevu', 'Randevu Teyitlendi', 'Randevu Ertelendi', 'Randevu İptal oldu'], true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, randevuDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Toplantı Sonucu
+        const toplantiSonucuIndex = headers.indexOf('Toplantı Sonucu');
+        if (toplantiSonucuIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.MEETING_RESULT_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, toplantiSonucuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        break;
+        
+      case 'Fırsatlar':
+        // Add validation for Aktivite
+        const firsatAktiviteIndex = headers.indexOf('Aktivite');
+        if (firsatAktiviteIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatAktiviteIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Fırsat Durumu
+        const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+        if (firsatDurumuIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(['Fırsat İletildi', 'Bilgi Verildi', 'Yeniden Aranacak'], true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatDurumuIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Fırsat Tarihi
+        const firsatTarihiIndex = headers.indexOf('Fırsat Tarihi');
+        if (firsatTarihiIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireDate()
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatTarihiIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        
+        // Add validation for Toplantı formatı
+        const firsatToplantiFormatIndex = headers.indexOf('Toplantı formatı');
+        if (firsatToplantiFormatIndex !== -1) {
+          const validation = SpreadsheetApp.newDataValidation()
+            .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
+            .setAllowInvalid(true)
+            .build();
+          sheet.getRange(2, firsatToplantiFormatIndex + 1, sheet.getLastRow() - 1, 1).setDataValidation(validation);
+        }
+        break;
+        
+      case 'Toplantılar':
+        // NOT: Toplantı durumu, Randevu durumu, Randevu Tarihi, Saat validasyonları kaldırıldı - bu sütunlar artık yok
         
         // Add validation for Toplantı formatı
         const toplantiFormatiIndex = headers.indexOf('Toplantı formatı');
@@ -3194,34 +3319,6 @@ function runAllTests() {
  * @param {string} employeeCode - Employee code
  * @returns {Object} - Employee data by sheet
  */
-function collectEmployeeData(managerFile, employeeCode) {
-  try {
-    const employeeFile = findEmployeeFile(employeeCode);
-    if (!employeeFile) {
-      return {};
-    }
-    const employeeData = {};
-    const sheets = employeeFile.getSheets();
-    for (const sheet of sheets) {
-      const sheetName = sheet.getName();
-      const lower = String(sheetName || '').toLowerCase();
-      let targetSheetName = '';
-      if (lower.includes('randevu')) targetSheetName = 'Randevular';
-      else if (lower.includes('fırsat') || lower.includes('firsat')) targetSheetName = 'Fırsatlar';
-      else if (lower.includes('toplant')) targetSheetName = 'Toplantılar';
-      else continue;
-
-      const sheetData = collectSheetData(sheet, employeeCode);
-      if (sheetData && sheetData.length > 0) {
-        employeeData[targetSheetName] = sheetData;
-      }
-    }
-    return employeeData;
-  } catch (error) {
-    console.error(`❌ Error collecting employee data for ${employeeCode}:`, error);
-    return {};
-  }
-}
 
 /**
  * 🔄 Sheet Data Collection - Raw Data Extraction
@@ -3246,30 +3343,26 @@ function collectSheetData(sheet, employeeCode) {
     const sourceLower = String(sourceName || '').toLowerCase();
     let targetColumns = [];
     if (sourceLower.includes('randevu')) {
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
       targetColumns = [
-        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-        'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-        'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Randevu durumu', 'Randevu Tarihi',
+        'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
       ];
     } else if (sourceLower.includes('fırsat') || sourceLower.includes('firsat')) {
-      // Meeting-only columns removed for opportunities target
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
       targetColumns = [
-        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-        'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Fırsat Durumu', 'Fırsat Tarihi',
-        'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-        'Rating count', 'Review', 'Maplink'
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Fırsat Durumu', 'Fırsat Tarihi',
+        'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
       ];
     } else if (sourceLower.includes('toplant')) {
+      // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
       targetColumns = [
-        'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
-        'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
-        'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
-        'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-        'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-        'Rating count', 'Review'
+        'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+        'Website', 'Mail', 'Toplantı formatı', 'Toplantıyı Yapan', 'Toplantı Tarihi',
+        'Ay', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Yeni Takip Tarihi',
+        'Yorum', 'Yönetici Not', 'Address', 'Maplink'
       ];
     } else {
       // Fallback (keep previous default)
@@ -3384,439 +3477,37 @@ function collectSheetData(sheet, employeeCode) {
 }
 
 /**
- * 🔄 Manager Sheet Update - Data Integration
- * @param {Spreadsheet} managerFile - Manager file
- * @param {string} sheetName - Sheet name
- * @param {Array} data - Data to update
- * @param {string} employeeCode - Employee code
- */
-function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
-  try {
-    if (!managerFile || !sheetName || !data || !employeeCode) {
-      return;
-    }
-    const effectiveMode = mode || 'replace';
-
-    // In append mode, use aggregate sheets with 'T ' prefix (e.g., T Randevular)
-    const targetSheetName = effectiveMode === 'append' ? `T ${sheetName}` : sheetName;
-    const baseTypeForHeaders = sheetName; // Randevular | Fırsatlar | Toplantılar
-
-    let sheet = managerFile.getSheetByName(targetSheetName);
-    if (!sheet) {
-      sheet = managerFile.insertSheet(targetSheetName);
-      // Create headers according to base sheet type (not the prefixed name)
-      createManagerSheetHeaders(sheet, baseTypeForHeaders);
-    }
-
-    // Replace mode: Randevular'da yöneticinin girdiği alanları korumak için satırları silme
-    if (effectiveMode !== 'append') {
-      const baseLower = String(baseTypeForHeaders || '').toLowerCase();
-      const isRandevuBase = baseLower.includes('randevu') && String(targetSheetName) === 'Randevular';
-      if (!isRandevuBase) {
-        clearEmployeeData(sheet, employeeCode);
-      }
-    }
-
-    const opStats = { totalIncoming: data.length, sameCount: 0, updateCount: 0, newCount: 0 };
-
-    if (data.length > 0) {
-      const allData = [];
-      for (let i = 0; i < data.length; i++) {
-        const rowData = data[i];
-        const rowDataCopy = [...rowData.data];
-        rowDataCopy.unshift(rowData.temsilciKodu);
-        allData.push(rowDataCopy);
-      }
-
-      // Upsert logic (restricted to same employee code)
-      let rowsToAppend = [];
-      const lastCol = sheet.getLastColumn();
-      const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-      const existing = sheet.getLastRow() > 1
-        ? sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues()
-        : [];
-
-      function findIdx(names) {
-        for (let i = 0; i < headers.length; i++) {
-          const h = String(headers[i] || '').trim().toLowerCase();
-          for (const name of names) {
-            if (h === String(name).trim().toLowerCase()) return i;
-          }
-        }
-        return -1;
-      }
-
-      const idxCode = findIdx(['Temsilci Kodu', 'Kod']);
-      const idxCompany = findIdx(['Company name', 'Company']);
-      const idxStatus = findIdx(['Fırsat Durumu', 'Randevu durumu', 'Toplantı durumu', 'Durum']);
-      const idxDate = findIdx(['Fırsat Tarihi', 'Randevu Tarihi', 'Toplantı Tarihi', 'Tarih']);
-
-      function canonicalCode(value) { return String(value || '').trim(); }
-      function canonicalCompany(value) { return String(value || '').replace(/\s+/g, ' ').trim(); }
-      function canonicalStatus(value) {
-        const v = String(value || '').toLowerCase();
-        if (v.includes('ilet')) return 'Fırsat İletildi';
-        if (v.includes('bilgi')) return 'Bilgi Verildi';
-        if (v.includes('yeniden') || v.includes('ara')) return 'Yeniden Aranacak';
-        return String(value || '').trim();
-      }
-      function canonicalDate(value) { return formatDateValue(value); }
-
-      function strictKey(row) {
-        return [
-          canonicalCode(idxCode >= 0 ? row[idxCode] : ''),
-          canonicalCompany(idxCompany >= 0 ? row[idxCompany] : ''),
-          canonicalStatus(idxStatus >= 0 ? row[idxStatus] : ''),
-          canonicalDate(idxDate >= 0 ? row[idxDate] : '')
-        ].join('||');
-      }
-      function softKey(row) {
-        return [
-          canonicalCode(idxCode >= 0 ? row[idxCode] : ''),
-          canonicalCompany(idxCompany >= 0 ? row[idxCompany] : '')
-        ].join('||');
-      }
-
-      // Normalized comparison helpers to avoid false updates
-      function normalizeForCompare(value, headerName) {
-        const name = String(headerName || '');
-        if (/tarih/i.test(name)) {
-          return String(formatDateValue(value) || '').trim();
-        }
-        if (/^saat$/i.test(name)) {
-          return String(formatTimeValue(value) || '').trim();
-        }
-        const s = String(value == null ? '' : value);
-        return s.replace(/\s+/g, ' ').trim();
-      }
-      const excludeCompareCols = ['Yönetici Not','Yonetici Not','CMS Adı','CMS Adi','CMS Grubu','E-Ticaret İzi','Site Hızı','Site Hizı','Site Hizi','Site Trafiği','Site Trafik','Log','Toplantı formatı','Address','City','Rating count','Review','Maplink','Toplantı Sonucu','Toplanti Sonucu','Teklif Detayı','Teklif Detayi','Satış Potansiyeli','Satis Potansiyeli','Toplantı Tarihi','Toplanti Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan','Toplantiyi Yapan'];
-      const loweredHeaders = headers.map(h => String(h || '').toLowerCase());
-      const excludeIdxSet = new Set(excludeCompareCols.map(n => loweredHeaders.indexOf(String(n).toLowerCase())).filter(i => i >= 0));
-      function areRowsEqualByColumns(currentDisplayRow, incomingRow) {
-        for (let i = 0; i < headers.length; i++) {
-          if (excludeIdxSet.has(i)) continue;
-          const curNorm = normalizeForCompare(currentDisplayRow[i], headers[i]);
-          const inNorm = normalizeForCompare(incomingRow[i], headers[i]);
-          if (curNorm !== inNorm) return false;
-        }
-        return true;
-      }
-
-      const codeNorm = canonicalCode(employeeCode);
-
-      // Build existing maps only for the same employee
-      const strictMap = new Map();              // strictKey -> rowIndex
-      const softMap = new Map();                // softKey -> rowIndex (or -1 if ambiguous)
-      for (let i = 0; i < existing.length; i++) {
-        const r = existing[i];
-        if (canonicalCode(r[idxCode]) !== codeNorm) continue; // restrict to same employee
-        const sKey = strictKey(r);
-        strictMap.set(sKey, i + 2); // 2-based
-        const soKey = softKey(r);
-        if (!softMap.has(soKey)) softMap.set(soKey, i + 2);
-        else softMap.set(soKey, i + 2); // prefer last occurrence (latest row) for update
-      }
-
-      const updates = []; // {rowIndex, values}
-
-      for (const r of allData) {
-        // ensure row's code is the intended employee code
-        r[idxCode] = codeNorm;
-        const sKey = strictKey(r);
-        if (strictMap.has(sKey)) {
-          const rowIndex = strictMap.get(sKey);
-          const currentDisplay = sheet.getRange(rowIndex, 1, 1, lastCol).getDisplayValues()[0];
-          const changed = !areRowsEqualByColumns(currentDisplay, r);
-          if (changed) {
-            try {
-              const diffs = [];
-              for (let i = 0; i < headers.length; i++) {
-                if (excludeIdxSet.has(i)) continue;
-                const curNorm = normalizeForCompare(currentDisplay[i], headers[i]);
-                const inNorm = normalizeForCompare(r[i], headers[i]);
-                if (curNorm !== inNorm) diffs.push({ col: headers[i], from: curNorm, to: inNorm });
-              }
-              if (diffs.length) console.log('🔍 Diff (strict match update)', { sheetName, employeeCode, rowIndex, diffs });
-            } catch (_) {}
-            updates.push({ rowIndex, values: r }); opStats.updateCount++;
-          } else { opStats.sameCount++; }
-          continue;
-        }
-        const soKey = softKey(r);
-        if (softMap.has(soKey)) {
-          const rowIndex = softMap.get(soKey);
-          const currentDisplay = sheet.getRange(rowIndex, 1, 1, lastCol).getDisplayValues()[0];
-          // Fırsatlar ve Randevular: tarih/statu değişimi olsa dahi append etme, mevcut satırı güncelle
-          const baseLower = String(baseTypeForHeaders || '').toLowerCase();
-          // Randevular: tarih/durum değişse bile mevcut satırı güncelle, append etme
-          if (baseLower.includes('randevu')) {
-            const changed = !areRowsEqualByColumns(currentDisplay, r);
-            if (changed) {
-              try {
-                const diffs = [];
-                for (let i = 0; i < headers.length; i++) {
-                  if (excludeIdxSet.has(i)) continue;
-                  const curNorm = normalizeForCompare(currentDisplay[i], headers[i]);
-                  const inNorm = normalizeForCompare(r[i], headers[i]);
-                  if (curNorm !== inNorm) diffs.push({ col: headers[i], from: curNorm, to: inNorm });
-                }
-                if (diffs.length) console.log('🔍 Diff (soft match update - Randevular)', { sheetName, employeeCode, rowIndex, diffs });
-              } catch (_) {}
-              updates.push({ rowIndex, values: r }); opStats.updateCount++;
-            } else { opStats.sameCount++; }
-            continue;
-          }
-          // Diğer sayfalar: tarih farklıysa yeni aktivite olarak ekle
-          if (!(baseLower.includes('fırsat') || baseLower.includes('firsat')) && idxDate >= 0) {
-            const existingDate = canonicalDate(currentDisplay[idxDate]);
-            const incomingDate = canonicalDate(r[idxDate]);
-            if (existingDate && incomingDate && existingDate !== incomingDate) {
-              rowsToAppend.push(r);
-              opStats.newCount++;
-              continue;
-            }
-          }
-          const changed = !areRowsEqualByColumns(currentDisplay, r);
-          if (changed) {
-            try {
-              const diffs = [];
-              for (let i = 0; i < headers.length; i++) {
-                if (excludeIdxSet.has(i)) continue;
-                const curNorm = normalizeForCompare(currentDisplay[i], headers[i]);
-                const inNorm = normalizeForCompare(r[i], headers[i]);
-                if (curNorm !== inNorm) diffs.push({ col: headers[i], from: curNorm, to: inNorm });
-              }
-              if (diffs.length) console.log('🔍 Diff (soft match update - others)', { sheetName, employeeCode, rowIndex, diffs });
-            } catch (_) {}
-            updates.push({ rowIndex, values: r }); opStats.updateCount++;
-          } else { opStats.sameCount++; }
-          continue;
-        }
-        rowsToAppend.push(r);
-        opStats.newCount++;
-      }
-
-      // Apply updates
-      for (const u of updates) {
-        // Randevular ana sayfasında (yönetici) kullanıcı tarafından girilen alanları koru
-        const baseLower = String(baseTypeForHeaders || '').toLowerCase();
-        const isManagerRandevular = baseLower.includes('randevu') && String(targetSheetName) === 'Randevular';
-        if (isManagerRandevular) {
-          const headersNow = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-          const lowered = headersNow.map(h => String(h||'').toLowerCase());
-          const protectCols = ['Toplantı Sonucu','Toplanti Sonucu','Toplantı sonucu','Toplanti sonucu','Teklif Detayı','Teklif Detayi','Satış Potansiyeli','Satis Potansiyeli','Toplantı Tarihi','Toplanti Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan','Toplantiyi Yapan','Yönetici Not','Yonetici Not'];
-          const protectedIdx = protectCols.map(n => lowered.indexOf(String(n).toLowerCase())).filter(i => i >= 0);
-          const currentRow = sheet.getRange(u.rowIndex, 1, 1, lastCol).getValues()[0];
-          protectedIdx.forEach(i => { u.values[i] = currentRow[i]; });
-        }
-        sheet.getRange(u.rowIndex, 1, 1, lastCol).setValues([u.values]);
-        // Renkler en sonda topluca uygulanacak
-      }
-
-              // Apply appends
-        if (rowsToAppend.length > 0 && rowsToAppend[0].length > 0) {
-          const startRow = sheet.getLastRow() + 1;
-          sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
-          
-          // Renk kodlaması uygula - TÜM SAYFALAR İÇİN
-          console.log(`🎨 Appended ${rowsToAppend.length} rows to ${sheet.getName()} (colors will be applied after all ops)`);
-        }
-
-      // Per-sheet formatting/validation only for touched sheet
-      if (!FAST_SYNC) { optimizeColumnWidths(sheet, baseTypeForHeaders); applyManagerSheetDataValidation(sheet, baseTypeForHeaders); try { sheet.setConditionalFormatRules([]); } catch (e) {} }
-
-      // Deduplicate only for Toplantılar to avoid collapsing distinct opportunity/appointment actions
-      try {
-        const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
-        if (lowerBase.includes('toplant')) {
-          removeDuplicatesInAggregateSheet(sheet, baseTypeForHeaders);
-        }
-      } catch (_) {}
-
-      // Sorting for aggregate sheets
-      try {
-        const lastRow = sheet.getLastRow();
-        if (lastRow > 2) {
-          const lowerBase = String(baseTypeForHeaders || '').toLowerCase();
-          // For T Randevular and T Toplantılar: sort by date, but in meetings keep 'Satış Yapıldı' on top
-          if (lowerBase.includes('randevu')) {
-            const statusIdx = findIdx(['Randevu durumu','Durum']);
-            const dateIdx = findIdx(['Randevu Tarihi','Tarih']);
-            const timeIdx = findIdx(['Saat']);
-            const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
-            const values = rng.getValues();
-            function getActDate(row){
-              if (dateIdx>=0) {
-                const v = row[dateIdx];
-                if (v instanceof Date && !isNaN(v.getTime())) return v;
-                const d1 = parseDdMmYyyy(v);
-                if (d1) return d1;
-                const d2 = new Date(v);
-                if (!isNaN(d2.getTime())) return d2;
-              }
-              return new Date('2099-12-31');
-            }
-            function parseTime(v){
-              if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
-              const s = String(v || '').trim();
-              const m = s.match(/^(\d{1,2}):(\d{2})/);
-              if (m) return Number(m[1])*60 + Number(m[2]);
-              return 0;
-            }
-            function groupRank(row){
-              const s = String(statusIdx>=0 ? row[statusIdx] : '').toLowerCase();
-              if (s.includes('iptal')) return 0; // Randevu İptal oldu
-              if (s.includes('erte')) return 1; // Randevu Ertelendi
-              if (s.includes('teyit')) return 2; // Randevu Teyitlendi
-              if (s.includes('randevu al')) return 3; // Randevu Alındı
-              if (s.includes('ileri')) return 4; // İleri Tarih Randevu
-              return 5; // diğerleri
-            }
-            values.sort(function(a,b){
-              const ra = groupRank(a);
-              const rb = groupRank(b);
-              if (ra !== rb) return ra - rb;
-              const da = getActDate(a);
-              const db = getActDate(b);
-              if (da.getTime() !== db.getTime()) return da - db;
-              if (timeIdx >= 0) return parseTime(a[timeIdx]) - parseTime(b[timeIdx]);
-              return 0;
-            });
-            rng.setValues(values);
-          } else if (lowerBase.includes('fırsat') || lowerBase.includes('firsat')) {
-            const dateIdx = findIdx(['Fırsat Tarihi','Firsat Tarihi','Tarih']);
-            const logIdx = findIdx(['Log']);
-            const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
-            const values = rng.getValues();
-            function parseDd2(s){
-              const v = String(s||'').trim();
-              const m = v.match(/(\d{2}\.\d{2}\.\d{4})/);
-              if (m) {
-                const [dd,mm,yy] = m[1].split('.');
-                const d = new Date(Number(yy), Number(mm)-1, Number(dd));
-                if (!isNaN(d.getTime())) return d;
-              }
-              return null;
-            }
-            function getDate(row){
-              const dLog = logIdx>=0 ? parseDd2(row[logIdx]) : null;
-              if (dLog) return dLog;
-              if (dateIdx>=0) {
-                const d = parseDdMmYyyy(row[dateIdx]);
-                if (d) return d;
-              }
-              // Tarihsiz satırları en sona koy (2100 yerine 2099 kullan)
-              return new Date('2099-12-31');
-            }
-            values.sort(function(a,b){
-              const da = getDate(a);
-              const db = getDate(b);
-              return da - db;
-            });
-            rng.setValues(values);
-          } else if (lowerBase.includes('toplant')) {
-            // Sadece T Toplantılar için çalıştır
-            if (!/^T\s/i.test(sheet.getName())) {
-              // Yönetici ana Toplantılar sayfasında sıralama yapma
-            }
-            // Toplantılar (append): Öncelik: Satış Yapıldı > Yerinde Satış > Sıcak > Orta > Soğuk > Tarih
-            const resultIdx = findIdx(['Toplantı Sonucu']);
-            const dateIdx = findIdx(['Toplantı Tarihi']);
-            const potIdx = findIdx(['Satış Potansiyeli']);
-            if (resultIdx >= 0 && dateIdx >= 0) {
-              const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
-              const values = rng.getValues();
-              function potRank(v){
-                const s = String(v||'').toLowerCase();
-                if (s === 'yerinde satış' || s === 'yerinde satis') return 1; // satıştan hemen sonra
-                if (s === 'sıcak' || s === 'sicak') return 2;
-                if (s === 'orta') return 3;
-                if (s === 'soğuk' || s === 'soguk') return 4;
-                return 9;
-              }
-              values.sort(function(a,b){
-                const aRes = String(a[resultIdx]||'');
-                const bRes = String(b[resultIdx]||'');
-                const aSale = aRes === 'Satış Yapıldı' ? 0 : 1;
-                const bSale = bRes === 'Satış Yapıldı' ? 0 : 1;
-                if (aSale !== bSale) return aSale - bSale; // Satış Yapıldı en üstte
-                if (potIdx >= 0) {
-                  const ar = potRank(a[potIdx]);
-                  const br = potRank(b[potIdx]);
-                  if (ar !== br) return ar - br;
-                }
-                const da = parseDdMmYyyy(a[dateIdx]) || new Date('2100-12-31');
-                const db = parseDdMmYyyy(b[dateIdx]) || new Date('2100-12-31');
-                return da - db;
-              });
-              rng.setValues(values);
-            }
-          } else if (idxCode >= 0) {
-            // Other aggregate sheets: keep grouped by code
-            sheet.getRange(2, 1, lastRow - 1, lastCol).sort([{ column: idxCode + 1, ascending: true }]);
-          }
-        }
-      } catch (sortErr) {
-        console.log('⚠️ Sorting skipped:', sortErr && sortErr.message);
-      }
-    }
-
-    // Final: apply colors after all operations to prevent late overrides
-    try {
-      const lr = sheet.getLastRow();
-      if (lr > 1) {
-        // Tüm sayfa için renklendirmeyi uygula (görünür olma şartı olmadan)
-        applyColorCodingToManagerData(sheet, sheet.getName(), 2, lr - 1);
-      }
-    } catch (finalColErr) {
-      console.log('⚠️ Final recolor skipped:', finalColErr && finalColErr.message);
-    }
-
-    return opStats;
-  } catch (error) {
-    console.error(`❌ Error updating manager sheet ${sheetName}:`, error);
-    return { totalIncoming: data ? data.length : 0, sameCount: 0, updateCount: 0, newCount: 0 };
-  }
-}
-
-/**
  * 🎨 Manager Sheet Headers - Professional Structure
  * @param {Sheet} sheet - Target sheet
  * @param {string} sheetName - Sheet name
  */
 function createManagerSheetHeaders(sheet, sheetName) {
   try {
-    if (!sheet || !sheetName) {
-      return;
-    }
     let headers = [];
     switch (sheetName) {
       case 'Randevular':
+        // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
         headers = [
-          'Temsilci Kodu', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Randevu durumu', 'Randevu Tarihi',
-          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review', 'Toplantı Sonucu', 'Toplantı Tarihi', 'Maplink'
+          'Temsilci Kodu', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+          'Website', 'Mail', 'Toplantı formatı', 'Randevu durumu', 'Randevu Tarihi',
+          'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
          ];
          break;
       case 'Fırsatlar':
+        // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
         headers = [
-          'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
-          'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Fırsat Durumu', 'Fırsat Tarihi',
-          'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review', 'Maplink'
+          'Temsilci Kodu', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+          'Website', 'Mail', 'Toplantı formatı', 'Fırsat Durumu', 'Fırsat Tarihi',
+          'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
         ];
         break;
       case 'Toplantılar':
+        // YENİ DÜZEN - Agent ile aynı (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
         headers = [
-          'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
-          'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
-          'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
-          'Saat', 'Yorum', 'Yönetici Not', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-          'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-          'Rating count', 'Review'
+          'Temsilci Kodu', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+          'Website', 'Mail', 'Toplantı formatı', 'Toplantıyı Yapan', 'Toplantı Tarihi',
+          'Ay', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Yeni Takip Tarihi',
+          'Yorum', 'Yönetici Not', 'Address', 'Maplink'
         ];
         break;
       default:
@@ -3843,9 +3534,7 @@ function createManagerSheetHeaders(sheet, sheetName) {
  */
 function clearEmployeeData(sheet, employeeCode) {
   try {
-    if (!sheet || !employeeCode) {
-      return;
-    }
+    console.log(`[START] clearEmployeeData: ${employeeCode}`);
     const data = sheet.getDataRange().getValues();
     if (!data || data.length <= 1) {
       return;
@@ -3859,15 +3548,25 @@ function clearEmployeeData(sheet, employeeCode) {
     if (temsilciKoduIndex === -1) {
       return;
     }
-    let deletedRows = 0;
+    
+    // OPTIMIZATION: Collect rows to delete first, then delete in reverse order (bottom to top)
+    const rowsToDelete = [];
     for (let i = data.length - 1; i > 0; i--) {
       const row = data[i];
       const rowTemsilciKodu = row[temsilciKoduIndex];
       if (rowTemsilciKodu === employeeCode) {
-        sheet.deleteRow(i + 1);
-        deletedRows++;
+        rowsToDelete.push(i + 1); // 1-based row index
       }
     }
+    
+    // Batch delete: Delete from bottom to top to maintain correct indices
+    let deletedRows = 0;
+    for (const rowIndex of rowsToDelete) {
+      sheet.deleteRow(rowIndex);
+      deletedRows++;
+    }
+    
+    console.log(`[RESULT] clearEmployeeData: ${deletedRows} rows deleted for ${employeeCode}`);
   } catch (error) {
     console.error(`❌ Error clearing data for employee ${employeeCode}:`, error);
   }
@@ -4052,6 +3751,24 @@ function updateManagerStatistics(managerFile, totalStats) {
 function showSyncResults(totalStats) { 
   console.log('📊 Showing sync results'); 
   
+  if (FAST_SYNC) {
+    try {
+      const safeTotal = totalStats && typeof totalStats === 'object' ? totalStats : {};
+      const empStats = safeTotal.employeeStats || {};
+      const totalRecords = safeTotal.totalRecords || 0;
+      const errorCount = (Array.isArray(safeTotal.errors) ? safeTotal.errors.length : 0);
+      let resultMessage = '📊 **SENKRONİZASYON SONUÇLARI (Hızlı)**\n\n';
+      resultMessage += `📈 **Toplam Kayıt**: ${totalRecords} kayıt\n`;
+      resultMessage += `👥 **İşlenen Temsilci**: ${Object.keys(empStats).length}\n`;
+      resultMessage += `❌ **Hata Sayısı**: ${errorCount}\n`;
+      SpreadsheetApp.getUi().alert('📊 Senkronizasyon Sonuçları', resultMessage, SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    } catch (e) {
+      SpreadsheetApp.getUi().alert('📊 Senkronizasyon Sonuçları', 'Hızlı özet gösterilemedi: ' + (e && e.message), SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+  }
+  
   try {
     if (!totalStats) {
       console.error('❌ No sync results to show');
@@ -4059,6 +3776,18 @@ function showSyncResults(totalStats) {
     }
 
     // Helper format/parse for dd.MM.yyyy
+    // Parse dd.MM.yyyy to Date (helper function)
+    function parseDdMmYyyy(str) {
+      try {
+        const s = String(str || "").trim();
+        if (!/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return null;
+        const [dd, mm, yyyy] = s.split(".").map(n => parseInt(n, 10));
+        const d = new Date(yyyy, mm - 1, dd);
+        return isNaN(d.getTime()) ? null : d;
+      } catch (e) {
+        return null;
+      }
+    }
     function formatDdMmYyyy(dateObj) {
       try {
         if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
@@ -4070,7 +3799,100 @@ function showSyncResults(totalStats) {
         return '';
       }
     }
-    function parseDdMmYyyy(value) {
+
+/**
+* 📅 Ay sütunu için ARRAYFORMULA veya doğrudan değer ataması yapar
+* @param {Sheet} sheet - Çalışma sayfası
+* @param {Array} dateHeaderCandidates - Tarih sütunu başlık adayları
+*/
+function setMonthArrayFormulaIfAbsent(sheet, dateHeaderCandidates) {
+try {
+  if (!sheet) return;
+  
+  console.log('📅 setMonthArrayFormulaIfAbsent başlatıldı:', { sheet: sheet.getName(), dateHeaderCandidates });
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const ayIdx = headers.indexOf('Ay');
+  
+  if (ayIdx === -1) {
+    console.log('📅 Ay sütunu bulunamadı');
+    return;
+  }
+  
+  // Tarih sütununu bul
+  let dateIdx = -1;
+  for (const candidate of dateHeaderCandidates) {
+    const idx = headers.indexOf(candidate);
+    if (idx !== -1) {
+      dateIdx = idx;
+      break;
+    }
+  }
+  
+  if (dateIdx === -1) {
+    console.log('📅 Tarih sütunu bulunamadı:', dateHeaderCandidates);
+    return;
+  }
+  
+  console.log('📅 Ay sütunu bulundu:', { ayIdx, dateIdx, dateHeader: headers[dateIdx] });
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+  
+  // Doğrudan değer atama yaklaşımı
+  const dateColumn = sheet.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  const ayValues = [];
+  
+  for (let i = 0; i < dateColumn.length; i++) {
+    const dateValue = dateColumn[i][0];
+    let monthName = '';
+    
+    if (dateValue) {
+      try {
+        let dateObj;
+        if (dateValue instanceof Date) {
+          dateObj = dateValue;
+        } else if (typeof dateValue === 'string') {
+          dateObj = parseDdMmYyyy(dateValue);
+        }
+        
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          monthName = getTurkishMonthName(dateObj.getMonth());
+        }
+      } catch (e) {
+        console.log('📅 Tarih dönüştürme hatası:', e);
+      }
+    }
+    
+    ayValues.push([monthName]);
+  }
+  
+  // Ay değerlerini yaz
+  if (ayValues.length > 0) {
+    sheet.getRange(2, ayIdx + 1, ayValues.length, 1).setValues(ayValues);
+    console.log('📅 Ay değerleri güncellendi:', { count: ayValues.length });
+  }
+  
+} catch (error) {
+  console.error('📅 setMonthArrayFormulaIfAbsent hatası:', error);
+}
+}
+
+/**
+* 📊 A1 formatında sütun harfini döndürür
+* @param {number} columnIndex - Sütun indeksi (0-tabanlı)
+* @returns {string} - Sütun harfi (A, B, C, ... AA, AB, ...)
+*/
+function columnToLetter(columnIndex) {
+let temp, letter = '';
+columnIndex++;
+while (columnIndex > 0) {
+  temp = (columnIndex - 1) % 26;
+  letter = String.fromCharCode(temp + 65) + letter;
+  columnIndex = (columnIndex - temp - 1) / 26;
+}
+return letter;
+}
       try {
         if (!value) return null;
         if (value instanceof Date && !isNaN(value.getTime())) return value;
@@ -4087,7 +3909,6 @@ function showSyncResults(totalStats) {
       } catch (err) {
         return null;
       }
-    }
     function extractDateFromLog(logValue) {
       try {
         const s = String(logValue || '');
@@ -4276,9 +4097,12 @@ const EMPLOYEE_FILES = {
   'KO 003': '1uLufPJqFSfm1WxqSzcvDOKW_hAv8AMhkQwljeiD51mc',
   'SB 004': '17RWqUrQ_m9h0ktJQ_E_55dt-Ao-RA01O6pUFbZ9DxDs',
   'KM 005': '15mwfzEBth_qIDEA8WofxOR5T3P8s-rMcMaLheBoV9uI',
+  'NT 012': '16EUHISXUqxGxkyfzYb5myKyl-p6O7yfuUWuPEhWWCyA',
   'GŞ 006': '1XiIyORsVR14hMNu7xJjLs2wHxBYmDskGCzCHGb0IwN8',
   'BH 007': '1X0k3uUh7KoiywGO3ewg7ULMAWOrY86I2NCBV7zaHUus',
-  'TD 008': '1tokFq-zPejBe-Npc1f4RHlRC15tgHn57qJIIIeVdXtQ'
+  'TD 008': '1tokFq-zPejBe-Npc1f4RHlRC15tgHn57qJIIIeVdXtQ',
+  'MK 009': '1xje6Kf9OZt1T2mB3XAjQgRMle-i-gbuKdh9AYmjPrIA',
+  'TİA 010': '1ltRrpcd4EWQT9sZOnEn8fVRdWTSMfG96L7_wb82nrLk'
 };
 
 const MANAGER_FILE_ID = '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A';
@@ -4348,79 +4172,198 @@ function generateDailyReportAutoSeriesManager(options) {
   }
 }
 
+/**
+ * 📊 YENİ RAPOR SİSTEMİ - Günlük (Genel)
+ * Tüm temsilcileri kıyaslayan günlük performans raporu
+ */
+function generateReportsGeneralDaily() {
+  console.log('📊 Yeni Günlük Rapor (Genel) başlatıldı');
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    
+    const dayLabel = formatDate(today);
+    
+    // Tüm temsilciler için veri topla
+    const employeeCodes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    const reportData = collectDailyReportData(employeeCodes, todayStart, todayEnd);
+    
+    // Rapor sayfası oluştur
+    createDailyReportSheet(ss, reportData, dayLabel, todayStart, todayEnd, 'all');
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Rapor Oluşturuldu',
+      `📊 Günlük performans raporu hazır!\n\n${dayLabel}\n\n"📊 Günlük Rapor - Genel" sayfasına bakın.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  } catch (error) {
+    console.error('❌ Günlük rapor hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Rapor oluşturma hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 YENİ RAPOR SİSTEMİ - Haftalık (Genel)
+ * Tüm temsilcileri kıyaslayan haftalık performans raporu
+ */
 function generateReportsGeneralWeekly() {
-  console.log('Function started:', { scope: 'all', period: 'weekly' });
+  console.log('📊 Yeni Haftalık Rapor (Genel) başlatıldı');
   try {
-    if (typeof generateWeeklyReportManager === 'function') {
-      return generateWeeklyReportManager({ scope: 'all' });
-    }
-    SpreadsheetApp.getUi().alert('Bilgi', 'Haftalık (Genel) rapor jeneratörü sonraki sürümde. Veriler indirildikten sonra bu menüden çalışacaktır.', SpreadsheetApp.getUi().ButtonSet.OK);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const today = new Date();
+    
+    // Bu hafta (Pazartesi-Pazar)
+    const weekStart = getWeekStart(today);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    // Hafta numarası (yılın kaçıncı haftası)
+    const weekNumber = getWeekNumberForReport(weekStart);
+    const weekLabel = `Hafta ${weekNumber} (${formatDate(weekStart)} - ${formatDate(weekEnd)})`;
+    
+    // Tüm temsilciler için veri topla
+    const employeeCodes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    const reportData = collectWeeklyReportData(employeeCodes, weekStart, weekEnd);
+    
+    // Rapor sayfası oluştur
+    createWeeklyReportSheet(ss, reportData, weekLabel, weekStart, weekEnd, 'all');
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Rapor Oluşturuldu',
+      `📊 Haftalık performans raporu hazır!\n\n${weekLabel}\n\n"📊 Haftalık Rapor - Genel" sayfasına bakın.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
   } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
+    console.error('❌ Haftalık rapor hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Rapor oluşturma hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
+/**
+ * 📊 YENİ RAPOR SİSTEMİ - Aylık (Genel)
+ * Tüm temsilcileri kıyaslayan aylık performans raporu
+ */
 function generateReportsGeneralMonthly() {
-  console.log('Function started:', { scope: 'all', period: 'monthly' });
+  console.log('📊 Yeni Aylık Rapor (Genel) başlatıldı');
   try {
-    if (typeof generateMonthlyReportManager === 'function') {
-      return generateMonthlyReportManager({ scope: 'all' });
-    }
-    SpreadsheetApp.getUi().alert('Bilgi', 'Aylık (Genel) rapor jeneratörü sonraki sürümde.', SpreadsheetApp.getUi().ButtonSet.OK);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const today = new Date();
+    
+    // Bu ay
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const monthLabel = `${getTurkishMonthName(today.getMonth())} ${today.getFullYear()}`;
+    
+    // Tüm temsilciler için veri topla
+    const employeeCodes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    const reportData = collectMonthlyReportData(employeeCodes, monthStart, monthEnd);
+    
+    // Rapor sayfası oluştur
+    createMonthlyReportSheet(ss, reportData, monthLabel, monthStart, monthEnd, 'all');
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Rapor Oluşturuldu',
+      `📊 Aylık performans raporu hazır!\n\n${monthLabel}\n\n"📊 Aylık Rapor - Genel" sayfasına bakın.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
   } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
+    console.error('❌ Aylık rapor hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Rapor oluşturma hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
+/**
+ * 📊 YENİ RAPOR SİSTEMİ - Günlük (Seçili Temsilci)
+ */
 function generateReportsForEmployeeDailyPrompt() {
-  console.log('Function started:', { scope: 'employee', period: 'daily' });
+  console.log('📊 Yeni Günlük Rapor (Seçili Temsilci) başlatıldı');
   try {
     const code = promptEmployeeCodeForReports();
     if (!code) return;
-    if (typeof generateDailyReportManager === 'function') {
-      return generateDailyReportManager({ scope: 'employee', employeeCode: code });
-    }
-    SpreadsheetApp.getUi().alert('Bilgi', `Günlük rapor ( ${code} ) jeneratörü sonraki sürümde.`, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    
+    const reportData = collectDailyReportData([code], todayStart, todayEnd);
+    createDailyReportSheet(ss, reportData, formatDate(today), todayStart, todayEnd, 'employee', code);
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Rapor Oluşturuldu',
+      `📊 ${code} - Günlük performans raporu hazır!\n\n"📊 Günlük Rapor - ${code}" sayfasına bakın.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
   } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
+    console.error('❌ Günlük rapor hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Rapor oluşturma hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
+/**
+ * 📊 YENİ RAPOR SİSTEMİ - Haftalık (Seçili Temsilci)
+ */
 function generateReportsForEmployeeWeeklyPrompt() {
-  console.log('Function started:', { scope: 'employee', period: 'weekly' });
+  console.log('📊 Yeni Haftalık Rapor (Seçili Temsilci) başlatıldı');
   try {
     const code = promptEmployeeCodeForReports();
     if (!code) return;
-    if (typeof generateWeeklyReportManager === 'function') {
-      return generateWeeklyReportManager({ scope: 'employee', employeeCode: code });
-    }
-    SpreadsheetApp.getUi().alert('Bilgi', `Haftalık rapor ( ${code} ) jeneratörü sonraki sürümde.`, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const today = new Date();
+    const weekStart = getWeekStart(today);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    const weekNumber = getWeekNumber(weekStart);
+    const weekLabel = `Hafta ${weekNumber} (${formatDate(weekStart)} - ${formatDate(weekEnd)})`;
+    
+    const reportData = collectWeeklyReportData([code], weekStart, weekEnd);
+    createWeeklyReportSheet(ss, reportData, weekLabel, weekStart, weekEnd, 'employee', code);
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Rapor Oluşturuldu',
+      `📊 ${code} - Haftalık performans raporu hazır!\n\n${weekLabel}\n\n"📊 Haftalık Rapor - ${code}" sayfasına bakın.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
   } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
+    console.error('❌ Haftalık rapor hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Rapor oluşturma hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
+/**
+ * 📊 YENİ RAPOR SİSTEMİ - Aylık (Seçili Temsilci)
+ */
 function generateReportsForEmployeeMonthlyPrompt() {
-  console.log('Function started:', { scope: 'employee', period: 'monthly' });
+  console.log('📊 Yeni Aylık Rapor (Seçili Temsilci) başlatıldı');
   try {
     const code = promptEmployeeCodeForReports();
     if (!code) return;
-    if (typeof generateMonthlyReportManager === 'function') {
-      return generateMonthlyReportManager({ scope: 'employee', employeeCode: code });
-    }
-    SpreadsheetApp.getUi().alert('Bilgi', `Aylık rapor ( ${code} ) jeneratörü sonraki sürümde.`, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const monthLabel = `${getTurkishMonthName(today.getMonth())} ${today.getFullYear()}`;
+    
+    const reportData = collectMonthlyReportData([code], monthStart, monthEnd);
+    createMonthlyReportSheet(ss, reportData, monthLabel, monthStart, monthEnd, 'employee', code);
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Rapor Oluşturuldu',
+      `📊 ${code} - Aylık performans raporu hazır!\n\n${monthLabel}\n\n"📊 Aylık Rapor - ${code}" sayfasına bakın.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
   } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
+    console.error('❌ Aylık rapor hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Rapor oluşturma hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
@@ -4605,33 +4548,6 @@ function updateManagerSheetIsolated(managerFile, baseSheetName, data, employeeCo
  
     console.log('Processing complete:', { isolatedName: sheet.getName(), sameCount, updateCount, newCount });
     return { success: true, sheet: sheet.getName(), sameCount, updateCount, newCount };
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
-  }
-}
-
-// Bu izole fonksiyonları kaldırıldı - kullanılmıyor
-
-function moveSelectedRandevuToMeeting() {
-  console.log('Function started:', {});
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getActiveSheet();
-    const nameLower = String(sheet && sheet.getName ? sheet.getName() : '').toLowerCase();
-    if (!sheet || !nameLower.includes('randevu')) {
-      SpreadsheetApp.getUi().alert('Bilgi', 'Lütfen Randevular veya T Randevular sayfasında bir satır seçin.', SpreadsheetApp.getUi().ButtonSet.OK);
-      return;
-    }
-    const range = sheet.getActiveRange();
-    if (!range || range.getNumRows() !== 1 || range.getRow() <= 1) {
-      SpreadsheetApp.getUi().alert('Bilgi', 'Lütfen başlık dışında tek bir veri satırı seçin.', SpreadsheetApp.getUi().ButtonSet.OK);
-      return;
-    }
-    const rowIndex = range.getRow();
-    copyRandevuRowToToplantilar(sheet, rowIndex, { navigateToMeetings: true });
-    console.log('Processing complete:', { rowIndex });
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
@@ -4930,6 +4846,98 @@ function copyRandevuRowToToplantilar(randevularSheet, rowIndex, options) {
   }
 }
 
+/**
+* 🎨 Tüm sayfayı renklendirme fonksiyonu
+* @param {string} sheetName - Renklendirmek istenen sayfa adı
+*/
+function applyColorCodingToEntireSheet(sheetName) {
+try {
+  console.log("🎨 applyColorCodingToEntireSheet başlatıldı:", { sheetName });
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet;
+  
+  if (sheetName) {
+    sheet = ss.getSheetByName(sheetName);
+  } else {
+    sheet = ss.getActiveSheet();
+    sheetName = sheet.getName();
+  }
+  
+  if (!sheet) {
+    console.error("🎨 Sayfa bulunamadı:", sheetName);
+    SpreadsheetApp.getUi().alert("Hata", "Belirtilen sayfa bulunamadı: " + sheetName, SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    console.log("🎨 Sayfada veri yok:", sheetName);
+    SpreadsheetApp.getUi().alert("Bilgi", "Sayfada renklendirilebilecek veri bulunamadı.", SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+  
+  // Tüm satırları renklendirme
+  applyColorCodingToManagerData(sheet, sheetName, 2, lastRow - 1);
+  
+  // Ay sütununu güncelleme
+  const sheetNameLower = sheetName.toLowerCase();
+  if (sheetNameLower.includes("randevu")) {
+    setMonthArrayFormulaIfAbsent(sheet, ["Randevu Tarihi", "Tarih"]);
+  } else if (sheetNameLower.includes("toplant")) {
+    setMonthArrayFormulaIfAbsent(sheet, ["Toplantı Tarihi", "Tarih"]);
+  } else if (sheetNameLower.includes("fırsat") || sheetNameLower.includes("firsat")) {
+    setMonthArrayFormulaIfAbsent(sheet, ["Fırsat Tarihi", "Tarih"]);
+  }
+  
+  // Saat formatını düzeltme
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const saatIdx = headers.indexOf("Saat");
+  
+  if (saatIdx !== -1 && lastRow > 1) {
+    const saatColumn = sheet.getRange(2, saatIdx + 1, lastRow - 1, 1);
+    const saatValues = saatColumn.getValues();
+    const formattedValues = [];
+    
+    for (let i = 0; i < saatValues.length; i++) {
+      const value = saatValues[i][0];
+      formattedValues.push([formatTimeValue(value)]);
+    }
+    
+    saatColumn.setValues(formattedValues);
+    console.log("🎨 Saat formatları düzeltildi:", { count: formattedValues.length });
+  }
+  
+  console.log("🎨 Tüm sayfa renklendirme tamamlandı:", { sheetName, rows: lastRow - 1 });
+  SpreadsheetApp.getUi().alert("✅ Tamamlandı", `${sheetName} sayfasındaki ${lastRow - 1} satır renklendirildi, ay değerleri ve saat formatları güncellendi.`, SpreadsheetApp.getUi().ButtonSet.OK);
+  
+} catch (error) {
+  console.error("🎨 applyColorCodingToEntireSheet hatası:", error);
+  SpreadsheetApp.getUi().alert("Hata", "Renklendirme sırasında bir hata oluştu: " + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+}
+
+/**
+* 🎨 T Randevular sayfasını renklendir
+*/
+function recolorTRandevularOnly() {
+applyColorCodingToEntireSheet("T Randevular");
+}
+
+/**
+* 🎨 T Fırsatlar sayfasını renklendir
+*/
+function recolorTFirsatlarOnly() {
+applyColorCodingToEntireSheet("T Fırsatlar");
+}
+
+/**
+* 🎨 T Toplantılar sayfasını renklendir
+*/
+function recolorTToplantilarOnly() {
+applyColorCodingToEntireSheet("T Toplantılar");
+}
+
 function onEdit(e) {
   console.log('Function started:', { range: e && e.range ? e.range.getA1Notation() : null });
   try {
@@ -5078,22 +5086,46 @@ function ensureToplantilarSchema(ss, sheetNameOverride) {
       return sheet;
     }
 
+    // YENİ FORMAT - sayfa_kolonlari.md ile TAM uyumlu
+    // NOT: Ay, Location, Rating count, Review sütunları kaldırıldı
     const requiredHeaders = [
-      'Kod', 'Kaynak', 'Keyword', 'Location', 'Company name', 'İsim Soyisim',
-      'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Toplantı Tarihi', 'Yeni Takip Tarihi', 'Toplantıyı Yapan',
-      'Category', 'Website', 'Phone', 'Yetkili Tel', 'Mail', 'Randevu durumu', 'Randevu Tarihi',
-      'Saat', 'Yorum', 'Yönetici Not',
-      'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi',
-      'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 'City',
-      'Rating count', 'Review'
+      'Kod', 'Company name', 'İsim Soyisim', 'Toplantıyı Yapan', 'Toplantı formatı',
+      'Toplantı Tarihi', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Yeni Takip Tarihi',
+      'Yorum', 'Yönetici Not', 'Kaynak', 'Keyword', 'Category', 'Phone', 'Yetkili Tel', 'Mail', 'Website',
+      'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi', 'Site Hızı', 'Site Trafiği', 'Log', 'Address', 'City', 'Maplink'
     ];
 
     const lastCol = sheet.getLastColumn();
     const currentHeaders = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
 
+    // Eski sütunları kaldır (Randevu durumu, Randevu Tarihi, Saat)
+    // Eski sütunları kaldır (Randevu durumu, Randevu Tarihi, Saat, Ay, Location, Rating count, Review)
+    const columnsToRemove = ['Randevu durumu', 'Randevu Tarihi', 'Saat', 'Ay', 'Location', 'Rating count', 'Review'];
+    let removedCount = 0;
+    
+    // Sağdan sola sil (index kaymasını önlemek için)
+    for (let i = currentHeaders.length - 1; i >= 0; i--) {
+      const header = String(currentHeaders[i] || '').trim();
+      if (columnsToRemove.includes(header)) {
+        const columnNumber = i + 1;
+        console.log(`🗑️ Eski sütun kaldırılıyor: ${header} (Sütun ${columnNumber})`);
+        
+        // Sütunu silmeden önce veriyi yedekle (isteğe bağlı - şu an sadece sütunu siliyoruz)
+        sheet.deleteColumn(columnNumber);
+        removedCount++;
+      }
+    }
+    
+    if (removedCount > 0) {
+      console.log(`✅ ${removedCount} eski sütun kaldırıldı`);
+    }
+    
+    // Şimdi mevcut header'ları tekrar al (silme sonrası)
+    const updatedHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+
     let appended = 0;
     for (const h of requiredHeaders) {
-      if (currentHeaders.indexOf(h) === -1) {
+      if (updatedHeaders.indexOf(h) === -1) {
         sheet.insertColumnAfter(sheet.getLastColumn() || 1);
         const newColIndex = sheet.getLastColumn();
         sheet.getRange(1, newColIndex).setValue(h);
@@ -5101,43 +5133,835 @@ function ensureToplantilarSchema(ss, sheetNameOverride) {
       }
     }
 
-    // Reorder: Move meeting fields right after 'İsim Soyisim' and ensure 'İsim Soyisim' follows 'Company name'
+    // Reorder: Yeni formata göre sütunları yeniden düzenle
+    // YENİ FORMAT: Kod, Company name, İsim Soyisim, Toplantıyı Yapan, Toplantı formatı, ...
     try {
-      const headersNow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-      const idxCompany = headersNow.indexOf('Company name');
-      const idxIsim = headersNow.indexOf('İsim Soyisim');
-      if (idxCompany !== -1 && idxIsim !== -1 && idxIsim !== idxCompany + 1) {
-        sheet.moveColumns(sheet.getRange(1, idxIsim + 1, sheet.getMaxRows(), 1), idxCompany + 2);
-      }
       const headersAfter = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-      const idxIsimNow = headersAfter.indexOf('İsim Soyisim');
-      const toMove = ['Toplantı Sonucu','Teklif Detayı','Satış Potansiyeli','Toplantı Tarihi','Yeni Takip Tarihi','Toplantıyı Yapan'];
-      if (idxIsimNow !== -1) {
-        let insertPos = idxIsimNow + 2; // after İsim Soyisim
-        for (const name of toMove) {
-          const curIdx = headersAfter.indexOf(name);
-          if (curIdx !== -1 && curIdx + 1 !== insertPos) {
-            sheet.moveColumns(sheet.getRange(1, curIdx + 1, sheet.getMaxRows(), 1), insertPos);
-            insertPos++;
-          } else if (curIdx !== -1) {
-            insertPos++;
+      const lastRow = sheet.getLastRow();
+      
+      // Tüm verileri oku (header hariç)
+      const allData = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues() : [];
+      
+      // Yeni sıraya göre verileri yeniden düzenle
+      const reorderedData = [];
+      for (let rowIdx = 0; rowIdx < allData.length; rowIdx++) {
+        const newRow = [];
+        for (const targetColumn of requiredHeaders) {
+          const colIndex = headersAfter.indexOf(targetColumn);
+          if (colIndex !== -1) {
+            newRow.push(allData[rowIdx][colIndex] || '');
+          } else {
+            newRow.push(''); // Yeni sütun için boş değer
           }
         }
+        reorderedData.push(newRow);
       }
+      
+      // Header'ları yeni sıraya göre yaz
+      sheet.getRange(1, 1, 1, requiredHeaders.length).setValues([requiredHeaders]);
+      
+      // Yeniden düzenlenmiş verileri yaz
+      if (reorderedData.length > 0) {
+        sheet.getRange(2, 1, reorderedData.length, requiredHeaders.length).setValues(reorderedData);
+      }
+      
+      console.log('✅ Toplantılar sayfası yeni formata göre yeniden düzenlendi');
     } catch (reorderErr) {
       console.log('⚠️ Reorder skipped:', reorderErr && reorderErr.message);
     }
 
-    if (appended > 0) {
+    // Her durumda validation'ları yenile (eski sütunlar kaldırıldı, yeni sütunlar eklendi)
       applyManagerSheetDataValidation(sheet, 'Toplantılar');
       optimizeColumnWidths(sheet, 'Toplantılar');
-      console.log('Toplantılar schema updated with missing headers:', appended);
+    
+    if (appended > 0 || removedCount > 0) {
+      console.log(`Toplantılar schema updated: ${appended} yeni sütun eklendi, ${removedCount} eski sütun kaldırıldı`);
     }
 
     return sheet;
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * Mevcut T Toplantılar sayfasını yeni kolon düzenine göre düzenle
+ * Temsilci dosyasındaki fixToplantilarimColumnOrder mantığıyla birebir aynı
+ */
+function fixTToplantilarColumnOrder() {
+  console.log('[START] fixTToplantilarColumnOrder');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('T Toplantılar');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'T Toplantılar sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    const ui = SpreadsheetApp.getUi();
+    
+    // Onay al
+    const confirm = ui.alert(
+      '⚠️ Uyarı',
+      'Bu işlem:\n' +
+      '• Keyword, Location, Category, CMS Adı, CMS Grubu, E-Ticaret İzi, Site Hızı, Site Trafiği, Log kolonlarını silecek\n' +
+      '• Kolonları yeni yapıya göre düzenleyecek\n' +
+      '• Verileri koruyarak taşıyacak\n' +
+      '• "Ay" kolonunu otomatik dolduracak\n' +
+      '• Toplantı formatı, Toplantı Sonucu, Satış Potansiyeli değerlerini normalize edecek\n\n' +
+      'Devam etmek istiyor musunuz?',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (confirm !== ui.Button.YES) {
+      return;
+    }
+    
+    // Yeni sütun sıralaması - YENİ DÜZEN (Manager'da Temsilci Kodu kullanılıyor)
+    const newColumns = [
+      'Temsilci Kodu', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+      'Website', 'Mail', 'Toplantı formatı', 'Toplantıyı Yapan', 'Toplantı Tarihi',
+      'Ay', 'Toplantı Sonucu', 'Teklif Detayı', 'Satış Potansiyeli', 'Yeni Takip Tarihi',
+      'Yorum', 'Yönetici Not', 'Address', 'Maplink'
+    ];
+    
+    // Mevcut verileri oku
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      ui.alert('ℹ️ Bilgi', 'T Toplantılar sayfasında düzenlenecek veri bulunamadı.', ui.ButtonSet.OK);
+      return;
+    }
+    
+    const allData = sheet.getDataRange().getValues();
+    const currentHeaders = allData[0];
+    const currentDataRows = allData.slice(1);
+    
+    console.log(`📊 Mevcut veri: ${currentDataRows.length} satır, ${currentHeaders.length} kolon`);
+    
+    // Tarih parse fonksiyonu
+    function parseDate(d) {
+      if (!d) return null;
+      if (d instanceof Date) return d;
+      if (typeof d === 'string') {
+        const parts = d.split('.');
+        if (parts.length === 3) {
+          return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        }
+        return new Date(d);
+      }
+      return new Date(d);
+    }
+    
+    // Normalize fonksiyonları
+    const normalizeMeetingFormat = (format) => {
+      if (!format || typeof format !== 'string') return format;
+      const formatLower = format.trim().toLowerCase();
+      
+      if (formatLower === 'yüz' || (formatLower.includes('yüze') === false && formatLower.startsWith('yüz'))) {
+        return 'Yüz Yüze';
+      }
+      if (formatLower === 'online' || formatLower === 'çevrimiçi') {
+        return 'Online';
+      }
+      if (formatLower === 'telefon' || formatLower === 'phone') {
+        return 'Telefon';
+      }
+      
+      const validFormats = ['Yüz Yüze', 'Online', 'Telefon'];
+      for (const validFormat of validFormats) {
+        if (formatLower === validFormat.toLowerCase()) {
+          return validFormat;
+        }
+      }
+      
+      return format;
+    };
+    
+    const normalizeToplantiSonucu = (sonuc) => {
+      if (!sonuc || typeof sonuc !== 'string') return sonuc;
+      const sonucLower = sonuc.trim().toLowerCase();
+      
+      if (sonucLower === 'teklif' || sonucLower === 'teklif verildi' || sonucLower === 'teklif gönderildi') {
+        return 'Teklif iletildi';
+      }
+      if (sonucLower === 'satış' || sonucLower === 'satış yapıldı' || sonucLower === 'satış gerçekleşti') {
+        return 'Satış Yapıldı';
+      }
+      if (sonucLower === 'beklemede' || sonucLower === 'bekliyor') {
+        return 'Beklemede';
+      }
+      if (sonucLower === 'iptal' || sonucLower === 'satış iptal') {
+        return 'Satış İptal';
+      }
+      
+      const validOptions = ['Satış Yapıldı', 'Teklif iletildi', 'Beklemede', 'Satış İptal'];
+      for (const validOption of validOptions) {
+        if (sonucLower === validOption.toLowerCase()) {
+          return validOption;
+        }
+      }
+      
+      return sonuc;
+    };
+    
+    const normalizeSatisPotansiyeli = (potansiyel) => {
+      if (!potansiyel || typeof potansiyel !== 'string') return potansiyel;
+      const potansiyelLower = potansiyel.trim().toLowerCase();
+      
+      if (potansiyelLower === 'yerinde' || potansiyelLower === 'yerinde satış') {
+        return 'Yerinde Satış';
+      }
+      if (potansiyelLower === 'sıcak' || potansiyelLower === 'sicak') {
+        return 'Sıcak';
+      }
+      if (potansiyelLower === 'orta') {
+        return 'Orta';
+      }
+      if (potansiyelLower === 'soğuk' || potansiyelLower === 'soguk') {
+        return 'Soğuk';
+      }
+      
+      const validOptions = ['Yerinde Satış', 'Sıcak', 'Orta', 'Soğuk'];
+      for (const validOption of validOptions) {
+        if (potansiyelLower === validOption.toLowerCase()) {
+          return validOption;
+        }
+      }
+      
+      return potansiyel;
+    };
+    
+    // Yeni veri array'ini oluştur
+    const newDataRows = [];
+    const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    
+    // Toplantı Tarihi kolon indexini bul
+    const toplantiTarihiIndex = currentHeaders.indexOf('Toplantı Tarihi');
+    
+    for (let rowIdx = 0; rowIdx < currentDataRows.length; rowIdx++) {
+      const oldRow = currentDataRows[rowIdx];
+      const newRow = new Array(newColumns.length).fill('');
+      
+      // Mevcut verileri yeni sıraya göre taşı
+      for (let oldColIdx = 0; oldColIdx < oldRow.length; oldColIdx++) {
+        const oldColName = String(currentHeaders[oldColIdx] || '').trim();
+        
+        // Silinecek kolonları atla
+        const columnsToRemove = ['Keyword', 'Location', 'Category', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi', 
+                                  'Site Hızı', 'Site Trafiği', 'Log', 'Review', 'City', 'Rating count',
+                                  'Randevu durumu', 'Randevu Tarihi', 'Saat'];
+        if (columnsToRemove.includes(oldColName)) {
+          continue;
+        }
+        
+        // Temsilci Kodu veya Kod mapping
+        let targetColName = oldColName;
+        if (oldColName === 'Kod') {
+          targetColName = 'Temsilci Kodu';
+        }
+        
+        // Yeni kolon index'ini bul
+        const newColIndex = newColumns.indexOf(targetColName);
+        if (newColIndex !== -1) {
+          newRow[newColIndex] = oldRow[oldColIdx];
+        }
+      }
+      
+      // Toplantı formatı değerini normalize et
+      const toplantiFormatiColIndex = newColumns.indexOf('Toplantı formatı');
+      if (toplantiFormatiColIndex !== -1 && newRow[toplantiFormatiColIndex]) {
+        const originalFormat = String(newRow[toplantiFormatiColIndex] || '').trim();
+        const normalizedFormat = normalizeMeetingFormat(originalFormat);
+        if (normalizedFormat !== originalFormat) {
+          console.log(`🔧 Satır ${rowIdx + 2}: Toplantı formatı "${originalFormat}" -> "${normalizedFormat}"`);
+          newRow[toplantiFormatiColIndex] = normalizedFormat;
+        }
+      }
+      
+      // Toplantı Sonucu değerini normalize et
+      const toplantiSonucuColIndex = newColumns.indexOf('Toplantı Sonucu');
+      if (toplantiSonucuColIndex !== -1 && newRow[toplantiSonucuColIndex]) {
+        const originalSonuc = String(newRow[toplantiSonucuColIndex] || '').trim();
+        const normalizedSonuc = normalizeToplantiSonucu(originalSonuc);
+        if (normalizedSonuc !== originalSonuc) {
+          console.log(`🔧 Satır ${rowIdx + 2}: Toplantı Sonucu "${originalSonuc}" -> "${normalizedSonuc}"`);
+          newRow[toplantiSonucuColIndex] = normalizedSonuc;
+        }
+      }
+      
+      // Satış Potansiyeli değerini normalize et
+      const satisPotansiyeliColIndex = newColumns.indexOf('Satış Potansiyeli');
+      if (satisPotansiyeliColIndex !== -1 && newRow[satisPotansiyeliColIndex]) {
+        const originalPotansiyel = String(newRow[satisPotansiyeliColIndex] || '').trim();
+        const normalizedPotansiyel = normalizeSatisPotansiyeli(originalPotansiyel);
+        if (normalizedPotansiyel !== originalPotansiyel) {
+          console.log(`🔧 Satır ${rowIdx + 2}: Satış Potansiyeli "${originalPotansiyel}" -> "${normalizedPotansiyel}"`);
+          newRow[satisPotansiyeliColIndex] = normalizedPotansiyel;
+        }
+      }
+      
+      // Ay kolonunu otomatik doldur (Toplantı Tarihi'ne göre)
+      const ayColIndex = newColumns.indexOf('Ay');
+      if (toplantiTarihiIndex !== -1 && ayColIndex !== -1) {
+        const tarihValue = oldRow[toplantiTarihiIndex];
+        const tarih = parseDate(tarihValue);
+        
+        if (tarih && !isNaN(tarih.getTime())) {
+          const ayAdi = monthNames[tarih.getMonth()];
+          newRow[ayColIndex] = ayAdi;
+          console.log(`📅 Satır ${rowIdx + 2}: Toplantı Tarihi="${tarihValue}" -> Ay="${ayAdi}"`);
+        }
+      }
+      
+      newDataRows.push(newRow);
+    }
+    
+    // Validation'ları temizle
+    const maxColBeforeClear = Math.max(sheet.getLastColumn() || 0, newColumns.length);
+    const maxRowBeforeClear = Math.max(sheet.getLastRow() || 0, newDataRows.length + 10);
+    
+    if (maxRowBeforeClear > 1 && maxColBeforeClear > 0) {
+      try {
+        const clearRange = sheet.getRange(1, 1, maxRowBeforeClear, maxColBeforeClear);
+        clearRange.clearDataValidations();
+        console.log('✅ Tüm validation kuralları temizlendi');
+      } catch (clearErr) {
+        console.error('⚠️ Validation temizleme hatası:', clearErr);
+      }
+    }
+    
+    // Tüm veriyi temizle
+    sheet.clear();
+    
+    // Yeni başlıkları yaz
+    sheet.getRange(1, 1, 1, newColumns.length).setValues([newColumns]);
+    
+    // Yeni verileri yaz
+    if (newDataRows.length > 0) {
+      const dataRange = sheet.getRange(2, 1, newDataRows.length, newColumns.length);
+      dataRange.setValues(newDataRows);
+      console.log(`✅ ${newDataRows.length} satır veri yazıldı`);
+    }
+    
+    // Temsilci Kodu kolonunu text formatında zorla
+    const kodColumnIndex = newColumns.indexOf('Temsilci Kodu') + 1;
+    if (kodColumnIndex > 0) {
+      sheet.getRange(2, kodColumnIndex, newDataRows.length, 1).setNumberFormat('@');
+    }
+    
+    // Validation'ları yeniden uygula
+    try {
+      applyManagerSheetDataValidation(sheet, 'Toplantılar');
+      console.log('✅ Validation kuralları yeniden uygulandı');
+    } catch (validationErr) {
+      console.error('⚠️ Validation uygulama hatası:', validationErr);
+    }
+    
+    // Flush to ensure all changes are applied
+    SpreadsheetApp.flush();
+    
+    let message = `T Toplantılar sayfası yeni yapıya göre düzenlendi!\n\n`;
+    message += `• Keyword, Location, Category, CMS Adı, CMS Grubu, E-Ticaret İzi, Site Hızı, Site Trafiği, Log kolonları silindi\n`;
+    message += `• ${newDataRows.length} satır veri taşındı\n`;
+    message += `• "Ay" kolonu otomatik dolduruldu\n`;
+    message += `• Toplantı formatı ve Toplantı Sonucu değerleri normalize edildi\n`;
+    
+    ui.alert('✅ Başarılı', message, ui.ButtonSet.OK);
+    
+    console.log('[RESULT] T Toplantılar kolon düzeni güncellendi');
+    
+  } catch (error) {
+    console.error('[ERROR] fixTToplantilarColumnOrder:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Sütun düzenleme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * Mevcut T Randevular sayfasını yeni kolon düzenine göre düzenle
+ */
+function fixTRandevularColumnOrder() {
+  console.log('[START] fixTRandevularColumnOrder');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('T Randevular');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'T Randevular sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    const ui = SpreadsheetApp.getUi();
+    
+    // Onay al
+    const confirm = ui.alert(
+      '⚠️ Uyarı',
+      'Bu işlem:\n' +
+      '• Keyword, Location, Category, CMS Adı, Log kolonlarını silecek\n' +
+      '• Kolonları yeni yapıya göre düzenleyecek\n' +
+      '• Verileri koruyarak taşıyacak\n' +
+      '• Ay başlığı satırlarını (📅 Aralık 2025 gibi) kaldırmayı deneyecek\n' +
+      '• "Ay" kolonunu otomatik dolduracak\n' +
+      '• "Saat" formatlarını düzeltecek\n\n' +
+      'Devam etmek istiyor musunuz?',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (confirm !== ui.Button.YES) {
+      return;
+    }
+    
+    console.log('📊 T Randevular kolon yapısı düzenleme başlıyor...');
+    
+    // Yeni kolon yapısı - YENİ DÜZEN (Manager'da Temsilci Kodu kullanılıyor)
+    const newColumns = [
+      'Temsilci Kodu', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+      'Website', 'Mail', 'Toplantı formatı', 'Randevu durumu', 'Randevu Tarihi',
+      'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
+    ];
+    
+    // Mevcut verileri oku
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow < 2) {
+      ui.alert('ℹ️ Bilgi', 'T Randevular sayfasında düzenlenecek veri bulunamadı.', ui.ButtonSet.OK);
+      return;
+    }
+    
+    const allData = sheet.getDataRange().getValues();
+    const oldHeaders = allData[0];
+    const oldDataRows = allData.slice(1);
+    
+    console.log(`📊 Mevcut veri: ${oldDataRows.length} satır, ${oldHeaders.length} kolon`);
+    
+    // Ay başlığı satırlarını bul ve kaldır
+    const monthHeaderRows = [];
+    
+    for (let i = 0; i < oldDataRows.length; i++) {
+      const firstCellValue = String(oldDataRows[i][0] || '').trim();
+      if (firstCellValue.includes('📅') || firstCellValue.match(/^(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)/i)) {
+        monthHeaderRows.push(i + 2); // +2 çünkü başlık satırı var ve index 0'dan başlıyor
+        console.log(`🗑️ Ay başlığı satırı bulundu: ${i + 2} - "${firstCellValue}"`);
+      }
+    }
+    
+    // Ay başlığı satırlarını sil (yüksekten düşüğe)
+    if (monthHeaderRows.length > 0) {
+      monthHeaderRows.sort((a, b) => b - a); // Yüksekten düşüğe
+      for (const rowNum of monthHeaderRows) {
+        try {
+          sheet.deleteRow(rowNum);
+          console.log(`🗑️ Ay başlığı satırı silindi: ${rowNum}`);
+        } catch (error) {
+          console.error(`❌ Satır ${rowNum} silinirken hata:`, error);
+        }
+      }
+    }
+    
+    // Güncel verileri tekrar oku (ay başlıkları silindikten sonra)
+    const updatedData = sheet.getDataRange().getValues();
+    const currentHeaders = updatedData[0];
+    const currentDataRows = updatedData.slice(1);
+    
+    console.log(`📊 Güncel veri: ${currentDataRows.length} satır`);
+    
+    // Tarih parse fonksiyonu
+    function parseDate(d) {
+      if (!d) return null;
+      if (d instanceof Date) return d;
+      if (typeof d === 'string') {
+        const parts = d.split('.');
+        if (parts.length === 3) {
+          return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        }
+        return new Date(d);
+      }
+      return new Date(d);
+    }
+    
+    // Yeni veri array'ini oluştur
+    const newDataRows = [];
+    const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    
+    // Randevu Tarihi kolon indexini bul
+    const randevuTarihiIndex = currentHeaders.indexOf('Randevu Tarihi');
+    
+    for (let rowIdx = 0; rowIdx < currentDataRows.length; rowIdx++) {
+      const oldRow = currentDataRows[rowIdx];
+      const newRow = new Array(newColumns.length).fill('');
+      
+      // Mevcut verileri yeni sıraya göre taşı
+      for (let oldColIdx = 0; oldColIdx < oldRow.length; oldColIdx++) {
+        const oldColName = String(currentHeaders[oldColIdx] || '').trim();
+        
+        // Silinecek kolonları atla
+        const columnsToRemove = ['Keyword', 'Location', 'Category', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi', 
+                                  'Site Hızı', 'Site Trafiği', 'Log', 'Review', 'City', 'Rating count',
+                                  'Toplantı Sonucu', 'Toplantı Tarihi'];
+        if (columnsToRemove.includes(oldColName)) {
+          continue;
+        }
+        
+        // Temsilci Kodu veya Kod mapping
+        let targetColName = oldColName;
+        if (oldColName === 'Kod') {
+          targetColName = 'Temsilci Kodu';
+        }
+        
+        // Yeni kolon index'ini bul
+        const newColIndex = newColumns.indexOf(targetColName);
+        if (newColIndex !== -1) {
+          newRow[newColIndex] = oldRow[oldColIdx];
+        }
+      }
+      
+      // Ay kolonunu otomatik doldur (Randevu Tarihi'ne göre)
+      const ayColIndex = newColumns.indexOf('Ay');
+      if (randevuTarihiIndex !== -1 && ayColIndex !== -1) {
+        const tarihValue = oldRow[randevuTarihiIndex];
+        const tarih = parseDate(tarihValue);
+        
+        if (tarih && !isNaN(tarih.getTime())) {
+          const ayAdi = monthNames[tarih.getMonth()];
+          newRow[ayColIndex] = ayAdi;
+          console.log(`📅 Satır ${rowIdx + 2}: Randevu Tarihi="${tarihValue}" -> Ay="${ayAdi}"`);
+        }
+      }
+      
+      // Saat kolonunu düzelt (format kontrolü)
+      const saatColIndex = newColumns.indexOf('Saat');
+      if (saatColIndex !== -1 && newRow[saatColIndex]) {
+        let saatValue = newRow[saatColIndex];
+        
+        // Date objesi ise, HH:mm formatına çevir
+        if (saatValue instanceof Date) {
+          const hours = saatValue.getHours().toString().padStart(2, '0');
+          const minutes = saatValue.getMinutes().toString().padStart(2, '0');
+          newRow[saatColIndex] = `${hours}:${minutes}`;
+        } else if (typeof saatValue === 'string' && saatValue.includes('.')) {
+          // Yanlış format (tarih gibi), temizle
+          console.warn(`⚠️ Satır ${rowIdx + 2}: Saat formatı yanlış: "${saatValue}", temizleniyor...`);
+          newRow[saatColIndex] = '';
+        } else if (typeof saatValue === 'string') {
+          // HH:mm formatında mı kontrol et
+          const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
+          if (timeMatch) {
+            const hours = timeMatch[1].padStart(2, '0');
+            const minutes = timeMatch[2].padStart(2, '0');
+            newRow[saatColIndex] = `${hours}:${minutes}`;
+          }
+        }
+      }
+      
+      newDataRows.push(newRow);
+    }
+    
+    // Validation'ları temizle
+    const maxColBeforeClear = Math.max(sheet.getLastColumn() || 0, newColumns.length);
+    const maxRowBeforeClear = Math.max(sheet.getLastRow() || 0, newDataRows.length + 10);
+    
+    if (maxRowBeforeClear > 1 && maxColBeforeClear > 0) {
+      try {
+        const clearRange = sheet.getRange(1, 1, maxRowBeforeClear, maxColBeforeClear);
+        clearRange.clearDataValidations();
+        console.log('✅ Tüm validation kuralları temizlendi');
+      } catch (clearErr) {
+        console.error('⚠️ Validation temizleme hatası:', clearErr);
+      }
+    }
+    
+    // Tüm veriyi temizle
+    sheet.clear();
+    
+    // Yeni başlıkları yaz
+    sheet.getRange(1, 1, 1, newColumns.length).setValues([newColumns]);
+    
+    // Yeni verileri yaz
+    if (newDataRows.length > 0) {
+      const dataRange = sheet.getRange(2, 1, newDataRows.length, newColumns.length);
+      dataRange.setValues(newDataRows);
+      console.log(`✅ ${newDataRows.length} satır veri yazıldı`);
+    }
+    
+    // Temsilci Kodu kolonunu text formatında zorla
+    const kodColumnIndex = newColumns.indexOf('Temsilci Kodu') + 1;
+    if (kodColumnIndex > 0) {
+      sheet.getRange(2, kodColumnIndex, newDataRows.length, 1).setNumberFormat('@');
+    }
+    
+    // Saat kolonunu text formatına zorla
+    const saatColumnIndex = newColumns.indexOf('Saat') + 1;
+    if (saatColumnIndex > 0 && newDataRows.length > 0) {
+      sheet.getRange(2, saatColumnIndex, newDataRows.length, 1).setNumberFormat('@');
+    }
+    
+    // Validation'ları yeniden uygula
+    try {
+      applyManagerSheetDataValidation(sheet, 'Randevular');
+      console.log('✅ Validation kuralları yeniden uygulandı');
+    } catch (validationErr) {
+      console.error('⚠️ Validation uygulama hatası:', validationErr);
+    }
+    
+    // Tüm satırlara renklendirme uygula
+    console.log('🎨 Tüm satırlara renklendirme uygulanıyor...');
+    let colorAppliedCount = 0;
+    
+    if (newDataRows.length > 0) {
+      for (let rowIdx = 0; rowIdx < newDataRows.length; rowIdx++) {
+        const rowNum = rowIdx + 2; // +2 çünkü header row=1, data starts at row=2
+        
+        try {
+          applyColorCodingToManagerData(sheet, 'Randevular', rowNum, 1);
+          colorAppliedCount++;
+        } catch (colorErr) {
+          console.error(`⚠️ Satır ${rowNum} renklendirme hatası:`, colorErr);
+        }
+      }
+    }
+    
+    console.log(`✅ ${colorAppliedCount} satır renklendirildi`);
+    
+    // Flush to ensure all changes are applied
+    SpreadsheetApp.flush();
+    
+    let message = `T Randevular sayfası yeni yapıya göre düzenlendi!\n\n`;
+    message += `• Keyword, Location, Category, CMS Adı, Log kolonları silindi\n`;
+    message += `• ${newDataRows.length} satır veri taşındı\n`;
+    message += `• "Ay" kolonu otomatik dolduruldu\n`;
+    message += `• ${colorAppliedCount} satır renklendirildi\n`;
+    
+    if (monthHeaderRows.length > 0) {
+      message += `• ${monthHeaderRows.length} ay başlığı satırı kaldırıldı\n`;
+    } else {
+      message += `• Ay başlığı satırı bulunamadı (zaten temiz veya manuel kaldırmanız gerekebilir)\n`;
+    }
+    
+    ui.alert('✅ Başarılı', message, ui.ButtonSet.OK);
+    
+    console.log('✅ T Randevular kolon yapısı düzenleme tamamlandı');
+    
+  } catch (error) {
+    console.error('❌ T Randevular kolon yapısı düzenleme hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Düzenleme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * Mevcut T Fırsatlar sayfasını yeni kolon düzenine göre düzenle
+ */
+function fixTFirsatlarColumnOrder() {
+  console.log('[START] fixTFirsatlarColumnOrder');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('T Fırsatlar');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'T Fırsatlar sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    const ui = SpreadsheetApp.getUi();
+    
+    // Onay al
+    const confirm = ui.alert(
+      '⚠️ Uyarı',
+      'Bu işlem:\n' +
+      '• Keyword, Location, Category, CMS Adı, CMS Grubu, E-Ticaret İzi, Site Hızı, Site Trafiği, Log, City, Rating count, Review kolonlarını silecek\n' +
+      '• Kolonları yeni yapıya göre düzenleyecek\n' +
+      '• Verileri koruyarak taşıyacak\n' +
+      '• "Ay" kolonunu otomatik dolduracak\n' +
+      '• "Saat" formatlarını düzeltecek\n\n' +
+      'Devam etmek istiyor musunuz?',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (confirm !== ui.Button.YES) {
+      return;
+    }
+    
+    console.log('📊 T Fırsatlar kolon yapısı düzenleme başlıyor...');
+    
+    // Yeni kolon yapısı - YENİ DÜZEN (Log Arşivi kullanıldığı için Log kolonu kaldırıldı)
+    const newColumns = [
+      'Temsilci Kodu', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+      'Website', 'Mail', 'Toplantı formatı', 'Fırsat Durumu', 'Fırsat Tarihi',
+      'Ay', 'Saat', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
+    ];
+    
+    // Mevcut verileri oku
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow < 2) {
+      ui.alert('ℹ️ Bilgi', 'T Fırsatlar sayfasında düzenlenecek veri bulunamadı.', ui.ButtonSet.OK);
+      return;
+    }
+    
+    const allData = sheet.getDataRange().getValues();
+    const currentHeaders = allData[0];
+    const currentDataRows = allData.slice(1);
+    
+    console.log(`📊 Mevcut veri: ${currentDataRows.length} satır, ${currentHeaders.length} kolon`);
+    
+    // Tarih parse fonksiyonu
+    function parseDate(d) {
+      if (!d) return null;
+      if (d instanceof Date) return d;
+      if (typeof d === 'string') {
+        const parts = d.split('.');
+        if (parts.length === 3) {
+          return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        }
+        return new Date(d);
+      }
+      return new Date(d);
+    }
+    
+    // Yeni veri array'ini oluştur
+    const newDataRows = [];
+    const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    
+    // Fırsat Tarihi kolon indexini bul (Temsilci Kodu veya Kod olabilir)
+    const firsatTarihiIndex = currentHeaders.indexOf('Fırsat Tarihi');
+    
+    for (let rowIdx = 0; rowIdx < currentDataRows.length; rowIdx++) {
+      const oldRow = currentDataRows[rowIdx];
+      const newRow = new Array(newColumns.length).fill('');
+      
+      // Mevcut verileri yeni sıraya göre taşı
+      for (let oldColIdx = 0; oldColIdx < oldRow.length; oldColIdx++) {
+        const oldColName = String(currentHeaders[oldColIdx] || '').trim();
+        
+        // Silinecek kolonları atla
+        const columnsToRemove = ['Keyword', 'Location', 'Category', 'CMS Adı', 'CMS Grubu', 'E-Ticaret İzi', 
+                                  'Site Hızı', 'Site Trafiği', 'Log', 'Review', 'City', 'Rating count'];
+        if (columnsToRemove.includes(oldColName)) {
+          continue;
+        }
+        
+        // Temsilci Kodu veya Kod mapping
+        let targetColName = oldColName;
+        if (oldColName === 'Kod') {
+          targetColName = 'Temsilci Kodu';
+        }
+        
+        // Yeni kolon index'ini bul
+        const newColIndex = newColumns.indexOf(targetColName);
+        if (newColIndex !== -1) {
+          newRow[newColIndex] = oldRow[oldColIdx];
+        }
+      }
+      
+      // Ay kolonunu otomatik doldur (Fırsat Tarihi'ne göre)
+      const ayColIndex = newColumns.indexOf('Ay');
+      if (firsatTarihiIndex !== -1 && ayColIndex !== -1) {
+        const tarihValue = oldRow[firsatTarihiIndex];
+        const tarih = parseDate(tarihValue);
+        
+        if (tarih && !isNaN(tarih.getTime())) {
+          const ayAdi = monthNames[tarih.getMonth()];
+          newRow[ayColIndex] = ayAdi;
+          console.log(`📅 Satır ${rowIdx + 2}: Fırsat Tarihi="${tarihValue}" -> Ay="${ayAdi}"`);
+        }
+      }
+      
+      // Saat kolonunu düzelt (format kontrolü)
+      const saatColIndex = newColumns.indexOf('Saat');
+      if (saatColIndex !== -1 && newRow[saatColIndex]) {
+        let saatValue = newRow[saatColIndex];
+        
+        // Date objesi ise, HH:mm formatına çevir
+        if (saatValue instanceof Date) {
+          const hours = saatValue.getHours().toString().padStart(2, '0');
+          const minutes = saatValue.getMinutes().toString().padStart(2, '0');
+          newRow[saatColIndex] = `${hours}:${minutes}`;
+        } else if (typeof saatValue === 'string' && saatValue.includes('.')) {
+          // Yanlış format (tarih gibi), temizle
+          console.warn(`⚠️ Satır ${rowIdx + 2}: Saat formatı yanlış: "${saatValue}", temizleniyor...`);
+          newRow[saatColIndex] = '';
+        } else if (typeof saatValue === 'string') {
+          // HH:mm formatında mı kontrol et
+          const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
+          if (timeMatch) {
+            const hours = timeMatch[1].padStart(2, '0');
+            const minutes = timeMatch[2].padStart(2, '0');
+            newRow[saatColIndex] = `${hours}:${minutes}`;
+          }
+        }
+      }
+      
+      newDataRows.push(newRow);
+    }
+    
+    // Validation'ları temizle
+    const maxColBeforeClear = Math.max(sheet.getLastColumn() || 0, newColumns.length);
+    const maxRowBeforeClear = Math.max(sheet.getLastRow() || 0, newDataRows.length + 10);
+    
+    if (maxRowBeforeClear > 1 && maxColBeforeClear > 0) {
+      try {
+        const clearRange = sheet.getRange(1, 1, maxRowBeforeClear, maxColBeforeClear);
+        clearRange.clearDataValidations();
+        console.log('✅ Tüm validation kuralları temizlendi');
+      } catch (clearErr) {
+        console.error('⚠️ Validation temizleme hatası:', clearErr);
+      }
+    }
+    
+    // Tüm veriyi temizle
+    sheet.clear();
+    
+    // Yeni başlıkları yaz
+    sheet.getRange(1, 1, 1, newColumns.length).setValues([newColumns]);
+    
+    // Yeni verileri yaz
+    if (newDataRows.length > 0) {
+      const dataRange = sheet.getRange(2, 1, newDataRows.length, newColumns.length);
+      dataRange.setValues(newDataRows);
+      console.log(`✅ ${newDataRows.length} satır veri yazıldı`);
+    }
+    
+    // Temsilci Kodu kolonunu text formatında zorla
+    const kodColumnIndex = newColumns.indexOf('Temsilci Kodu') + 1;
+    if (kodColumnIndex > 0) {
+      sheet.getRange(2, kodColumnIndex, newDataRows.length, 1).setNumberFormat('@');
+    }
+    
+    // Saat kolonunu text formatına zorla
+    const saatColumnIndex = newColumns.indexOf('Saat') + 1;
+    if (saatColumnIndex > 0 && newDataRows.length > 0) {
+      sheet.getRange(2, saatColumnIndex, newDataRows.length, 1).setNumberFormat('@');
+    }
+    
+    // Validation'ları yeniden uygula
+    try {
+      applyManagerSheetDataValidation(sheet, 'Fırsatlar');
+      console.log('✅ Validation kuralları yeniden uygulandı');
+    } catch (validationErr) {
+      console.error('⚠️ Validation uygulama hatası:', validationErr);
+    }
+    
+    // Flush to ensure all changes are applied
+    SpreadsheetApp.flush();
+    
+    let message = `T Fırsatlar sayfası yeni yapıya göre düzenlendi!\n\n`;
+    message += `• Keyword, Location, Category, CMS Adı, CMS Grubu, E-Ticaret İzi, Site Hızı, Site Trafiği, Log, City, Rating count, Review kolonları silindi\n`;
+    message += `• ${newDataRows.length} satır veri taşındı\n`;
+    message += `• "Ay" kolonu otomatik dolduruldu\n`;
+    
+    ui.alert('✅ Başarılı', message, ui.ButtonSet.OK);
+    
+    console.log('✅ T Fırsatlar kolon yapısı düzenleme tamamlandı');
+    
+  } catch (error) {
+    console.error('❌ T Fırsatlar kolon yapısı düzenleme hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Düzenleme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
     throw error;
   }
 }
@@ -6047,6 +6871,117 @@ function updateManagerFullActivitySummaryWide(managerFile, rows, employeeCode, m
         const rng = sheet.getRange(2, 1, lastRow2 - 1, headers.length);
         const vals = rng.getValues();
         function parseDdMmYyyyLocal(s){ if (s instanceof Date && !isNaN(s.getTime())) return s; const v=String(s||'').trim(); const m=v.match(/(\d{2})\.(\d{2})\.(\d{4})/); if(m){ return new Date(Number(m[3]), Number(m[2])-1, Number(m[1])); } return new Date('2100-12-31'); }
+/**
+* 📅 Türkçe ay adını döndür
+* @param {number} month - Ay numarası (0-11)
+* @returns {string} - Türkçe ay adı
+*/
+function getTurkishMonthName(month) {
+const monthNames = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+];
+
+if (month >= 0 && month <= 11) {
+  return monthNames[month];
+}
+
+return '';
+}
+
+/**
+* 📅 Ay sütunu için ARRAYFORMULA veya doğrudan değer ataması yapar
+* @param {Sheet} sheet - Çalışma sayfası
+* @param {Array} dateHeaderCandidates - Tarih sütunu başlık adayları
+*/
+function setMonthArrayFormulaIfAbsent(sheet, dateHeaderCandidates) {
+try {
+  if (!sheet) return;
+  
+  console.log('📅 setMonthArrayFormulaIfAbsent başlatıldı:', { sheet: sheet.getName(), dateHeaderCandidates });
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const ayIdx = headers.indexOf('Ay');
+  
+  if (ayIdx === -1) {
+    console.log('📅 Ay sütunu bulunamadı');
+    return;
+  }
+  
+  // Tarih sütununu bul
+  let dateIdx = -1;
+  for (const candidate of dateHeaderCandidates) {
+    const idx = headers.indexOf(candidate);
+    if (idx !== -1) {
+      dateIdx = idx;
+      break;
+    }
+  }
+  
+  if (dateIdx === -1) {
+    console.log('📅 Tarih sütunu bulunamadı:', dateHeaderCandidates);
+    return;
+  }
+  
+  console.log('📅 Ay sütunu bulundu:', { ayIdx, dateIdx, dateHeader: headers[dateIdx] });
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+  
+  // Doğrudan değer atama yaklaşımı
+  const dateColumn = sheet.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  const ayValues = [];
+  
+  for (let i = 0; i < dateColumn.length; i++) {
+    const dateValue = dateColumn[i][0];
+    let monthName = '';
+    
+    if (dateValue) {
+      try {
+        let dateObj;
+        if (dateValue instanceof Date) {
+          dateObj = dateValue;
+        } else if (typeof dateValue === 'string') {
+          dateObj = parseDdMmYyyy(dateValue);
+        }
+        
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          monthName = getTurkishMonthName(dateObj.getMonth());
+        }
+      } catch (e) {
+        console.log('📅 Tarih dönüştürme hatası:', e);
+      }
+    }
+    
+    ayValues.push([monthName]);
+  }
+  
+  // Ay değerlerini yaz
+  if (ayValues.length > 0) {
+    sheet.getRange(2, ayIdx + 1, ayValues.length, 1).setValues(ayValues);
+    console.log('📅 Ay değerleri güncellendi:', { count: ayValues.length });
+  }
+  
+} catch (error) {
+  console.error('📅 setMonthArrayFormulaIfAbsent hatası:', error);
+}
+}
+
+/**
+* 📊 A1 formatında sütun harfini döndürür
+* @param {number} columnIndex - Sütun indeksi (0-tabanlı)
+* @returns {string} - Sütun harfi (A, B, C, ... AA, AB, ...)
+*/
+function columnToLetter(columnIndex) {
+let temp, letter = '';
+columnIndex++;
+while (columnIndex > 0) {
+  temp = (columnIndex - 1) % 26;
+  letter = String.fromCharCode(temp + 65) + letter;
+  columnIndex = (columnIndex - temp - 1) / 26;
+}
+return letter;
+}
         vals.sort(function(a,b){ const da=parseDdMmYyyyLocal(a[1]); const db=parseDdMmYyyyLocal(b[1]); if (da.getTime()!==db.getTime()) return da - db; const ca=String(a[0]||''); const cb=String(b[0]||''); return ca.localeCompare(cb); });
         rng.setValues(vals);
       }
@@ -6106,38 +7041,6 @@ function applySourcesToMainActivitySummary(managerFile, dataObj, employeeCode) {
     }
   } catch (error) {
     console.error('Function failed:', error);
-  }
-}
-
-function refreshActivitySummaryAll() {
-  console.log('Function started:', { action: 'refreshActivitySummaryAll' });
-  const ui = SpreadsheetApp.getUi();
-  const lock = LockService.getDocumentLock();
-  try {
-    if (!lock.tryLock(30000)) {
-      ui.alert('Meşgul', 'Önceki işlem bitmedi. Lütfen biraz sonra tekrar deneyin.', ui.ButtonSet.OK);
-      return { success: false, reason: 'locked' };
-    }
-    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
-    for (const code of codes) {
-      const employeeFile = findEmployeeFile(code);
-      const rows = collectFormatTableNegativeSummary(employeeFile, code);
-      updateManagerActivitySummary(managerFile, rows, code, 'replace');
-      try {
-        const withSrc = collectFormatTableNegativeSummaryWithSources(employeeFile, code);
-        applySourcesToMainActivitySummary(managerFile, withSrc, code);
-      } catch (_) {}
-    }
-    console.log('Processing complete:', { updatedEmployees: codes.length });
-    ui.alert('✅ Tamamlandı', 'T Aktivite Özet güncellendi', ui.ButtonSet.OK);
-    return { success: true, updated: codes.length };
-  } catch (error) {
-    console.error('Function failed:', error);
-    ui.alert('❌ Hata', String(error && error.message || error), ui.ButtonSet.OK);
-    throw error;
-  } finally {
-    try { lock.releaseLock(); } catch (e) {}
   }
 }
 
@@ -6264,6 +7167,117 @@ function generateWeeklyReportManager(options) {
     }
 
     function parseDdMmYyyy(str) {
+/**
+* 📅 Türkçe ay adını döndür
+* @param {number} month - Ay numarası (0-11)
+* @returns {string} - Türkçe ay adı
+*/
+function getTurkishMonthName(month) {
+const monthNames = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+];
+
+if (month >= 0 && month <= 11) {
+  return monthNames[month];
+}
+
+return '';
+}
+
+/**
+* 📅 Ay sütunu için ARRAYFORMULA veya doğrudan değer ataması yapar
+* @param {Sheet} sheet - Çalışma sayfası
+* @param {Array} dateHeaderCandidates - Tarih sütunu başlık adayları
+*/
+function setMonthArrayFormulaIfAbsent(sheet, dateHeaderCandidates) {
+try {
+  if (!sheet) return;
+  
+  console.log('📅 setMonthArrayFormulaIfAbsent başlatıldı:', { sheet: sheet.getName(), dateHeaderCandidates });
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const ayIdx = headers.indexOf('Ay');
+  
+  if (ayIdx === -1) {
+    console.log('📅 Ay sütunu bulunamadı');
+    return;
+  }
+  
+  // Tarih sütununu bul
+  let dateIdx = -1;
+  for (const candidate of dateHeaderCandidates) {
+    const idx = headers.indexOf(candidate);
+    if (idx !== -1) {
+      dateIdx = idx;
+      break;
+    }
+  }
+  
+  if (dateIdx === -1) {
+    console.log('📅 Tarih sütunu bulunamadı:', dateHeaderCandidates);
+    return;
+  }
+  
+  console.log('📅 Ay sütunu bulundu:', { ayIdx, dateIdx, dateHeader: headers[dateIdx] });
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+  
+  // Doğrudan değer atama yaklaşımı
+  const dateColumn = sheet.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  const ayValues = [];
+  
+  for (let i = 0; i < dateColumn.length; i++) {
+    const dateValue = dateColumn[i][0];
+    let monthName = '';
+    
+    if (dateValue) {
+      try {
+        let dateObj;
+        if (dateValue instanceof Date) {
+          dateObj = dateValue;
+        } else if (typeof dateValue === 'string') {
+          dateObj = parseDdMmYyyy(dateValue);
+        }
+        
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          monthName = getTurkishMonthName(dateObj.getMonth());
+        }
+      } catch (e) {
+        console.log('📅 Tarih dönüştürme hatası:', e);
+      }
+    }
+    
+    ayValues.push([monthName]);
+  }
+  
+  // Ay değerlerini yaz
+  if (ayValues.length > 0) {
+    sheet.getRange(2, ayIdx + 1, ayValues.length, 1).setValues(ayValues);
+    console.log('📅 Ay değerleri güncellendi:', { count: ayValues.length });
+  }
+  
+} catch (error) {
+  console.error('📅 setMonthArrayFormulaIfAbsent hatası:', error);
+}
+}
+
+/**
+* 📊 A1 formatında sütun harfini döndürür
+* @param {number} columnIndex - Sütun indeksi (0-tabanlı)
+* @returns {string} - Sütun harfi (A, B, C, ... AA, AB, ...)
+*/
+function columnToLetter(columnIndex) {
+let temp, letter = '';
+columnIndex++;
+while (columnIndex > 0) {
+  temp = (columnIndex - 1) % 26;
+  letter = String.fromCharCode(temp + 65) + letter;
+  columnIndex = (columnIndex - temp - 1) / 26;
+}
+return letter;
+}
       const s = String(str || '').trim();
       if (!/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return null;
       const [dd, mm, yyyy] = s.split('.');
@@ -6515,9 +7529,7 @@ function addReportsComparisonMenu(menu) {
   sub.addItem('Günlük', 'openEmployeeMultiSelectReportDaily')
      .addItem('Günlük Seri', 'openEmployeeMultiSelectReportDailySeries')
      .addItem('Haftalık', 'openEmployeeMultiSelectReportWeekly')
-     .addItem('Haftalık Seri', 'generateWeeklyReportSeriesManager')
      .addItem('Haftalık Seri (Karşılaştırma)', 'openEmployeeMultiSelectReportWeeklySeries')
-     .addItem('Pivot Tabanı (Güncel)', 'generatePivotBaseReportManager')
      .addItem('Aylık', 'openEmployeeMultiSelectReportMonthly');
   menu.addSubMenu(sub);
 }
@@ -6661,17 +7673,21 @@ function generateComparisonWeeklySeriesManager(params) {
     const weeks = [];
     const today = new Date();
     
+    // Son 8 hafta (Pazartesi-Pazar mantığı ile)
     for (let i = 7; i >= 0; i--) { // 7'den 0'a doğru (eskiden yeniye)
-      const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - (today.getDay() + 7 * i));
-      weekStart.setHours(0, 0, 0, 0);
+      const weekDate = new Date(today);
+      weekDate.setDate(today.getDate() - (7 * i)); // i hafta öncesi
       
+      // Pazartesi'yi bul
+      const weekStart = getWeekStart(weekDate);
+      
+      // Pazar = Pazartesi + 6 gün
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
       
       // Yılın kaçıncı haftası olduğunu hesapla
-      const weekNumber = Math.ceil((weekStart.getTime() - new Date(weekStart.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+      const weekNumber = getWeekNumberForReport(weekStart);
       
       weeks.push({
         start: weekStart,
@@ -6845,6 +7861,117 @@ function countActivitiesForPeriod(employeeCode, startDate, endDate) {
     }
 
     function parseDdMmYyyy(dateStr) {
+/**
+* 📅 Türkçe ay adını döndür
+* @param {number} month - Ay numarası (0-11)
+* @returns {string} - Türkçe ay adı
+*/
+function getTurkishMonthName(month) {
+const monthNames = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+];
+
+if (month >= 0 && month <= 11) {
+  return monthNames[month];
+}
+
+return '';
+}
+
+/**
+* 📅 Ay sütunu için ARRAYFORMULA veya doğrudan değer ataması yapar
+* @param {Sheet} sheet - Çalışma sayfası
+* @param {Array} dateHeaderCandidates - Tarih sütunu başlık adayları
+*/
+function setMonthArrayFormulaIfAbsent(sheet, dateHeaderCandidates) {
+try {
+  if (!sheet) return;
+  
+  console.log('📅 setMonthArrayFormulaIfAbsent başlatıldı:', { sheet: sheet.getName(), dateHeaderCandidates });
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const ayIdx = headers.indexOf('Ay');
+  
+  if (ayIdx === -1) {
+    console.log('📅 Ay sütunu bulunamadı');
+    return;
+  }
+  
+  // Tarih sütununu bul
+  let dateIdx = -1;
+  for (const candidate of dateHeaderCandidates) {
+    const idx = headers.indexOf(candidate);
+    if (idx !== -1) {
+      dateIdx = idx;
+      break;
+    }
+  }
+  
+  if (dateIdx === -1) {
+    console.log('📅 Tarih sütunu bulunamadı:', dateHeaderCandidates);
+    return;
+  }
+  
+  console.log('📅 Ay sütunu bulundu:', { ayIdx, dateIdx, dateHeader: headers[dateIdx] });
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+  
+  // Doğrudan değer atama yaklaşımı
+  const dateColumn = sheet.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  const ayValues = [];
+  
+  for (let i = 0; i < dateColumn.length; i++) {
+    const dateValue = dateColumn[i][0];
+    let monthName = '';
+    
+    if (dateValue) {
+      try {
+        let dateObj;
+        if (dateValue instanceof Date) {
+          dateObj = dateValue;
+        } else if (typeof dateValue === 'string') {
+          dateObj = parseDdMmYyyy(dateValue);
+        }
+        
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          monthName = getTurkishMonthName(dateObj.getMonth());
+        }
+      } catch (e) {
+        console.log('📅 Tarih dönüştürme hatası:', e);
+      }
+    }
+    
+    ayValues.push([monthName]);
+  }
+  
+  // Ay değerlerini yaz
+  if (ayValues.length > 0) {
+    sheet.getRange(2, ayIdx + 1, ayValues.length, 1).setValues(ayValues);
+    console.log('📅 Ay değerleri güncellendi:', { count: ayValues.length });
+  }
+  
+} catch (error) {
+  console.error('📅 setMonthArrayFormulaIfAbsent hatası:', error);
+}
+}
+
+/**
+* 📊 A1 formatında sütun harfini döndürür
+* @param {number} columnIndex - Sütun indeksi (0-tabanlı)
+* @returns {string} - Sütun harfi (A, B, C, ... AA, AB, ...)
+*/
+function columnToLetter(columnIndex) {
+let temp, letter = '';
+columnIndex++;
+while (columnIndex > 0) {
+  temp = (columnIndex - 1) % 26;
+  letter = String.fromCharCode(temp + 65) + letter;
+  columnIndex = (columnIndex - temp - 1) / 26;
+}
+return letter;
+}
       if (!dateStr) return null;
       const m = String(dateStr).match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
       if (m) {
@@ -7306,6 +8433,117 @@ function generateComparisonSeriesManager(params) {
       return Utilities.formatDate(dateObj, Session.getScriptTimeZone(), 'dd.MM.yyyy');
     }
     function parseDdMmYyyy(str) {
+/**
+* 📅 Türkçe ay adını döndür
+* @param {number} month - Ay numarası (0-11)
+* @returns {string} - Türkçe ay adı
+*/
+function getTurkishMonthName(month) {
+const monthNames = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+];
+
+if (month >= 0 && month <= 11) {
+  return monthNames[month];
+}
+
+return '';
+}
+
+/**
+* 📅 Ay sütunu için ARRAYFORMULA veya doğrudan değer ataması yapar
+* @param {Sheet} sheet - Çalışma sayfası
+* @param {Array} dateHeaderCandidates - Tarih sütunu başlık adayları
+*/
+function setMonthArrayFormulaIfAbsent(sheet, dateHeaderCandidates) {
+try {
+  if (!sheet) return;
+  
+  console.log('📅 setMonthArrayFormulaIfAbsent başlatıldı:', { sheet: sheet.getName(), dateHeaderCandidates });
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const ayIdx = headers.indexOf('Ay');
+  
+  if (ayIdx === -1) {
+    console.log('📅 Ay sütunu bulunamadı');
+    return;
+  }
+  
+  // Tarih sütununu bul
+  let dateIdx = -1;
+  for (const candidate of dateHeaderCandidates) {
+    const idx = headers.indexOf(candidate);
+    if (idx !== -1) {
+      dateIdx = idx;
+      break;
+    }
+  }
+  
+  if (dateIdx === -1) {
+    console.log('📅 Tarih sütunu bulunamadı:', dateHeaderCandidates);
+    return;
+  }
+  
+  console.log('📅 Ay sütunu bulundu:', { ayIdx, dateIdx, dateHeader: headers[dateIdx] });
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+  
+  // Doğrudan değer atama yaklaşımı
+  const dateColumn = sheet.getRange(2, dateIdx + 1, lastRow - 1, 1).getValues();
+  const ayValues = [];
+  
+  for (let i = 0; i < dateColumn.length; i++) {
+    const dateValue = dateColumn[i][0];
+    let monthName = '';
+    
+    if (dateValue) {
+      try {
+        let dateObj;
+        if (dateValue instanceof Date) {
+          dateObj = dateValue;
+        } else if (typeof dateValue === 'string') {
+          dateObj = parseDdMmYyyy(dateValue);
+        }
+        
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          monthName = getTurkishMonthName(dateObj.getMonth());
+        }
+      } catch (e) {
+        console.log('📅 Tarih dönüştürme hatası:', e);
+      }
+    }
+    
+    ayValues.push([monthName]);
+  }
+  
+  // Ay değerlerini yaz
+  if (ayValues.length > 0) {
+    sheet.getRange(2, ayIdx + 1, ayValues.length, 1).setValues(ayValues);
+    console.log('📅 Ay değerleri güncellendi:', { count: ayValues.length });
+  }
+  
+} catch (error) {
+  console.error('📅 setMonthArrayFormulaIfAbsent hatası:', error);
+}
+}
+
+/**
+* 📊 A1 formatında sütun harfini döndürür
+* @param {number} columnIndex - Sütun indeksi (0-tabanlı)
+* @returns {string} - Sütun harfi (A, B, C, ... AA, AB, ...)
+*/
+function columnToLetter(columnIndex) {
+let temp, letter = '';
+columnIndex++;
+while (columnIndex > 0) {
+  temp = (columnIndex - 1) % 26;
+  letter = String.fromCharCode(temp + 65) + letter;
+  columnIndex = (columnIndex - temp - 1) / 26;
+}
+return letter;
+}
       const s = String(str || '').trim();
       if (!/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return null;
       const [dd, mm, yy] = s.split('.');
@@ -7633,94 +8871,6 @@ function generateComparisonSeriesManager(params) {
   }
 }
 
-function generateWeeklyReportSeriesManager(options) {
-  console.log('Function started:', options || {});
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const weeksBack = (options && options.weeks) ? Math.max(1, Math.min(26, Number(options.weeks))) : 8; // default last 8 weeks
-
-    function toKey(d){ return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd.MM.yyyy'); }
-    function startOfWeek(d){ const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const day=dt.getDay(); const diff=(day===0?-6:1-day); dt.setDate(dt.getDate()+diff); dt.setHours(0,0,0,0); return dt; }
-    function endOfWeek(d){ const s=startOfWeek(d); const e=new Date(s); e.setDate(s.getDate()+6); e.setHours(23,59,59,999); return e; }
-    function withinRange(value,a,b){ try{ if(!value) return false; const d=value instanceof Date? value: new Date(String(value)); if(isNaN(d.getTime())) return false; return d>=a && d<=b; }catch(e){return false;} }
-    function extractDateFromLog(logValue){ const s=String(logValue||''); const m=s.match(/(\d{2}\.\d{2}\.\d{4})/); if(m&&m[1]){ const [dd,mm,yy]=m[1].split('.'); const d=new Date(Number(yy),Number(mm)-1,Number(dd)); if(!isNaN(d.getTime())) return d; } return null; }
-    function getActivityDate(headers,row,mainHeader){ const iH=headers.indexOf(mainHeader); if(iH!==-1 && row[iH]) return row[iH]; const iL=headers.indexOf('Log'); if(iL!==-1){ const d=extractDateFromLog(row[iL]); if(d) return d; } return ''; }
-
-    // Prepare target sheet
-    const sheetName = 'Haftalık Seri';
-    let sh = ss.getSheetByName(sheetName); if (!sh) sh = ss.insertSheet(sheetName); else sh.clear();
-    const header = ['Hafta','Randevu Alındı','İleri Tarih Randevu','Yeniden Aranacak','Bilgi Verildi','Fırsat İletildi','İlgilenmiyor','Ulaşılamadı','TOPLAM KONTAK','TOPLAM İŞLEM'];
-    sh.getRange(1,1,1,header.length).setValues([header]).setFontWeight('bold');
-
-    // Data sources (prefer T sheets)
-    const shR = ss.getSheetByName('T Randevular') || ss.getSheetByName('Randevular');
-    const shF = ss.getSheetByName('T Fırsatlar') || ss.getSheetByName('Fırsatlar');
-    const shS = ss.getSheetByName('T Aktivite Özet');
-
-    const weeks = [];
-    const today = new Date(); today.setHours(0,0,0,0);
-    const thisWeekStart = startOfWeek(today);
-    for (let i=0;i<weeksBack;i++){
-      const ws = new Date(thisWeekStart); ws.setDate(thisWeekStart.getDate()-7*i);
-      const we = endOfWeek(ws);
-      weeks.push({ label: `${toKey(ws)} – ${toKey(we)}`, a: ws, b: we });
-    }
-
-    // Helpers to read headers/values once
-    function readSheet(sh){ if(!sh || sh.getLastRow()<=1) return null; const lc=sh.getLastColumn(); return { h: sh.getRange(1,1,1,lc).getValues()[0], v: sh.getRange(2,1,sh.getLastRow()-1,lc).getValues() } }
-    const R = readSheet(shR), F = readSheet(shF), S = readSheet(shS);
-
-    function countBetween(a,b){
-      const c = { 'Randevu Alındı':0,'İleri Tarih Randevu':0,'Randevu Teyitlendi':0,'Randevu Ertelendi':0,'Randevu İptal oldu':0,'Yeniden Aranacak':0,'Bilgi Verildi':0,'Fırsat İletildi':0,'İlgilenmiyor':0,'Ulaşılamadı':0 };
-      // Randevular
-      if (R){ const iStatus=R.h.indexOf('Randevu durumu'); for (const r of R.v){ const d=getActivityDate(R.h,r,'Randevu Tarihi'); if(!withinRange(d,a,b)) continue; const s=String(r[iStatus]||''); if(c.hasOwnProperty(s)) c[s]++; } }
-      // Fırsatlar
-      if (F){ const iStatus=F.h.indexOf('Fırsat Durumu'); for (const r of F.v){ const d=getActivityDate(F.h,r,'Fırsat Tarihi'); if(!withinRange(d,a,b)) continue; const s=String(r[iStatus]||'').toLowerCase(); const norm=s.includes('ilet')? 'Fırsat İletildi': s.includes('bilgi')? 'Bilgi Verildi': s.includes('yeniden')||s.includes('ara')? 'Yeniden Aranacak': ''; if(norm) c[norm]++; } }
-      // Negatifler
-      if (S){ 
-        for (const r of S.v){ 
-          let d = null;
-          const dateValue = r[1];
-          
-          // Date objesi mi string mi kontrol et
-          if (dateValue instanceof Date) {
-            d = dateValue;
-          } else if (typeof dateValue === 'string') {
-            const m = dateValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-            if (m) {
-              d = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
-            }
-          }
-          
-          if(!d || isNaN(d.getTime())) continue; 
-          if (d>=a && d<=b){ 
-            c['İlgilenmiyor']+=Number(r[2]||0); 
-            c['Ulaşılamadı']+=Number(r[3]||0); 
-          } 
-        } 
-      }
-      return c;
-    }
-
-    let rowIdx = 2;
-    for (const w of weeks){
-      const c = countBetween(w.a,w.b);
-      const toplamKontak = c['Randevu Alındı'] + c['İleri Tarih Randevu'] + c['Yeniden Aranacak'] + c['Bilgi Verildi'] + c['Fırsat İletildi'] + c['İlgilenmiyor'];
-      const toplamIslem = toplamKontak + c['Ulaşılamadı'];
-      const row = [w.label, c['Randevu Alındı'], c['İleri Tarih Randevu'], c['Yeniden Aranacak'], c['Bilgi Verildi'], c['Fırsat İletildi'], c['İlgilenmiyor'], c['Ulaşılamadı'], toplamKontak, toplamIslem];
-      sh.getRange(rowIdx,1,1,row.length).setValues([row]);
-      rowIdx++;
-    }
-
-    sh.autoResizeColumns(1, header.length);
-    return { success: true };
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
-  }
-}
-
 // Satış Yapıldı > Yerinde Satış > Sıcak > Orta > Soğuk > Toplantı Tarihi sıralaması
 function sortMeetingsSalesTop(sheet) {
   console.log("🔄 sortMeetingsSalesTop başlatıldı - Toplantılar sıralama");
@@ -8001,210 +9151,6 @@ function runDedupeOnAllTAggregates() {
     SpreadsheetApp.getUi().alert('Tamam', 'T sayfalarında mükerrer kayıtlar temizlendi.', SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (e) {
     SpreadsheetApp.getUi().alert('Hata', String(e && e.message || e), SpreadsheetApp.getUi().ButtonSet.OK);
-  }
-}
-
-function generatePivotBaseReportManager() {
-  console.log('Function started: generatePivotBaseReportManager');
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const shR = ss.getSheetByName('T Randevular') || ss.getSheetByName('Randevular');
-    const shF = ss.getSheetByName('T Fırsatlar') || ss.getSheetByName('Fırsatlar');
-    const shT = ss.getSheetByName('T Toplantılar') || ss.getSheetByName('Toplantılar');
-    const shS = ss.getSheetByName('T Aktivite Özet');
-
-    function toKey(d){ return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd.MM.yyyy'); }
-    function extractDateFromLog(logValue){ const s=String(logValue||''); const m=s.match(/(\d{2}\.\d{2}\.\d{4})/); if(m&&m[1]){ const [dd,mm,yy]=m[1].split('.'); const d=new Date(Number(yy),Number(mm)-1,Number(dd)); if(!isNaN(d.getTime())) return d; } return null; }
-    function getDate(headers,row,main){ const i=headers.indexOf(main); if(i!==-1 && row[i]) return row[i]; const iL=headers.indexOf('Log'); if(iL!==-1){ const d=extractDateFromLog(row[iL]); if(d) return d; } return null; }
-
-    // Etiket normalizasyonu (etiket eşlemesi)
-    function normStr(s){
-      return String(s||'')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .replace(/\s+/g,' ')
-        .trim();
-    }
-    function normalizeLabel(raw, context){
-      const n = normStr(raw);
-      // Negatifler
-      if (/(ulasil|ulasila|ulas|cevap yok|yanit yok|mesgul|erise|eri\u015file)/.test(n)) return 'Ulaşılamadı';
-      if (/(ilgilenm|ilgi yok|ilgi-yok|ilgi bulunm|ilgi duymuyor)/.test(n)) return 'İlgilenmiyor';
-      // Fırsat durumları (pozitifler)
-      if (context === 'firsat') {
-        if (n.includes('ilet')) return 'Fırsat İletildi';
-        if (n.includes('bilgi')) return 'Bilgi Verildi';
-        if (n.includes('yeniden') || n.includes('ara')) return 'Yeniden Aranacak';
-        return '';
-      }
-      // Diğerleri aynen
-      return String(raw||'').trim();
-    }
-
-    function read(sh){ 
-      console.log('read() function called with sheet:', sh ? sh.getName() : 'null');
-      if(!sh || sh.getLastRow()<=1) {
-        console.log('Sheet is null or has <=1 row. Last row:', sh ? sh.getLastRow() : 'N/A');
-        return null; 
-      }
-      const lc=sh.getLastColumn();
-      console.log('Sheet dimensions:', { lastRow: sh.getLastRow(), lastCol: lc });
-      const headers = sh.getRange(1,1,1,lc).getValues()[0];
-      const values = sh.getRange(2,1,sh.getLastRow()-1,lc).getValues();
-      console.log('Read data:', { headers: headers, valueCount: values.length });
-      return { h: headers, v: values }; 
-    }
-    const R = read(shR), F = read(shF), Tm = read(shT), S = read(shS);
-
-    let rows = [['Kod','Tarih','Aktivite','Adet']];
-    const activityMap = new Map(); // key: "Kod|Tarih|Aktivite" -> count
-
-    // Helper function to add/update activity count
-    function addActivity(code, date, activity, count = 1) {
-      const key = `${code}|${date}|${activity}`;
-      if (activityMap.has(key)) {
-        activityMap.set(key, activityMap.get(key) + count);
-      } else {
-        activityMap.set(key, count);
-      }
-    }
-
-    // Randevular: etiketleri normalize et ve topla
-    if (R){
-      const iCode=R.h.indexOf('Kod')!==-1? R.h.indexOf('Kod'): R.h.indexOf('Temsilci Kodu');
-      const iStatus=R.h.indexOf('Randevu durumu');
-      for (const r of R.v){
-        const d=getDate(R.h,r,'Randevu Tarihi'); if(!d) continue;
-        const raw = String(r[iStatus]||'').trim(); if(!raw) continue;
-        const s = normalizeLabel(raw, 'randevu'); if(!s) continue;
-        addActivity(String(r[iCode]||'').trim(), toKey(d), s, 1);
-      }
-    }
-
-    // Fırsatlar: normalize ederek sadece ilgili pozitifleri al ve topla
-    if (F){
-      const iCode=F.h.indexOf('Kod')!==-1? F.h.indexOf('Kod'): F.h.indexOf('Temsilci Kodu');
-      const iStatus=F.h.indexOf('Fırsat Durumu');
-      for (const r of F.v){
-        const d=getDate(F.h,r,'Fırsat Tarihi'); if(!d) continue;
-        const s = normalizeLabel(String(r[iStatus]||''), 'firsat'); if(!s) continue;
-        addActivity(String(r[iCode]||'').trim(), toKey(d), s, 1);
-      }
-    }
-
-    // Toplantılar: olduğu gibi, gerekirse küçük normalizasyon yapılabilir ve topla
-    if (Tm){
-      const iCode=Tm.h.indexOf('Kod')!==-1? Tm.h.indexOf('Kod'): Tm.h.indexOf('Temsilci Kodu');
-      const iStatus=Tm.h.indexOf('Toplantı Sonucu');
-      for (const r of Tm.v){
-        const d=getDate(Tm.h,r,'Toplantı Tarihi'); if(!d) continue;
-        const s=String(r[iStatus]||'').trim(); if(!s) continue;
-        addActivity(String(r[iCode]||'').trim(), toKey(d), s, 1);
-      }
-    }
-
-    // Özet (Format Tablo'dan toplanan negatifler): varsa ekle
-    if (S){
-      console.log('Processing T Aktivite Özet data:', S.v.length, 'rows');
-      console.log('Sample data from T Aktivite Özet:', S.v.slice(0, 3));
-      console.log('Headers from T Aktivite Özet:', S.h);
-      
-      for (const r of S.v){
-        const code=String(r[0]||'').trim();
-        const ds=String(r[1]||'');
-        console.log('Processing row:', { code, date: ds, ilgi: r[2], ulas: r[3] });
-        
-        // Daha esnek tarih parsing - hem Date objesi hem string formatını destekle
-        let d = null;
-        if (ds) {
-          if (ds instanceof Date) {
-            // Zaten Date objesi
-            d = ds;
-            console.log('Date object found:', { original: ds, parsed: d, toKey: toKey(d) });
-          } else if (typeof ds === 'string') {
-            // Önce dd.MM.yyyy formatını dene
-            const m1 = ds.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-            if (m1) {
-              d = new Date(Number(m1[3]), Number(m1[2])-1, Number(m1[1]));
-              console.log('Date parsed from dd.MM.yyyy:', { original: ds, parsed: d, toKey: toKey(d) });
-            } else {
-              // Sonra Date.parse() ile dene (Thu Aug 07 2025 formatı için)
-              const parsed = Date.parse(ds);
-              if (!isNaN(parsed)) {
-                d = new Date(parsed);
-                console.log('Date parsed from Date.parse():', { original: ds, parsed: d, toKey: toKey(d) });
-              } else {
-                console.log('Date parsing failed for string:', ds);
-              }
-            }
-          }
-        }
-        
-        if(!code || !d || isNaN(d.getTime())) {
-          console.log('Skipping invalid row:', { code, date: ds, parsed: d, isValid: !isNaN(d?.getTime()) });
-          continue;
-        }
-        
-        const ilgi=Number(r[2]||0); 
-        const ulas=Number(r[3]||0);
-        
-        console.log('Valid row found:', { code, date: toKey(d), ilgi, ulas });
-        
-        if (ilgi>0) {
-          addActivity(code, toKey(d), 'İlgilenmiyor', ilgi);
-          console.log('Added İlgilenmiyor:', code, toKey(d), 'İlgilenmiyor', ilgi);
-        }
-        if (ulas>0) {
-          addActivity(code, toKey(d), 'Ulaşılamadı', ulas);
-          console.log('Added Ulaşılamadı:', code, toKey(d), 'Ulaşılamadı', ulas);
-        }
-      }
-      console.log('T Aktivite Özet processing complete.');
-    } else {
-      console.log('T Aktivite Özet sheet is null or empty. Sheet object:', shS);
-      if (shS) {
-        console.log('Sheet exists but read() returned null. Last row:', shS.getLastRow());
-        console.log('Sheet name:', shS.getName());
-        if (shS.getLastRow() > 1) {
-          console.log('First few rows of T Aktivite Özet:');
-          const sampleData = shS.getRange(1, 1, Math.min(5, shS.getLastRow()), shS.getLastColumn()).getValues();
-          console.log(sampleData);
-        }
-      }
-    }
-
-    // Convert activityMap to rows and sort by date
-    console.log('Converting activityMap to rows...');
-    for (const [key, count] of activityMap.entries()) {
-      const [code, date, activity] = key.split('|');
-      rows.push([code, date, activity, count]);
-    }
-
-    // Sort rows by date (skip header row)
-    console.log('Sorting rows by date...');
-    const headerRow = rows[0];
-    const dataRows = rows.slice(1);
-    
-    dataRows.sort((a, b) => {
-      const dateA = new Date(a[1].split('.').reverse().join('-'));
-      const dateB = new Date(b[1].split('.').reverse().join('-'));
-      return dateA - dateB;
-    });
-    
-    rows = [headerRow, ...dataRows];
-    
-    console.log('Final rows structure (first 10):', rows.slice(0, 10));
-    console.log('Total rows:', rows.length);
-
-    let pv = ss.getSheetByName('Pivot Veri'); if (!pv) pv = ss.insertSheet('Pivot Veri'); else pv.clear();
-    pv.getRange(1,1,rows.length,4).setValues(rows);
-    pv.autoResizeColumns(1,4);
-    SpreadsheetApp.getUi().alert('Tamam', 'Pivot tabanı güncellendi (Pivot Veri).', SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch (error) {
-    console.error('Function failed:', error);
-    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
-    throw error;
   }
 }
 /**
@@ -8575,6 +9521,38 @@ function showEmployeeResults(employeeCode, employeeName, data) {
 // ➕ SIRAYLA EKLE FONKSİYONLARI
 // ========================================
 
+function syncSingleEmployeeAppend_MK_009() {
+  console.log('🔄 MK 009 append fonksiyonu çağrıldı!');
+  
+  try {
+    FAST_SYNC = true;
+    const syncResult = syncSingleEmployee('MK 009', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
+  } catch (error) {
+    FAST_SYNC = false;
+    console.error('❌ MK 009 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `MK 009 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+function syncSingleEmployeeAppend_TİA_010() {
+  console.log('🔄 TİA 010 append fonksiyonu çağrıldı!');
+  
+  try {
+    FAST_SYNC = true;
+    const syncResult = syncSingleEmployee('TİA 010', { mode: 'append' });
+    console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
+  } catch (error) {
+    FAST_SYNC = false;
+    console.error('❌ TİA 010 append hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `TİA 010 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
 /**
  * ➕ LG 001 - Lale Gül Sırayla Ekle
  */
@@ -8582,11 +9560,13 @@ function syncSingleEmployeeAppend_LG_001() {
   console.log('🔄 LG 001 append fonksiyonu çağrıldı!');
   
   try {
-    // Sadece sırayla ekleme (hızlı)
+    FAST_SYNC = true;
     const syncResult = syncSingleEmployee('LG 001', { mode: 'append' });
     console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
-    
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
   } catch (error) {
+    FAST_SYNC = false;
     console.error('❌ LG 001 append hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', `LG 001 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -8599,11 +9579,13 @@ function syncSingleEmployeeAppend_NT_002() {
   console.log('🔄 NT 002 append fonksiyonu çağrıldı!');
   
   try {
-    // Sadece sırayla ekleme (hızlı)
+    FAST_SYNC = true;
     const syncResult = syncSingleEmployee('NT 002', { mode: 'append' });
     console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
-    
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
   } catch (error) {
+    FAST_SYNC = false;
     console.error('❌ NT 002 append hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', `NT 002 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -8616,11 +9598,13 @@ function syncSingleEmployeeAppend_KO_003() {
   console.log('🔄 KO 003 append fonksiyonu çağrıldı!');
   
   try {
-    // Sadece sırayla ekleme (hızlı)
+    FAST_SYNC = true;
     const syncResult = syncSingleEmployee('KO 003', { mode: 'append' });
     console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
-    
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
   } catch (error) {
+    FAST_SYNC = false;
     console.error('❌ KO 003 append hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', `KO 003 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -8633,11 +9617,13 @@ function syncSingleEmployeeAppend_SB_004() {
   console.log('🔄 SB 004 append fonksiyonu çağrıldı!');
   
   try {
-    // Sadece sırayla ekleme (hızlı)
+    FAST_SYNC = true;
     const syncResult = syncSingleEmployee('SB 004', { mode: 'append' });
     console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
-    
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
   } catch (error) {
+    FAST_SYNC = false;
     console.error('❌ SB 004 append hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', `SB 004 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -8650,11 +9636,13 @@ function syncSingleEmployeeAppend_KM_005() {
   console.log('🔄 KM 005 append fonksiyonu çağrıldı!');
   
   try {
-    // Sadece sırayla ekleme (hızlı)
+    FAST_SYNC = true;
     const syncResult = syncSingleEmployee('KM 005', { mode: 'append' });
     console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
-    
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
   } catch (error) {
+    FAST_SYNC = false;
     console.error('❌ KM 005 append hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', `KM 005 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -8667,11 +9655,13 @@ function syncSingleEmployeeAppend_GŞ_006() {
   console.log('🔄 GŞ 006 append fonksiyonu çağrıldı!');
   
   try {
-    // Sadece sırayla ekleme (hızlı)
+    FAST_SYNC = true;
     const syncResult = syncSingleEmployee('GŞ 006', { mode: 'append' });
     console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
-    
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
   } catch (error) {
+    FAST_SYNC = false;
     console.error('❌ GŞ 006 append hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', `GŞ 006 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -8684,9 +9674,13 @@ function syncSingleEmployeeAppend_BH_007() {
   console.log('🔄 BH 007 append fonksiyonu çağrıldı!');
   
   try {
+    FAST_SYNC = true;
     const syncResult = syncSingleEmployee('BH 007', { mode: 'append' });
     console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
   } catch (error) {
+    FAST_SYNC = false;
     console.error('❌ BH 007 append hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', `BH 007 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -8699,9 +9693,13 @@ function syncSingleEmployeeAppend_TD_008() {
   console.log('🔄 TD 008 append fonksiyonu çağrıldı!');
   
   try {
+    FAST_SYNC = true;
     const syncResult = syncSingleEmployee('TD 008', { mode: 'append' });
     console.log('✅ Sırayla ekleme tamamlandı:', syncResult);
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict skipped:', e && e.message); }
+    FAST_SYNC = false;
   } catch (error) {
+    FAST_SYNC = false;
     console.error('❌ TD 008 append hatası:', error);
     SpreadsheetApp.getUi().alert('❌ Hata', `TD 008 hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -8710,6 +9708,26 @@ function syncSingleEmployeeAppend_TD_008() {
 // ========================================
 // 📊 LOG ÖZETİ FONKSİYONLARI - SADECE LOG ANALİZİ
 // ========================================
+
+function logAnalysis_MK_009() {
+  console.log('📊 MK 009 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('MK 009', 'Merve Kılıç');
+  } catch (error) {
+    console.error('❌ MK 009 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `MK 009 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+function logAnalysis_TİA_010() {
+  console.log('📊 TİA 010 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('TİA 010', 'Tuğçe İlkay Adsız');
+  } catch (error) {
+    console.error('❌ TİA 010 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `TİA 010 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
 
 /**
  * 📊 LG 001 - Lale Gül Log Özeti
@@ -8803,16 +9821,1529 @@ function logAnalysis_BH_007() {
 }
 
 /**
- * 📊 TD 008 - Tuğçe Duman Log Özeti
+ * 📊 NT 012 - Nazlı Tutuşan Log Özeti
  */
-function logAnalysis_TD_008() {
-  console.log('📊 TD 008 log analizi çağrıldı!');
+function logAnalysis_NT_012() {
+  console.log('📊 NT 012 log analizi çağrıldı!');
   try {
-    getAllEmployeeLogsByDate('TD 008', 'Tuğçe Duman');
+    getAllEmployeeLogsByDate('NT 012', 'Nazlı Tutuşan');
   } catch (error) {
-    console.error('❌ TD 008 log analizi hatası:', error);
-    SpreadsheetApp.getUi().alert('❌ Hata', `TD 008 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    console.error('❌ NT 012 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `NT 012 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
+}
+
+/**
+ * 🌐 Genel Log Analizi - Tüm Temsilciler
+ * Tüm temsilcilerin loglarını tek sayfada gösterir
+ */
+function showGeneralLogAnalysis() {
+  console.log('🌐 Genel Log Analizi başlatıldı');
+  try {
+    // UI kontrolü
+    const ui = SpreadsheetApp.getUi();
+    if (!ui) {
+      throw new Error('UI erişilemiyor. Lütfen Google Sheets içinden çalıştırın.');
+    }
+    
+    // Tarih seçimi için HTML dialog oluştur
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h2 {
+      margin-top: 0;
+      color: #1976D2;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #333;
+    }
+    input[type="date"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .button-group {
+      margin-top: 20px;
+      text-align: right;
+    }
+    button {
+      padding: 10px 20px;
+      margin-left: 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .btn-primary {
+      background-color: #1976D2;
+      color: white;
+    }
+    .btn-primary:hover {
+      background-color: #1565C0;
+    }
+    .btn-secondary {
+      background-color: #757575;
+      color: white;
+    }
+    .btn-secondary:hover {
+      background-color: #616161;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>📅 Tarih Aralığı Seçin</h2>
+    
+    <div class="form-group">
+      <label for="startDate">Başlangıç Tarihi:</label>
+      <input type="date" id="startDate" required>
+    </div>
+    
+    <div class="form-group">
+      <label for="endDate">Bitiş Tarihi:</label>
+      <input type="date" id="endDate" required>
+    </div>
+    
+    <div class="button-group">
+      <button class="btn-secondary" onclick="cancel()">İptal</button>
+      <button class="btn-primary" onclick="submit()">Tamam</button>
+    </div>
+  </div>
+
+  <script>
+    // Varsayılan tarihleri ayarla (son 30 gün)
+    (function() {
+      const today = new Date();
+      const endDate = new Date(today);
+      const startDate = new Date(today);
+      startDate.setDate(startDate.getDate() - 30);
+      
+      // Format: YYYY-MM-DD
+      function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+      }
+      
+      document.getElementById('endDate').value = formatDate(endDate);
+      document.getElementById('startDate').value = formatDate(startDate);
+    })();
+
+    function submit() {
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      
+      if (!startDate || !endDate) {
+        alert('Lütfen başlangıç ve bitiş tarihlerini seçin.');
+        return;
+      }
+      
+      if (new Date(startDate) > new Date(endDate)) {
+        alert('Başlangıç tarihi bitiş tarihinden sonra olamaz.');
+        return;
+      }
+      
+      // Butonu devre dışı bırak (çift tıklamayı önle)
+      const submitBtn = document.querySelector('.btn-primary');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'İşleniyor...';
+      }
+      
+      google.script.run
+        .withSuccessHandler(function() {
+          google.script.host.close();
+        })
+        .withFailureHandler(function(error) {
+          alert('Hata: ' + (error.message || error));
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Tamam';
+          }
+        })
+        .continueGeneralLogAnalysis(startDate, endDate);
+    }
+
+    function cancel() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>`;
+    
+    const html = HtmlService.createHtmlOutput(htmlContent)
+      .setWidth(450)
+      .setHeight(350);
+    
+    console.log('📋 Dialog HTML oluşturuldu, gösteriliyor...');
+    ui.showModalDialog(html, '📅 Tarih Aralığı Seçin');
+    console.log('✅ Dialog gösterildi');
+  } catch (error) {
+    console.error('❌ Genel Log Analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Genel Log Analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 🌐 Genel Log Analizi - Devam
+ * Tarih aralığı seçildikten sonra çağrılır
+ */
+function continueGeneralLogAnalysis(startDateStr, endDateStr) {
+  console.log('🔍 continueGeneralLogAnalysis çağrıldı:', { startDateStr, endDateStr });
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Tarihleri parse et
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+    endDate.setHours(23, 59, 59, 999); // Günün sonuna ayarla
+    
+    console.log('📅 Tarih filtresi:', Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy'), '-', Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy'));
+    
+    // Tüm temsilcilerin loglarını topla
+    const allEmployeeLogs = new Map(); // employeeCode -> logs array
+    const employeeCodes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    
+    console.log(`📊 ${employeeCodes.length} temsilci kontrol edilecek...`);
+    console.log(`👥 Temsilci kodları:`, employeeCodes);
+    
+    for (let i = 0; i < employeeCodes.length; i++) {
+      const employeeCode = employeeCodes[i];
+      const employeeName = CRM_CONFIG.EMPLOYEE_CODES[employeeCode];
+      console.log(`📊 ${employeeCode} işleniyor... (${i + 1}/${employeeCodes.length})`);
+      
+      try {
+        const employeeFile = findEmployeeFile(employeeCode);
+        if (!employeeFile) {
+          console.log(`⚠️ ${employeeCode} dosyası bulunamadı (EMPLOYEE_FILES mapping'inde yok olabilir)`);
+          continue;
+        }
+        
+        console.log(`✅ ${employeeCode} dosyası açıldı`);
+        
+        // HİBRİT YAKLAŞIM: Önce Log Arşivi'nden, yoksa Format Tablo'lardan çek
+        let logsFromArchive = [];
+        let logsFromFormatTables = [];
+        
+        // 1. Log Arşivi'nden veri çek
+        let logArchiveSheet = employeeFile.getSheetByName('📋 Log Arşivi');
+        if (!logArchiveSheet) {
+          logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+        }
+        
+        if (logArchiveSheet && logArchiveSheet.getLastRow() > 1) {
+          console.log(`📊 ${employeeCode}: Log Arşivi'nden veri okunuyor...`);
+          const allData = logArchiveSheet.getDataRange().getValues();
+          
+          if (allData.length >= 2) {
+            const headers = allData[0];
+            const aktiviteTarihiIndex = headers.indexOf('Tarih') !== -1 ? headers.indexOf('Tarih') : headers.indexOf('Aktivite Tarihi');
+            const logIndex = headers.indexOf('Log Detayı') !== -1 ? headers.indexOf('Log Detayı') : headers.indexOf('Log');
+            const aktiviteIndex = headers.indexOf('Aktivite');
+            const saatIndex = headers.indexOf('Saat');
+            
+            if (aktiviteTarihiIndex !== -1 && logIndex !== -1 && aktiviteIndex !== -1) {
+              for (let row = 1; row < allData.length; row++) {
+                const aktiviteTarihi = allData[row][aktiviteTarihiIndex];
+                let logValue = allData[row][logIndex];
+                const aktivite = allData[row][aktiviteIndex];
+                const saat = saatIndex !== -1 ? allData[row][saatIndex] : null;
+                
+                if (!aktiviteTarihi || !logValue || !aktivite) continue;
+                
+                // Eğer log'da zaman yoksa ama "Saat" kolonu varsa, zamanı log'a ekle
+                if (saat && !extractTimeFromLog(logValue)) {
+                  const saatStr = String(saat);
+                  // Saat formatını kontrol et ve log'a ekle
+                  if (saatStr.match(/\d{1,2}:\d{2}/)) {
+                    logValue = `${logValue} ${saatStr}`;
+                  }
+                }
+                
+                // Tarih parse etme
+                let logDate = null;
+                if (aktiviteTarihi instanceof Date) {
+                  logDate = new Date(aktiviteTarihi);
+                } else {
+                  logDate = parseDdMmYyyy(aktiviteTarihi);
+                  if (!logDate) {
+                    try {
+                      logDate = new Date(String(aktiviteTarihi));
+                      if (isNaN(logDate.getTime())) continue;
+                    } catch (e) {
+                      continue;
+                    }
+                  }
+                }
+                
+                if (!logDate || isNaN(logDate.getTime())) continue;
+                
+                // Tarih karşılaştırması
+                const logDateOnly = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+                const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                
+                if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+                  logsFromArchive.push({
+                    date: aktiviteTarihi,
+                    log: logValue,
+                    aktivite: aktivite,
+                    source: 'Log Arşivi'
+                  });
+                }
+              }
+            }
+          }
+        }
+        
+        // 2. Log Arşivi'nde tarih aralığına uygun veri yoksa Format Tablo'lardan çek
+        // NOT: Log Arşivi'nde veri varsa bile, eğer tarih aralığına uygun değilse Format Tablo'lardan çek
+        if (logsFromArchive.length === 0) {
+          console.log(`📊 ${employeeCode}: Log Arşivi'nde tarih aralığına uygun veri yok, Format Tablo'lardan çekiliyor...`);
+          logsFromFormatTables = collectLogsFromFormatTables(employeeFile, startDate, endDate);
+        }
+        
+        // 3. İki kaynağı birleştir ve duplicate'leri temizle
+        // ÖNEMLİ: Aynı tarih + aktivite + log kombinasyonu sadece bir kez sayılır
+        const allLogs = [...logsFromArchive, ...logsFromFormatTables];
+        const uniqueLogs = new Map();
+        
+        for (const log of allLogs) {
+          // Duplicate kontrolü: tarih + aktivite + log kombinasyonu (daha detaylı)
+          const dateStr = log.date instanceof Date 
+            ? Utilities.formatDate(log.date, 'Europe/Istanbul', 'dd.MM.yyyy')
+            : String(log.date);
+          const aktiviteStr = String(log.aktivite || '').trim();
+          const logStr = String(log.log || '').substring(0, 50); // İlk 50 karakter
+          const key = `${dateStr}_${aktiviteStr}_${logStr}`;
+          
+          // Log Arşivi öncelikli (daha güncel ve doğru)
+          if (!uniqueLogs.has(key)) {
+            uniqueLogs.set(key, log);
+          } else {
+            // Eğer mevcut kayıt Format Tablo'dan geliyorsa ve yeni kayıt Log Arşivi'ndense, Log Arşivi'ni kullan
+            const existing = uniqueLogs.get(key);
+            if (existing.source === 'Format Tablo' && log.source === 'Log Arşivi') {
+              uniqueLogs.set(key, log);
+            }
+          }
+        }
+        
+        const finalLogs = Array.from(uniqueLogs.values());
+        
+        if (finalLogs.length > 0) {
+          allEmployeeLogs.set(employeeCode, finalLogs);
+          const uniqueDays = new Set(finalLogs.map(l => {
+            const d = parseDdMmYyyy(l.date) || (l.date instanceof Date ? l.date : new Date(String(l.date)));
+            if (d instanceof Date && !isNaN(d.getTime())) {
+              return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+            }
+            return String(l.date);
+          }));
+          console.log(`✅ ${employeeCode}: Log Arşivi: ${logsFromArchive.length}, Format Tablo: ${logsFromFormatTables.length}, Toplam (unique): ${finalLogs.length} log, ${uniqueDays.size} gün`);
+        } else {
+          console.log(`⚠️ ${employeeCode}: Tarih aralığında log bulunamadı`);
+        }
+      } catch (error) {
+        console.error(`❌ ${employeeCode} işleme hatası:`, error);
+      }
+    }
+    
+    console.log(`📊 Toplam ${allEmployeeLogs.size} temsilcide log bulundu`);
+    
+    // Genel Log Analizi sayfası oluştur
+    createGeneralLogAnalysisSheet(managerFile, allEmployeeLogs, startDate, endDate);
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Genel Log Analizi Tamamlandı',
+      `📊 ${allEmployeeLogs.size} temsilci kontrol edildi\n📅 Tarih aralığı: ${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}\n\n"GENEL LOG ANALİZİ - TÜM TEMSİLCİLER" sayfasına bakın.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  } catch (error) {
+    console.error('❌ continueGeneralLogAnalysis hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Genel Log Analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 Genel Log Analizi Sayfası Oluştur
+ * Tüm özellikler: 30 sn alarm, 5 dk alarm, aktivite analizi, karşılaştırma
+ * Tarih aralığına göre dinamik: Günlük/Haftalık/Aylık
+ */
+function createGeneralLogAnalysisSheet(managerFile, allEmployeeLogs, startDate, endDate) {
+  try {
+    const sheetName = 'GENEL LOG ANALİZİ - TÜM TEMSİLCİLER';
+    
+    // Eski sayfayı sil veya temizle
+    let sheet = managerFile.getSheetByName(sheetName);
+    if (sheet) {
+      managerFile.deleteSheet(sheet);
+    }
+    sheet = managerFile.insertSheet(sheetName);
+    
+    // Tarih aralığını analiz et
+    const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    let periodType = 'Günlük';
+    if (daysDiff > 30) {
+      periodType = 'Aylık';
+    } else if (daysDiff > 7) {
+      periodType = 'Haftalık';
+    } else {
+      periodType = 'Günlük';
+    }
+    
+    let currentRow = 1;
+    
+    // ========================================
+    // BAŞLIK BÖLÜMÜ
+    // ========================================
+    sheet.getRange(currentRow, 1).setValue('🌐 GENEL LOG ANALİZİ - TÜM TEMSİLCİLER');
+    sheet.getRange(currentRow, 1, 1, 15).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(18).setBackground('#1976D2').setFontColor('#FFFFFF');
+    currentRow++;
+    
+    const dateRangeText = `${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')} (${daysDiff} gün)`;
+    sheet.getRange(currentRow, 1).setValue(`📅 Tarih Aralığı: ${dateRangeText}`);
+    sheet.getRange(currentRow, 1, 1, 15).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setBackground('#E3F2FD');
+    currentRow++;
+    
+    sheet.getRange(currentRow, 1).setValue(`📊 Analiz Tipi: ${periodType} Analiz`);
+    sheet.getRange(currentRow, 1, 1, 15).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(12).setBackground('#BBDEFB');
+    currentRow += 2;
+    
+    // ========================================
+    // ALARM SİSTEMİ (30 SN VE 5 DK)
+    // ========================================
+    const alarms = detectAlarms(allEmployeeLogs);
+    if (alarms.length > 0) {
+      sheet.getRange(currentRow, 1).setValue('🚨 ZORUNLU ALARM SİSTEMİ');
+      sheet.getRange(currentRow, 1, 1, 15).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FF5252').setFontColor('#FFFFFF');
+      currentRow++;
+      
+      // Alarm başlıkları
+      sheet.getRange(currentRow, 1).setValue('Temsilci');
+      sheet.getRange(currentRow, 2).setValue('Tarih');
+      sheet.getRange(currentRow, 3).setValue('Saat');
+      sheet.getRange(currentRow, 4).setValue('Alarm Tipi');
+      sheet.getRange(currentRow, 5).setValue('Detay');
+      sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#FFCDD2');
+      currentRow++;
+      
+      // Alarmları yaz (Farklı renkler, simgeler ve bold süreler)
+      for (const alarm of alarms) {
+        sheet.getRange(currentRow, 1).setValue(alarm.employeeCode);
+        sheet.getRange(currentRow, 2).setValue(alarm.date);
+        sheet.getRange(currentRow, 3).setValue(alarm.time);
+        
+        // Alarm tipi (zaten simge içeriyor)
+        sheet.getRange(currentRow, 4).setValue(alarm.type);
+        
+        // Detay metnini bold süre ile oluştur
+        let detailText = alarm.detail;
+        let boldText = '';
+        let boldStart = 0;
+        
+        if (alarm.alarmType === '15sn' && alarm.seconds) {
+          // 15 saniye alarmı: "X saniye içinde arandı" - saniyeyi bold yap
+          boldText = `${alarm.seconds} saniye`;
+          detailText = `${boldText} içinde arandı`;
+          boldStart = 0;
+        } else if (alarm.alarmType === '5dk' && alarm.minutes !== undefined) {
+          // 5 dakika alarmı: ">X dakika arama yapılmadı" - dakikayı bold yap
+          boldText = `${alarm.minutes} dakika`;
+          detailText = `>${boldText} arama yapılmadı`;
+          boldStart = 1; // ">" karakterinden sonra
+        }
+        
+        // RichTextValue ile bold süre ekle
+        if (boldText && detailText.includes(boldText)) {
+          const richText = SpreadsheetApp.newRichTextValue()
+            .setText(detailText)
+            .setTextStyle(boldStart, boldStart + boldText.length, SpreadsheetApp.newTextStyle().setBold(true).build())
+            .build();
+          sheet.getRange(currentRow, 5).setRichTextValue(richText);
+        } else {
+          sheet.getRange(currentRow, 5).setValue(detailText);
+        }
+        
+        // Farklı renkler: 15sn için sarı, 5dk için mor (daha belirgin)
+        if (alarm.alarmType === '15sn') {
+          sheet.getRange(currentRow, 1, 1, 5).setBackground('#FFEB3B'); // Sarı (daha belirgin)
+        } else if (alarm.alarmType === '5dk') {
+          sheet.getRange(currentRow, 1, 1, 5).setBackground('#E1BEE7'); // Açık mor (daha belirgin)
+        } else {
+          sheet.getRange(currentRow, 1, 1, 5).setBackground('#FFEBEE'); // Varsayılan kırmızı
+        }
+        
+        currentRow++;
+      }
+      currentRow += 2;
+    }
+    
+    // ========================================
+    // PERİYODİK AKTİVİTE ANALİZİ (GÜNLÜK/HAFTALIK/AYLIK)
+    // ========================================
+    let activityAnalysisData;
+    let analysisTitle;
+    
+    if (periodType === 'Günlük') {
+      activityAnalysisData = calculateDailyActivityAnalysis(allEmployeeLogs);
+      analysisTitle = '📈 GÜNLÜK AKTİVİTE ANALİZİ';
+    } else if (periodType === 'Haftalık') {
+      activityAnalysisData = calculateWeeklyActivityAnalysis(allEmployeeLogs, startDate, endDate);
+      analysisTitle = '📈 HAFTALIK AKTİVİTE ANALİZİ';
+    } else {
+      activityAnalysisData = calculateMonthlyActivityAnalysis(allEmployeeLogs, startDate, endDate);
+      analysisTitle = '📈 AYLIK AKTİVİTE ANALİZİ';
+    }
+    
+    if (activityAnalysisData && activityAnalysisData.length > 0) {
+      sheet.getRange(currentRow, 1).setValue(analysisTitle);
+      sheet.getRange(currentRow, 1, 1, 10).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(16).setBackground('#4CAF50').setFontColor('#FFFFFF');
+      currentRow += 2;
+      
+      // Her periyot için analiz
+      for (const periodData of activityAnalysisData) {
+        // Periyot başlığı
+        const periodHeader = periodType === 'Günlük' 
+          ? `📅 ${periodData.period} (${periodData.totalLogs} log)`
+          : periodType === 'Haftalık'
+          ? `📅 ${periodData.period} (${periodData.totalLogs} log)`
+          : `📅 ${periodData.period} (${periodData.totalLogs} log)`;
+        
+        sheet.getRange(currentRow, 1).setValue(periodHeader);
+        sheet.getRange(currentRow, 1, 1, 10).merge();
+        sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(13).setBackground('#81C784').setFontColor('#FFFFFF');
+        currentRow++;
+        
+        // İlk ve son log saatleri
+        sheet.getRange(currentRow, 1).setValue(`İlk Log Saati (${periodType})`);
+        sheet.getRange(currentRow, 2).setValue(periodData.firstLogTime);
+        sheet.getRange(currentRow, 1, 1, 2).setFontWeight('bold').setBackground('#C8E6C9');
+        currentRow++;
+        
+        sheet.getRange(currentRow, 1).setValue(`Son Log Saati (${periodType})`);
+        sheet.getRange(currentRow, 2).setValue(periodData.lastLogTime);
+        sheet.getRange(currentRow, 1, 1, 2).setFontWeight('bold').setBackground('#C8E6C9');
+        currentRow += 2;
+        
+        // Aktivite analizi başlığı
+        sheet.getRange(currentRow, 1).setValue(`📊 ${periodType.toUpperCase()} AKTİVİTE ANALİZİ`);
+        sheet.getRange(currentRow, 1, 1, 7).merge();
+        sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(12).setBackground('#A5D6A7');
+        currentRow++;
+        
+        // Tablo başlıkları - Daha geniş ve okunur
+        const headers = ['Aktivite', 'Sayı', 'Toplam Süre', 'Ortalama Süre', 'Yüzdelik', 'Dağılım'];
+        for (let i = 0; i < headers.length; i++) {
+          sheet.getRange(currentRow, i + 1).setValue(headers[i]);
+        }
+        sheet.getRange(currentRow, 1, 1, headers.length)
+          .setFontWeight('bold')
+          .setFontSize(11)
+          .setBackground('#66BB6A')
+          .setFontColor('#FFFFFF')
+          .setHorizontalAlignment('center')
+          .setVerticalAlignment('middle');
+        currentRow++;
+        
+        // Aktivite verilerini yaz - Daha okunur format
+        for (let i = 0; i < periodData.activities.length; i++) {
+          const activity = periodData.activities[i];
+          
+          sheet.getRange(currentRow, 1).setValue(activity.type);
+          sheet.getRange(currentRow, 2).setValue(activity.count);
+          sheet.getRange(currentRow, 3).setValue(activity.totalDurationFormatted);
+          sheet.getRange(currentRow, 4).setValue(activity.avgDurationFormatted);
+          sheet.getRange(currentRow, 5).setValue(activity.percentageFormatted);
+          sheet.getRange(currentRow, 6).setValue(activity.distributionFormatted);
+          
+          // Sayıları sağa hizala, metinleri sola
+          sheet.getRange(currentRow, 2).setHorizontalAlignment('right');
+          sheet.getRange(currentRow, 3).setHorizontalAlignment('right');
+          sheet.getRange(currentRow, 4).setHorizontalAlignment('right');
+          sheet.getRange(currentRow, 5).setHorizontalAlignment('right');
+          sheet.getRange(currentRow, 6).setHorizontalAlignment('right');
+          
+          // Çift satırlar için alternatif renk
+          if (i % 2 === 0) {
+            sheet.getRange(currentRow, 1, 1, headers.length).setBackground('#F1F8E9');
+          } else {
+            sheet.getRange(currentRow, 1, 1, headers.length).setBackground('#FFFFFF');
+          }
+          
+          currentRow++;
+        }
+        
+        currentRow += 3; // Periyotlar arası boşluk
+      }
+      currentRow += 1;
+    }
+    
+    // ========================================
+    // KARŞILAŞTIRMA RAPORU (TÜM DURUMLAR)
+    // ========================================
+    const comparisonData = calculateComparisonData(allEmployeeLogs);
+    if (comparisonData.length > 0) {
+      sheet.getRange(currentRow, 1).setValue('📊 TEMSİLCİ KARŞILAŞTIRMA RAPORU');
+      sheet.getRange(currentRow, 1, 1, 20).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FF9800').setFontColor('#FFFFFF');
+      currentRow++;
+      
+      // Standart sıralama ile başlıklar
+      const standardActivities = getStandardActivityOrder();
+      const headers = ['Temsilci', 'Toplam Log', '15sn Altı', '5dk+ Pasif', ...standardActivities];
+      
+      for (let i = 0; i < headers.length; i++) {
+        sheet.getRange(currentRow, i + 1).setValue(headers[i]);
+      }
+      sheet.getRange(currentRow, 1, 1, headers.length).setFontWeight('bold').setBackground('#FFE0B2');
+      currentRow++;
+      
+      // Karşılaştırma verilerini yaz
+      for (const data of comparisonData) {
+        sheet.getRange(currentRow, 1).setValue(data.employeeCode);
+        sheet.getRange(currentRow, 2).setValue(data.totalLogs);
+        sheet.getRange(currentRow, 3).setValue(data.fastLogs);
+        sheet.getRange(currentRow, 4).setValue(data.longPauses);
+        
+        // Tüm aktiviteleri standart sırayla yaz
+        let col = 5;
+        for (const activity of standardActivities) {
+          const key = activity.toLowerCase()
+            .replace(/\s+/g, '')
+            .replace(/ı/g, 'i')
+            .replace(/ş/g, 's')
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c');
+          sheet.getRange(currentRow, col).setValue(data[key] || 0);
+          col++;
+        }
+        currentRow++;
+      }
+      currentRow += 2;
+    }
+    
+    // Kolon genişliklerini ayarla - Daha okunur
+    sheet.setColumnWidth(1, 180); // Aktivite
+    sheet.setColumnWidth(2, 80);  // Sayı
+    sheet.setColumnWidth(3, 120); // Toplam Süre
+    sheet.setColumnWidth(4, 130); // Ortalama Süre
+    sheet.setColumnWidth(5, 100); // Yüzdelik
+    sheet.setColumnWidth(6, 100); // Dağılım
+    sheet.setColumnWidth(7, 400); // Log Detayı (varsa)
+    
+    // Sayfayı aktif et
+    sheet.activate();
+    
+    console.log('✅ Genel Log Analizi sayfası oluşturuldu (tüm özellikler dahil)');
+  } catch (error) {
+    console.error('❌ createGeneralLogAnalysisSheet hatası:', error);
+    throw error;
+  }
+}
+
+/**
+ * 🚨 Alarm Tespiti (15 sn ve 5 dk)
+ */
+function detectAlarms(allEmployeeLogs) {
+  const alarms = [];
+  console.log('🚨 detectAlarms başlatıldı, toplam temsilci:', allEmployeeLogs.size);
+  
+  for (const [employeeCode, logs] of allEmployeeLogs) {
+    console.log(`🔍 ${employeeCode}: ${logs.length} log kontrol ediliyor...`);
+    
+    // ÖNEMLİ: Sadece zaman bilgisi olan logları kullan (alarm hesaplaması için gerekli)
+    const logsWithTime = logs.filter(log => {
+      const time = extractTimeFromLog(log.log);
+      return time !== null && time !== 0;
+    });
+    
+    console.log(`📊 ${employeeCode}: ${logsWithTime.length} log zaman bilgisi içeriyor (toplam ${logs.length} log'dan)`);
+    
+    if (logsWithTime.length < 2) {
+      console.log(`⚠️ ${employeeCode}: Alarm hesaplaması için yeterli log yok (en az 2 log gerekli)`);
+      continue;
+    }
+    
+    // Logları tarih ve saate göre sırala
+    const sortedLogs = [...logsWithTime].sort((a, b) => {
+      const dateA = parseDdMmYyyy(a.date) || (a.date instanceof Date ? a.date : new Date(String(a.date)));
+      const dateB = parseDdMmYyyy(b.date) || (b.date instanceof Date ? b.date : new Date(String(b.date)));
+      
+      if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+        return 0;
+      }
+      
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      
+      const timeA = extractTimeFromLog(a.log);
+      const timeB = extractTimeFromLog(b.log);
+      return (timeA || 0) - (timeB || 0);
+    });
+    
+    console.log(`📊 ${employeeCode}: ${sortedLogs.length} log sıralandı`);
+    
+    // 15 saniye alarm kontrolü
+    let fastLogCount = 0;
+    for (let i = 0; i < sortedLogs.length - 1; i++) {
+      const current = sortedLogs[i];
+      const next = sortedLogs[i + 1];
+      
+      const timeDiff = calculateTimeDifferenceSeconds(current, next);
+      
+      // Debug: İlk 10 kontrolü detaylı logla
+      if (i < 10) {
+        console.log(`🔍 ${employeeCode} - Log ${i+1}: date1=${current.date}, log1="${current.log?.substring(0, 50)}", date2=${next.date}, log2="${next.log?.substring(0, 50)}", diff=${timeDiff}s`);
+      }
+      
+      if (timeDiff > 0 && timeDiff < 15) {
+        fastLogCount++;
+        console.log(`🚨 ${employeeCode} - 15sn alarm bulundu: ${timeDiff}s (log1: "${current.log?.substring(0, 50)}", log2: "${next.log?.substring(0, 50)}")`);
+        alarms.push({
+          employeeCode: employeeCode,
+          date: current.date,
+          time: extractTimeString(current.log) || 'Bilinmiyor',
+          type: '⚡ 15 Saniyeden Daha Hızlı Log', // Yıldırım simgesi
+          alarmType: '15sn',
+          seconds: timeDiff,
+          detail: `${timeDiff} saniye içinde arandı`
+        });
+      }
+    }
+    
+    // 5 dakika pasif zaman kontrolü
+    let longPauseCount = 0;
+    for (let i = 0; i < sortedLogs.length - 1; i++) {
+      const current = sortedLogs[i];
+      const next = sortedLogs[i + 1];
+      
+      const timeDiff = calculateTimeDifferenceSeconds(current, next);
+      
+      // Debug: 5dk+ alarmları logla
+      if (timeDiff >= 300) {
+        const minutes = Math.floor(timeDiff / 60);
+        console.log(`🚨 ${employeeCode} - 5dk+ alarm bulundu: ${minutes} dakika (${timeDiff}s) (log1: "${current.log?.substring(0, 50)}", log2: "${next.log?.substring(0, 50)}")`);
+      }
+      
+      if (timeDiff >= 300) { // 5 dakika = 300 saniye
+        longPauseCount++;
+        const minutes = Math.floor(timeDiff / 60);
+        const timeText = minutes > 0 ? `${minutes} dakika` : `${timeDiff} saniye`;
+        alarms.push({
+          employeeCode: employeeCode,
+          date: current.date,
+          time: extractTimeString(current.log) || 'Bilinmiyor',
+          type: '⏸️ 5 Dakikadan Uzun Hiçbir Log Yok', // Duraklama simgesi
+          alarmType: '5dk',
+          minutes: minutes,
+          seconds: timeDiff,
+          detail: `>${timeText} arama yapılmadı`
+        });
+      }
+    }
+    
+    console.log(`✅ ${employeeCode}: ${fastLogCount} hızlı log, ${longPauseCount} uzun pasif bulundu`);
+  }
+  
+  console.log(`🚨 Toplam ${alarms.length} alarm tespit edildi`);
+  return alarms;
+}
+
+/**
+ * 📈 Günlük Aktivite Analizi Hesaplama
+ * Her gün için ayrı analiz yapar
+ */
+function calculateDailyActivityAnalysis(allEmployeeLogs) {
+  // Tüm logları tarihe göre grupla
+  const logsByDate = new Map();
+  
+  for (const [employeeCode, logs] of allEmployeeLogs) {
+    for (const log of logs) {
+      const date = log.date;
+      if (!logsByDate.has(date)) {
+        logsByDate.set(date, []);
+      }
+      logsByDate.get(date).push({
+        ...log,
+        employeeCode: employeeCode
+      });
+    }
+  }
+  
+  const results = [];
+  
+  // Her gün için analiz yap
+  for (const [date, logs] of logsByDate) {
+    // Logları saate göre sırala
+    const sortedLogs = [...logs].sort((a, b) => {
+      const timeA = extractTimeFromLog(a.log);
+      const timeB = extractTimeFromLog(b.log);
+      return timeA - timeB;
+    });
+    
+    // İlk ve son log saatleri
+    const firstLogTime = sortedLogs.length > 0 ? extractTimeString(sortedLogs[0].log) : '';
+    const lastLogTime = sortedLogs.length > 0 ? extractTimeString(sortedLogs[sortedLogs.length - 1].log) : '';
+    
+    // Aktivite türüne göre grupla
+    const activityMap = new Map();
+    let totalLogs = logs.length;
+    
+    for (const log of logs) {
+      const activity = log.aktivite;
+      if (!activity) continue;
+      
+      if (!activityMap.has(activity)) {
+        activityMap.set(activity, {
+          count: 0,
+          totalDuration: 0,
+          durations: []
+        });
+      }
+      
+      const stats = activityMap.get(activity);
+      stats.count++;
+      
+      // Log arası süre hesapla (bir sonraki log ile)
+      const logIndex = sortedLogs.findIndex(l => l.log === log.log && l.date === log.date);
+      if (logIndex >= 0 && logIndex < sortedLogs.length - 1) {
+        const nextLog = sortedLogs[logIndex + 1];
+        const timeDiff = calculateTimeDifferenceMinutes(log, nextLog);
+        if (timeDiff > 0) {
+          stats.totalDuration += timeDiff;
+          stats.durations.push(timeDiff);
+        }
+      }
+    }
+    
+    // Aktivite analizlerini hesapla (ortak fonksiyon kullan)
+    const activityAnalysis = calculateActivityStatsForPeriod(sortedLogs);
+    const activities = activityAnalysis.activities;
+    
+    // Standart sıralama kullan (zaten calculateActivityStatsForPeriod içinde sıralanmış)
+    
+    results.push({
+      period: date,
+      totalLogs: totalLogs,
+      firstLogTime: firstLogTime,
+      lastLogTime: lastLogTime,
+      activities: activities
+    });
+  }
+  
+  // Tarihe göre sırala (en yeni en üstte)
+  results.sort((a, b) => {
+    const dateA = parseDdMmYyyy(a.period) || new Date(a.period);
+    const dateB = parseDdMmYyyy(b.period) || new Date(b.period);
+    return dateB.getTime() - dateA.getTime();
+  });
+  
+  return results;
+}
+
+/**
+ * 📈 Haftalık Aktivite Analizi Hesaplama
+ * Her hafta için ayrı analiz yapar
+ */
+function calculateWeeklyActivityAnalysis(allEmployeeLogs, startDate, endDate) {
+  // Tüm logları haftaya göre grupla (Pazartesi-Pazar)
+  const logsByWeek = new Map();
+  
+  for (const [employeeCode, logs] of allEmployeeLogs) {
+    for (const log of logs) {
+      const logDate = parseDdMmYyyy(log.date) || new Date(log.date);
+      if (!logDate || isNaN(logDate.getTime())) continue;
+      
+      // Log'un hangi haftaya ait olduğunu bul (Pazartesi başlangıç)
+      const weekStart = getWeekStart(logDate);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6); // Pazar
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      // Hafta numarasını hesapla
+      const weekNumber = getWeekNumberForReport(weekStart);
+      const weekKey = `Hafta ${weekNumber} (${getWeekDateRange(logDate)})`;
+      
+      if (!logsByWeek.has(weekKey)) {
+        logsByWeek.set(weekKey, {
+          weekStart: weekStart,
+          weekEnd: weekEnd,
+          logs: []
+        });
+      }
+      logsByWeek.get(weekKey).logs.push({
+        ...log,
+        employeeCode: employeeCode,
+        dateObj: logDate
+      });
+    }
+  }
+  
+  const results = [];
+  
+  // Her hafta için analiz yap
+  for (const [weekKey, weekData] of logsByWeek) {
+    const logs = weekData.logs;
+    
+    // Logları tarih ve saate göre sırala
+    const sortedLogs = [...logs].sort((a, b) => {
+      if (a.dateObj.getTime() !== b.dateObj.getTime()) {
+        return a.dateObj.getTime() - b.dateObj.getTime();
+      }
+      const timeA = extractTimeFromLog(a.log);
+      const timeB = extractTimeFromLog(b.log);
+      return timeA - timeB;
+    });
+    
+    // İlk ve son log saatleri
+    const firstLogTime = sortedLogs.length > 0 ? extractTimeString(sortedLogs[0].log) : '';
+    const lastLogTime = sortedLogs.length > 0 ? extractTimeString(sortedLogs[sortedLogs.length - 1].log) : '';
+    
+    // Aktivite analizi (günlük ile aynı mantık)
+    const activityAnalysis = calculateActivityStatsForPeriod(sortedLogs);
+    
+    results.push({
+      period: weekKey,
+      totalLogs: logs.length,
+      firstLogTime: firstLogTime,
+      lastLogTime: lastLogTime,
+      activities: activityAnalysis.activities,
+      weekStart: weekData.weekStart,
+      weekEnd: weekData.weekEnd
+    });
+  }
+  
+  // Hafta numarasına göre sırala (en yeni en üstte)
+  results.sort((a, b) => {
+    const weekNumA = parseInt(a.period.match(/Hafta (\d+)/)?.[1] || '0');
+    const weekNumB = parseInt(b.period.match(/Hafta (\d+)/)?.[1] || '0');
+    return weekNumB - weekNumA;
+  });
+  
+  return results;
+}
+
+/**
+ * 📈 Aylık Aktivite Analizi Hesaplama
+ * Her ay için ayrı analiz yapar
+ */
+function calculateMonthlyActivityAnalysis(allEmployeeLogs, startDate, endDate) {
+  // Tüm logları aya göre grupla
+  const logsByMonth = new Map();
+  
+  for (const [employeeCode, logs] of allEmployeeLogs) {
+    for (const log of logs) {
+      const logDate = parseDdMmYyyy(log.date) || new Date(log.date);
+      if (!logDate || isNaN(logDate.getTime())) continue;
+      
+      const monthKey = Utilities.formatDate(logDate, 'Europe/Istanbul', 'MMMM yyyy');
+      
+      if (!logsByMonth.has(monthKey)) {
+        logsByMonth.set(monthKey, []);
+      }
+      logsByMonth.get(monthKey).push({
+        ...log,
+        employeeCode: employeeCode,
+        dateObj: logDate
+      });
+    }
+  }
+  
+  const results = [];
+  
+  // Her ay için analiz yap
+  for (const [monthKey, logs] of logsByMonth) {
+    // Logları tarih ve saate göre sırala
+    const sortedLogs = [...logs].sort((a, b) => {
+      if (a.dateObj.getTime() !== b.dateObj.getTime()) {
+        return a.dateObj.getTime() - b.dateObj.getTime();
+      }
+      const timeA = extractTimeFromLog(a.log);
+      const timeB = extractTimeFromLog(b.log);
+      return timeA - timeB;
+    });
+    
+    // İlk ve son log saatleri
+    const firstLogTime = sortedLogs.length > 0 ? extractTimeString(sortedLogs[0].log) : '';
+    const lastLogTime = sortedLogs.length > 0 ? extractTimeString(sortedLogs[sortedLogs.length - 1].log) : '';
+    
+    // Aktivite analizi
+    const activityAnalysis = calculateActivityStatsForPeriod(sortedLogs);
+    
+    results.push({
+      period: monthKey,
+      totalLogs: logs.length,
+      firstLogTime: firstLogTime,
+      lastLogTime: lastLogTime,
+      activities: activityAnalysis.activities
+    });
+  }
+  
+  // Aya göre sırala (en yeni en üstte)
+  results.sort((a, b) => {
+    const dateA = new Date(a.period);
+    const dateB = new Date(b.period);
+    return dateB.getTime() - dateA.getTime();
+  });
+  
+  return results;
+}
+
+/**
+ * 📊 Periyot için aktivite istatistikleri hesaplama (ortak fonksiyon)
+ * ÖNEMLİ: Süre hesaplama sadece aynı temsilciye ait loglar arasında yapılır
+ */
+function calculateActivityStatsForPeriod(sortedLogs) {
+  const activityMap = new Map();
+  let totalLogs = sortedLogs.length;
+  
+  // Logları temsilciye göre grupla (süre hesaplama için)
+  const logsByEmployee = new Map();
+  for (const log of sortedLogs) {
+    const employeeCode = log.employeeCode || 'UNKNOWN';
+    if (!logsByEmployee.has(employeeCode)) {
+      logsByEmployee.set(employeeCode, []);
+    }
+    logsByEmployee.get(employeeCode).push(log);
+  }
+  
+  // Her temsilci için loglarını sırala ve süre hesapla
+  for (const [employeeCode, employeeLogs] of logsByEmployee) {
+    const sortedEmployeeLogs = [...employeeLogs].sort((a, b) => {
+      const dateA = parseDdMmYyyy(a.date) || new Date(a.date);
+      const dateB = parseDdMmYyyy(b.date) || new Date(b.date);
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      const timeA = extractTimeFromLog(a.log);
+      const timeB = extractTimeFromLog(b.log);
+      return timeA - timeB;
+    });
+    
+    // Aynı temsilciye ait loglar arasında süre hesapla
+    for (let i = 0; i < sortedEmployeeLogs.length; i++) {
+      const log = sortedEmployeeLogs[i];
+      const activity = log.aktivite;
+      if (!activity) continue;
+      
+      if (!activityMap.has(activity)) {
+        activityMap.set(activity, {
+          count: 0,
+          totalDuration: 0,
+          durations: []
+        });
+      }
+      
+      const stats = activityMap.get(activity);
+      stats.count++;
+      
+      // Sadece aynı temsilciye ait bir sonraki log ile süre hesapla
+      if (i < sortedEmployeeLogs.length - 1) {
+        const nextLog = sortedEmployeeLogs[i + 1];
+        const timeDiff = calculateTimeDifferenceMinutes(log, nextLog);
+        if (timeDiff > 0) {
+          stats.totalDuration += timeDiff;
+          stats.durations.push(timeDiff);
+        }
+      }
+    }
+  }
+  
+  // Aktivite analizlerini hesapla
+  const activities = [];
+  for (const [activity, stats] of activityMap) {
+    const percentage = totalLogs > 0 ? (stats.count / totalLogs) * 100 : 0;
+    const avgDuration = stats.count > 0 ? stats.totalDuration / stats.count : 0;
+    
+    // Toplam süre formatı
+    const totalHours = Math.floor(stats.totalDuration / 60);
+    const totalMinutes = Math.round(stats.totalDuration % 60);
+    const totalDurationFormatted = totalHours > 0 
+      ? `${totalHours}s ${totalMinutes}dk` 
+      : `${totalMinutes}dk`;
+    
+    // Ortalama süre formatı
+    const avgDurationFormatted = `${avgDuration.toFixed(1)} dk`;
+    
+    // Yüzdelik formatı
+    const percentageFormatted = `%${percentage.toFixed(1)}`;
+    
+    // Dağılım formatı
+    const distributionFormatted = `%${percentage.toFixed(1)}`;
+    
+    activities.push({
+      type: activity,
+      count: stats.count,
+      totalDuration: stats.totalDuration,
+      totalDurationFormatted: totalDurationFormatted,
+      avgDuration: avgDuration,
+      avgDurationFormatted: avgDurationFormatted,
+      percentage: percentage,
+      percentageFormatted: percentageFormatted,
+      distributionFormatted: distributionFormatted
+    });
+  }
+  
+  // Standart sıralama kullan
+  const sortedActivities = sortActivitiesByStandardOrder(activities);
+  
+  return { activities: sortedActivities };
+}
+
+/**
+ * 📅 Hafta numarası hesaplama (ISO 8601)
+ */
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+/**
+ * 📅 Hafta tarih aralığı hesaplama (Pazartesi-Pazar)
+ * @param {Date} date - Herhangi bir tarih
+ * @returns {string} - "dd.MM - dd.MM.yyyy" formatında hafta aralığı
+ */
+function getWeekDateRange(date) {
+  // Pazartesi'yi bul
+  const monday = getWeekStart(date);
+  // Pazar = Pazartesi + 6 gün
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  
+  return `${Utilities.formatDate(monday, 'Europe/Istanbul', 'dd.MM')} - ${Utilities.formatDate(sunday, 'Europe/Istanbul', 'dd.MM.yyyy')}`;
+}
+
+/**
+ * ⏰ İki log arası süre hesaplama (dakika cinsinden)
+ */
+function calculateTimeDifferenceMinutes(log1, log2) {
+  try {
+    const time1 = extractTimeFromLog(log1.log);
+    const time2 = extractTimeFromLog(log2.log);
+    const date1 = parseDdMmYyyy(log1.date) || new Date(log1.date);
+    const date2 = parseDdMmYyyy(log2.date) || new Date(log2.date);
+    
+    if (!time1 || !time2) return 0;
+    
+    const dateTime1 = new Date(date1);
+    dateTime1.setHours(Math.floor(time1 / 60), time1 % 60, 0, 0);
+    
+    const dateTime2 = new Date(date2);
+    dateTime2.setHours(Math.floor(time2 / 60), time2 % 60, 0, 0);
+    
+    const diffMs = dateTime2.getTime() - dateTime1.getTime();
+    return Math.round(diffMs / (1000 * 60)); // Dakika cinsinden
+  } catch (error) {
+    return 0;
+  }
+}
+
+/**
+ * 📊 Standart Aktivite Sıralama Fonksiyonu
+ * Her yerde aynı sıralama: Negatifler → Fırsatlar → Randevu/Toplantı/Satış
+ */
+function getStandardActivityOrder() {
+  return [
+    // Negatifler
+    'İlgilenmiyor',
+    'Ulaşılamadı',
+    'Geçersiz Numara',
+    'Kurumsal',
+    // Fırsatlar
+    'Yeniden Aranacak',
+    'Bilgi Verildi',
+    'Fırsat İletildi',
+    // Randevu/Toplantı/Satış
+    'Randevu Alındı',
+    'İleri Tarih Randevu',
+    'Toplantı Tamamlandı',
+    'Satış Yapıldı'
+  ];
+}
+
+/**
+ * 📊 Aktivite sıralama fonksiyonu (standart sıralama)
+ */
+function sortActivitiesByStandardOrder(activities) {
+  const order = getStandardActivityOrder();
+  const orderMap = new Map();
+  order.forEach((activity, index) => {
+    orderMap.set(activity, index);
+  });
+  
+  return activities.sort((a, b) => {
+    const activityA = typeof a === 'string' ? a : a.type || a.aktivite || a.name || '';
+    const activityB = typeof b === 'string' ? b : b.type || b.aktivite || b.name || '';
+    
+    const orderA = orderMap.has(activityA) ? orderMap.get(activityA) : 999;
+    const orderB = orderMap.has(activityB) ? orderMap.get(activityB) : 999;
+    
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    
+    // Aynı sıradaysa alfabetik
+    return activityA.localeCompare(activityB, 'tr');
+  });
+}
+
+/**
+ * 📊 Karşılaştırma Verisi Hesaplama
+ * Tüm durumları içerir ve standart sıralama kullanır
+ */
+function calculateComparisonData(allEmployeeLogs) {
+  const results = [];
+  const standardActivities = getStandardActivityOrder();
+  
+  for (const [employeeCode, logs] of allEmployeeLogs) {
+    let totalLogs = logs.length;
+    let fastLogs = 0;
+    let longPauses = 0;
+    
+    // Tüm aktiviteler için sayaç
+    const activityCounts = new Map();
+    standardActivities.forEach(activity => {
+      activityCounts.set(activity, 0);
+    });
+    
+    // Aktivite sayıları için tüm logları kullan
+    for (const log of logs) {
+      const activity = log.aktivite;
+      if (activity && activityCounts.has(activity)) {
+        activityCounts.set(activity, activityCounts.get(activity) + 1);
+      }
+    }
+    
+    // Alarm hesaplaması için sadece zaman bilgisi olan logları kullan
+    const logsWithTime = logs.filter(log => {
+      const time = extractTimeFromLog(log.log);
+      return time !== null && time !== 0;
+    });
+    
+    // Zaman bilgisi olan logları sırala
+    const sortedLogsWithTime = [...logsWithTime].sort((a, b) => {
+      const dateA = parseDdMmYyyy(a.date) || (a.date instanceof Date ? a.date : new Date(String(a.date)));
+      const dateB = parseDdMmYyyy(b.date) || (b.date instanceof Date ? b.date : new Date(String(b.date)));
+      
+      if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+        return 0;
+      }
+      
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      const timeA = extractTimeFromLog(a.log);
+      const timeB = extractTimeFromLog(b.log);
+      return (timeA || 0) - (timeB || 0);
+    });
+    
+    // Alarm istatistiklerini hesapla (sadece zaman bilgisi olan loglar için)
+    for (let i = 0; i < sortedLogsWithTime.length - 1; i++) {
+      const current = sortedLogsWithTime[i];
+      const next = sortedLogsWithTime[i + 1];
+      
+      const timeDiff = calculateTimeDifferenceSeconds(current, next);
+      
+      // 15 sn altı log
+      if (timeDiff > 0 && timeDiff < 15) {
+        fastLogs++;
+      }
+      
+      // 5 dk+ pasif
+      if (timeDiff >= 300) {
+        longPauses++;
+      }
+    }
+    
+    // Sonuç objesi oluştur
+    const result = {
+      employeeCode: employeeCode,
+      totalLogs: totalLogs,
+      fastLogs: fastLogs,
+      longPauses: longPauses
+    };
+    
+    // Tüm aktiviteleri ekle
+    standardActivities.forEach(activity => {
+      const key = activity.toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/ı/g, 'i')
+        .replace(/ş/g, 's')
+        .replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u')
+        .replace(/ö/g, 'o')
+        .replace(/ç/g, 'c');
+      result[key] = activityCounts.get(activity) || 0;
+    });
+    
+    results.push(result);
+  }
+  
+  // Randevu Alındı sayısına göre sırala (en çoktan en aza)
+  results.sort((a, b) => {
+    const randevuA = a.randevualindi || 0;
+    const randevuB = b.randevualindi || 0;
+    return randevuB - randevuA;
+  });
+  
+  return results;
+}
+
+/**
+ * ⏰ İki log arası süre hesaplama (saniye cinsinden)
+ * Geliştirilmiş: Log string'inden direkt tam tarih+saat+saniye çıkarır
+ */
+function calculateTimeDifferenceSeconds(log1, log2) {
+  try {
+    // Log string'inden direkt tam tarih+saat+saniye çıkar
+    let dateTime1 = extractFullDateTimeFromLog(log1);
+    let dateTime2 = extractFullDateTimeFromLog(log2);
+    
+    // Eğer log string'inden bulunamadıysa, date ve time field'larından dene
+    if (!dateTime1) {
+      dateTime1 = buildDateTimeFromFields(log1);
+    }
+    if (!dateTime2) {
+      dateTime2 = buildDateTimeFromFields(log2);
+    }
+    
+    // Validasyon
+    if (!dateTime1 || !dateTime2 || isNaN(dateTime1.getTime()) || isNaN(dateTime2.getTime())) {
+      return 0;
+    }
+    
+    const diffMs = dateTime2.getTime() - dateTime1.getTime();
+    const diffSeconds = Math.round(diffMs / 1000);
+    
+    // Negatif fark kontrolü (loglar yanlış sıralanmış olabilir)
+    if (diffSeconds < 0) {
+      // Negatif fark - loglar yanlış sıralanmış, ama mutlak değer al
+      return Math.abs(diffSeconds);
+    }
+    
+    return diffSeconds;
+  } catch (error) {
+    console.error('❌ calculateTimeDifferenceSeconds hatası:', error, 'log1:', log1, 'log2:', log2);
+    return 0;
+  }
+}
+
+/**
+ * ⏰ Log string'inden tam tarih+saat+saniye çıkarma
+ * Format: "Aktivite - dd.MM.yyyy HH:mm:ss" veya "dd.MM.yyyy HH:mm:ss"
+ */
+function extractFullDateTimeFromLog(logObj) {
+  try {
+    const logStr = String(logObj.log || '');
+    if (!logStr) return null;
+    
+    // Format 1: "Aktivite - dd.MM.yyyy HH:mm:ss" (örn: "İlgilenmiyor - 28.11.2025 11:14:18")
+    const match1 = logStr.match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})/);
+    if (match1) {
+      const day = parseInt(match1[1]);
+      const month = parseInt(match1[2]) - 1; // JavaScript'te ay 0-11 arası
+      const year = parseInt(match1[3]);
+      const hours = parseInt(match1[4]);
+      const minutes = parseInt(match1[5]);
+      const seconds = parseInt(match1[6]);
+      
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60 && seconds >= 0 && seconds < 60) {
+        const date = new Date(year, month, day, hours, minutes, seconds);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+    }
+    
+    // Format 2: Sadece "HH:mm:ss" ve date field'ından tarih al
+    const match2 = logStr.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+    if (match2 && logObj.date) {
+      const hours = parseInt(match2[1]);
+      const minutes = parseInt(match2[2]);
+      const seconds = parseInt(match2[3]);
+      
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60 && seconds >= 0 && seconds < 60) {
+        let date = parseDdMmYyyy(logObj.date);
+        if (!date || isNaN(date.getTime())) {
+          if (logObj.date instanceof Date) {
+            date = new Date(logObj.date);
+          } else {
+            date = new Date(String(logObj.date));
+          }
+        }
+        
+        if (date && !isNaN(date.getTime())) {
+          date.setHours(hours, minutes, seconds);
+          return date;
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * ⏰ Date ve time field'larından DateTime oluşturma
+ */
+function buildDateTimeFromFields(logObj) {
+  try {
+    let date = null;
+    
+    // Tarih parse et
+    if (logObj.date) {
+      date = parseDdMmYyyy(logObj.date);
+      if (!date || isNaN(date.getTime())) {
+        if (logObj.date instanceof Date) {
+          date = new Date(logObj.date);
+        } else {
+          date = new Date(String(logObj.date));
+        }
+      }
+    }
+    
+    if (!date || isNaN(date.getTime())) {
+      return null;
+    }
+    
+    // Zaman parse et
+    let time = null;
+    if (logObj.log) {
+      time = extractTimeFromLog(logObj.log);
+    }
+    if (!time && logObj.time) {
+      time = extractTimeFromLog(logObj.time);
+    }
+    
+    if (!time || time === 0) {
+      return null;
+    }
+    
+    // Tarih ve zamanı birleştir (saniyeler 0 olarak ayarlanır)
+    const dateTime = new Date(date);
+    dateTime.setHours(Math.floor(time / 60), time % 60, 0, 0);
+    
+    return dateTime;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * ⏰ Log'dan zaman çıkarma (dakika cinsinden)
+ * Geliştirilmiş: Farklı zaman formatlarını destekler
+ */
+function extractTimeFromLog(logStr) {
+  if (!logStr) return null;
+  
+  try {
+    const str = String(logStr);
+    
+    // Format 1: HH:mm:ss (örn: 14:30:45)
+    const match1 = str.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+    if (match1) {
+      const hours = parseInt(match1[1]);
+      const minutes = parseInt(match1[2]);
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+        return hours * 60 + minutes;
+      }
+    }
+    
+    // Format 2: HH:mm (örn: 14:30)
+    const match2 = str.match(/(\d{1,2}):(\d{2})(?!\d)/);
+    if (match2) {
+      const hours = parseInt(match2[1]);
+      const minutes = parseInt(match2[2]);
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+        return hours * 60 + minutes;
+      }
+    }
+    
+    // Format 3: Log içinde tarih ve saat birlikte (örn: "Randevu alındı - 30.11.2025 14:30:45")
+    const match3 = str.match(/(\d{2}\.\d{2}\.\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})/);
+    if (match3) {
+      const hours = parseInt(match3[2]);
+      const minutes = parseInt(match3[3]);
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+        return hours * 60 + minutes;
+      }
+    }
+    
+    // Format 4: Log içinde sadece saat (örn: "14:30:45 - Randevu alındı")
+    const match4 = str.match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+    if (match4) {
+      const hours = parseInt(match4[1]);
+      const minutes = parseInt(match4[2]);
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+        return hours * 60 + minutes;
+      }
+    }
+    
+  } catch (error) {
+    // Sessizce null döndür
+    return null;
+  }
+  
+  return null;
+}
+
+/**
+ * ⏰ Log'dan zaman string'i çıkarma
+ */
+function extractTimeString(logStr) {
+  try {
+    const match = String(logStr).match(/(\d{1,2}):(\d{2}):(\d{2})/);
+    if (match) {
+      return `${match[1]}:${match[2]}`;
+    }
+    const match2 = String(logStr).match(/(\d{1,2}):(\d{2})/);
+    if (match2) {
+      return `${match2[1]}:${match2[2]}`;
+    }
+  } catch (error) {
+    return '';
+  }
+  return '';
 }
 
 
@@ -8837,6 +11368,12 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     const lastUpdateKey = `LAST_UPDATE_${employeeCode}`;
     // const lastUpdateDate = PropertiesService.getScriptProperties().getProperty(lastUpdateKey);
     const lastUpdateDate = null; // GEÇİCİ: Tüm log'ları al
+    
+    // ⏱️ Son 30 gün filtresi
+    const today = new Date();
+    const cutoffDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    cutoffDate.setDate(cutoffDate.getDate() - 30);
+    console.log(`⏱️ Son 30 gün filtresi aktif. Eşik: ${Utilities.formatDate(cutoffDate, 'Europe/Istanbul', 'dd.MM.yyyy')} ve sonrası`);
     
     console.log(`🔍 Son güncelleme tarihi: ${lastUpdateDate || 'İlk giriş (tüm log\'lar alınacak)'}`);
     
@@ -8928,8 +11465,9 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     
     // Tarih bazlı gruplama
     const logsByDate = new Map();
+    let skippedOlderThanCutoff = 0;
     
-    console.log(`📊 Toplam ${allData.length} satır okunacak`);
+    console.log(`📊 Toplam ${allData.length} satır okunacak (Son 30 gün filtresi ile)`);
     
     // GEÇİCİ: Mevcut log özeti sayfasından eski verileri alma işlemini devre dışı bırak
     // TODO: Bu işlem daha sonra aktif edilecek
@@ -8938,6 +11476,8 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     
     // Yeni verileri işle
     let newLogsCount = 0;
+    let hamVeriSkippedCount = 0;
+    let invalidLogsCount = 0;
     console.log(`🚀 LOG İŞLEME BAŞLIYOR: ${allData.length} satır işlenecek`);
     
     for (let i = 0; i < allData.length; i++) {
@@ -8948,22 +11488,11 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
       const aktiviteTarihi = row[row._tarihIndex];
       const aktivite = row[row._aktiviteIndex];
       
-      // İlk 10 satırı detaylı göster (debug için)
-      if (i < 10) {
-        console.log(`🔍 SATIR ${i + 1} DETAYI:`);
-        console.log(`   Aktivite: "${aktivite}" (tip: ${typeof aktivite})`);
-        console.log(`   Tarih: "${aktiviteTarihi}" (tip: ${typeof aktiviteTarihi})`);
-        console.log(`   Log: "${logValue?.substring(0, 50)}..." (tip: ${typeof logValue})`);
-        console.log(`   Kaynak: "${row._sheetName}"`);
-        console.log(`   İndeksler: Aktivite=${row._aktiviteIndex}, Tarih=${row._tarihIndex}, Log=${row._logIndex}`);
-        console.log(`   Ham satır:`, row);
-      }
-      
       // "Ham veri'den aktarıldı" kontrolü - bunları atla
       const isHamVeri = logValue && String(logValue).toLowerCase().includes('ham veri');
       
       if (isHamVeri) {
-        console.log(`⏭️ Ham veri satırı atlandı: "${logValue?.substring(0, 30)}..."`);
+        hamVeriSkippedCount++;
         continue; // Bu satırı atla
       }
       
@@ -8971,6 +11500,16 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
       const hasAktiviteTarihi = aktiviteTarihi && String(aktiviteTarihi).trim() !== '';
       const hasLogValue = logValue && String(logValue).trim() !== '';
       const hasAktivite = aktivite && String(aktivite).trim() !== '';
+
+      // Son 30 gün filtresi (Aktivite Tarihi üzerinden)
+      if (hasAktiviteTarihi) {
+        const dt = parseDdMmYyyy(aktiviteTarihi) || new Date(String(aktiviteTarihi));
+        const valid = dt instanceof Date && !isNaN(dt.getTime());
+        if (!valid || dt < cutoffDate) {
+          skippedOlderThanCutoff++;
+          continue;
+        }
+      }
       
       if (hasAktiviteTarihi && hasLogValue && hasAktivite) {
         // GEÇİCİ: Tüm log'ları al (tarih karşılaştırmasını devre dışı bırak)
@@ -8980,24 +11519,59 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
           logsByDate.set(aktiviteTarihi, []);
         }
         
+        // Log'dan zaman bilgisini çıkar (sıralama için)
+        const timeFromLog = extractTimeFromLog(logValue);
+        // extractTimeStr fonksiyonu createEmployeeLogSummarySheet içinde tanımlı, burada basit bir versiyon kullan
+        let timeStr = '';
+        try {
+          const s = String(logValue || '');
+          const m = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+          if (m) {
+            timeStr = `${String(m[1]).padStart(2, '0')}:${m[2]}`;
+          } else {
+            const m2 = s.match(/(\d{1,2}):(\d{2})/);
+            if (m2) {
+              timeStr = `${String(m2[1]).padStart(2, '0')}:${m2[2]}`;
+            }
+          }
+        } catch (e) {
+          timeStr = '';
+        }
+        
         logsByDate.get(aktiviteTarihi).push({
           rowIndex: i + 2,
           log: logValue,
           aktivite: aktivite,
           aktiviteTarihi: aktiviteTarihi,
-          sourceSheet: row._sheetName
+          sourceSheet: row._sheetName,
+          timeMinutes: timeFromLog || 0, // Sıralama için zaman (dakika cinsinden)
+          timeStr: timeStr // Görüntüleme için zaman string'i
         });
         
         newLogsCount++;
-        console.log(`✅ Yeni log eklendi: ${aktiviteTarihi} - ${aktivite} (Kaynak: ${row._sheetName})`);
       } else {
-        console.log(`❌ Log atlandı: Tarih="${aktiviteTarihi}" (boş: ${!hasAktiviteTarihi}), Aktivite="${aktivite}" (boş: ${!hasAktivite}), Log="${logValue?.substring(0, 30)}..." (boş: ${!hasLogValue})`);
+        invalidLogsCount++;
       }
+    }
+    
+    // Her gün için logları zamana göre sırala (sayfa bazlı değil, zaman bazlı)
+    console.log('🔄 Loglar zamana göre sıralanıyor...');
+    for (const [dateKey, logs] of logsByDate) {
+      logs.sort((a, b) => {
+        // Önce zaman bilgisine göre sırala
+        if (a.timeMinutes !== b.timeMinutes) {
+          return a.timeMinutes - b.timeMinutes;
+        }
+        // Aynı saatte ise, log string'ine göre sırala
+        return String(a.log || '').localeCompare(String(b.log || ''));
+      });
+      console.log(`✅ ${dateKey}: ${logs.length} log zamana göre sıralandı`);
     }
     
     console.log(`🎯 LOG İŞLEME TAMAMLANDI:`);
     console.log(`   Toplam satır: ${allData.length}`);
     console.log(`   İşlenen log: ${newLogsCount}`);
+    console.log(`   30+ gün eski (atlanan): ${skippedOlderThanCutoff}`);
     console.log(`   Tarih sayısı: ${logsByDate.size}`);
     console.log(`   Tarihler: ${Array.from(logsByDate.keys()).join(', ')}`);
     
@@ -9018,7 +11592,7 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     const logSheet = createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, allLogsByDate);
     
     // Sonuç raporu
-    let resultMessage = `📊 ${employeeCode} - ${employeeName} Log Özeti!\n\n`;
+    let resultMessage = `📊 ${employeeCode} - ${employeeName} Log Özeti (Son 30 gün)\n\n`;
     resultMessage += `📅 Toplam gün sayısı: ${allLogsByDate.size}\n`;
     
     let totalLogs = 0;
@@ -9029,6 +11603,9 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     
     if (newLogsCount > 0) {
       resultMessage += `\n🆕 Yeni eklenen log: ${newLogsCount}`;
+    }
+    if (skippedOlderThanCutoff > 0) {
+      resultMessage += `\n⏭️ 30+ gün eski (atlanan): ${skippedOlderThanCutoff}`;
     }
     
     resultMessage += `\n📊 Toplam log sayısı: ${totalLogs}`;
@@ -9051,158 +11628,576 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
 function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, logsByDate) {
   try {
     const sheetName = `📊 ${employeeCode} Log Özeti`;
-    
-    // Eski sayfayı sil (varsa)
-    const existingSheet = managerFile.getSheetByName(sheetName);
-    if (existingSheet) {
-      managerFile.deleteSheet(existingSheet);
+
+    // Eski sayfayı SİLME; varsa sadece içeriğini temizle (başlıkları yeniden yazacağız)
+    let sheet = managerFile.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = managerFile.insertSheet(sheetName);
+    } else {
+      try {
+        const lr = sheet.getLastRow();
+        const lc = sheet.getLastColumn();
+        if (lr > 0 && lc > 0) sheet.getRange(1, 1, lr, lc).clearContent();
+      } catch (_) {}
     }
-    
-    // Yeni sayfa oluştur
-    const sheet = managerFile.insertSheet(sheetName);
-    
-    // Başlık
-    sheet.getRange(1, 1).setValue(`📊 ${employeeCode} - ${employeeName} Log Özeti`);
-    sheet.getRange(1, 1, 1, 4).merge();
-    sheet.getRange(1, 1).setFontWeight('bold').setFontSize(14);
-    
-    // ZAMAN ANALİZİ - ÜSTTE
-    addTimeAnalysis(sheet, logsByDate);
-    
-    // Özet bilgiler
-    let row = 10; // Zaman analizi sonrası başla
-    sheet.getRange(row, 1).setValue('📅 Toplam Gün:');
-    sheet.getRange(row, 2).setValue(logsByDate.size);
-    row++;
-    
-    let totalLogs = 0;
-    for (const [date, logs] of logsByDate) {
-      totalLogs += logs.length;
+
+    // Gruplu görünüm: Gün → Kaynak → Başlık satırı → Kayıtlar
+    const columns = ['Saat', 'Aktivite', 'Log Detayı', 'Kaynak', 'Satır No'];
+    const rows = [];
+
+    function parseKeyToDate(key) {
+      try {
+        const parts = String(key || '').split('.');
+        if (parts.length === 3) return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      } catch (_) {}
+      return new Date('1900-01-01');
     }
+
+    function toMinutesFromLog(obj) {
+      const s = String(obj && obj.log || '');
+      const m = s.match(/(\d{1,2}):(\d{2})/);
+      return m ? (Number(m[1]) * 60 + Number(m[2])) : 0;
+    }
+
+    function extractTimeStr(logStr) {
+      const s = String(logStr || '');
+      const m = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+      if (m) return `${String(m[1]).padStart(2, '0')}:${m[2]}`;
+      const m2 = s.match(/(\d{1,2}):(\d{2})/);
+      if (m2) return `${String(m2[1]).padStart(2, '0')}:${m2[2]}`;
+      return '';
+    }
+
+    const sortedDates = Array.from(logsByDate.keys()).sort((a, b) => parseKeyToDate(b) - parseKeyToDate(a));
     
-    sheet.getRange(row, 1).setValue('📊 Toplam Log:');
-    sheet.getRange(row, 2).setValue(totalLogs);
-    row++;
+    // Tüm alarm satırlarını tut (RichTextValue için)
+    const alarmRows = [];
+
+    // İşbaşı saati (11:00)
+    const WORK_START_HOUR = 11;
+    const WORK_START_MINUTE = 0;
+    const WORK_START_MINUTES = WORK_START_HOUR * 60 + WORK_START_MINUTE; // 660 dakika
     
-    // Tarih bazlı log'ları ekle - En eski tarihten en yeniye sırala
-    row += 2; // Biraz boşluk bırak
-    
-    // Tarihleri sırala: En yeni tarihten en eskiye
-    const sortedDates = Array.from(logsByDate.keys()).sort((a, b) => {
-      const dateA = new Date(a.split('.').reverse().join('-'));
-      const dateB = new Date(b.split('.').reverse().join('-'));
-      return dateB - dateA; // En yeni tarih önce
-    });
-    
-    for (const date of sortedDates) {
-      const logs = logsByDate.get(date);
-      // Tarih başlığı
-      sheet.getRange(row, 1).setValue(`📅 ${date} (${logs.length} log)`);
-      sheet.getRange(row, 1, 1, 5).merge();
-      sheet.getRange(row, 1).setFontWeight('bold').setBackground('#E3F2FD');
-      row++;
+    for (const dateKey of sortedDates) {
+      const dayList = (logsByDate.get(dateKey) || []).slice();
       
-      // Kaynak bazlı gruplama
-      const logsBySource = new Map();
-      for (const log of logs) {
-        const source = log.sourceSheet || 'Bilinmiyor';
-        if (!logsBySource.has(source)) {
-          logsBySource.set(source, []);
-        }
-        logsBySource.get(source).push(log);
-      }
-      
-      // Her kaynak için ayrı bölüm
-      for (const [source, sourceLogs] of logsBySource) {
-        // Kaynak başlığı
-        sheet.getRange(row, 1).setValue(`📊 ${source} (${sourceLogs.length} log)`);
-        sheet.getRange(row, 1, 1, 5).merge();
-        sheet.getRange(row, 1).setFontWeight('bold').setBackground('#FFF3E0');
-        row++;
+      // Gün özeti hesapla - ÖNCE logları zamana göre sırala
+      // Her log için timeMinutes MUTLAKA doğru hesapla (dayList.sort YAPMA, direkt logsWithTime'da sırala)
+      const logsWithTime = dayList.map(item => {
+        // Önce mevcut timeMinutes'i kontrol et
+        let timeMinutes = item.timeMinutes;
         
-        // Tablo başlıkları
-        sheet.getRange(row, 1).setValue('Saat');
-        sheet.getRange(row, 2).setValue('Aktivite');
-        sheet.getRange(row, 3).setValue('Log Detayı');
-        sheet.getRange(row, 4).setValue('Kaynak');
-        sheet.getRange(row, 5).setValue('Satır No');
-        sheet.getRange(row, 1, 1, 5).setFontWeight('bold').setBackground('#F5F5F5');
-        row++;
-        
-        // Log verilerini ekle - Saat sıralaması ile
-        const sortedLogs = sourceLogs.sort((a, b) => {
-          const timeA = a.log.match(/(\d{1,2}):(\d{2})/);
-          const timeB = b.log.match(/(\d{1,2}):(\d{2})/);
-          
-          if (!timeA || !timeB) return 0;
-          
-          const minutesA = parseInt(timeA[1]) * 60 + parseInt(timeA[2]);
-          const minutesB = parseInt(timeB[1]) * 60 + parseInt(timeB[2]);
-          
-          return minutesA - minutesB; // En düşük saatten yükseğe
-        });
-        
-        for (const log of sortedLogs) {
-          // Log'dan saat bilgisini çıkar
-          const timeMatch = log.log.match(/(\d{1,2}):(\d{2})/);
-          const time = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : 'Bilinmiyor';
-          
-          sheet.getRange(row, 1).setValue(time);
-          sheet.getRange(row, 2).setValue(log.aktivite);
-          sheet.getRange(row, 3).setValue(log.log);
-          sheet.getRange(row, 4).setValue(log.sourceSheet || 'Bilinmiyor');
-          sheet.getRange(row, 5).setValue(log.rowIndex);
-          
-          // Aktivite türüne göre renklendirme - CRM_CONFIG'den
-          const aktivite = log.aktivite.toString();
-          let backgroundColor = null;
-          
-          // CRM_CONFIG'den renk bul
-          for (const [status, color] of Object.entries(CRM_CONFIG.COLOR_CODES)) {
-            if (aktivite.toLowerCase().includes(status.toLowerCase())) {
-              backgroundColor = color;
-              break;
-            }
-          }
-          
-          // Eğer renk bulunamadıysa varsayılan (Ulaşılamadı ve İlgilenmiyor hariç)
-          if (!backgroundColor) {
-            if (aktivite.toLowerCase().includes('randevu alındı') || aktivite.toLowerCase().includes('fırsat eklendi')) {
-              backgroundColor = 'rgb(232, 245, 232)'; // Açık Yeşil
-            } else if (aktivite.toLowerCase().includes('bilgi verildi') || aktivite.toLowerCase().includes('yeniden aranacak')) {
-              backgroundColor = 'rgb(255, 248, 225)'; // Açık Sarı
-            }
-            // İlgilenmiyor ve Ulaşılamadı için renk yok - beyaz kalacak
-          }
-          
-          // Renk uygula
-          if (backgroundColor) {
-            sheet.getRange(row, 1, 1, 5).setBackground(backgroundColor);
-          }
-          
-          row++;
+        // Eğer geçerli bir değer yoksa, log'dan direkt çıkar
+        if (!timeMinutes || timeMinutes === 0 || timeMinutes === null || isNaN(timeMinutes)) {
+          timeMinutes = extractTimeFromLog(item.log);
         }
         
-        // Kaynaklar arası boşluk
-        row++;
+        // Hala geçersizse, log string'inden manuel çıkar
+        if (!timeMinutes || timeMinutes === 0 || timeMinutes === null || isNaN(timeMinutes)) {
+          const logStr = String(item.log || '');
+          // Format: "İlgilenmiyor - 28.11.2025 11:47:42" veya "11:47:42" veya "11:47"
+          const timeMatch1 = logStr.match(/(\d{2}\.\d{2}\.\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})/); // Tarih + saat
+          if (timeMatch1) {
+            const h = parseInt(timeMatch1[2]);
+            const m = parseInt(timeMatch1[3]);
+            if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+              timeMinutes = h * 60 + m;
+            }
+          } else {
+            const timeMatch2 = logStr.match(/(\d{1,2}):(\d{2}):(\d{2})/); // Sadece saat:dd:mm:ss
+            if (timeMatch2) {
+              const h = parseInt(timeMatch2[1]);
+              const m = parseInt(timeMatch2[2]);
+              if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+                timeMinutes = h * 60 + m;
+              }
+            } else {
+              const timeMatch3 = logStr.match(/(\d{1,2}):(\d{2})(?!\d)/); // Sadece saat:dd:mm
+              if (timeMatch3) {
+                const h = parseInt(timeMatch3[1]);
+                const m = parseInt(timeMatch3[2]);
+                if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+                  timeMinutes = h * 60 + m;
+                }
+              }
+            }
+          }
+        }
+        
+        // Son çare: 0 veya çok büyük bir sayı (hatalı hesaplamaları filtrelemek için)
+        if (!timeMinutes || timeMinutes === 0 || timeMinutes === null || isNaN(timeMinutes) || timeMinutes > 1440) {
+          timeMinutes = 9999; // Zamanı olmayan loglar en sona gitsin
+        }
+        
+        return {
+          ...item,
+          timeMinutes: timeMinutes
+        };
+      });
+      
+      // Zamana göre sırala (erken saat yukarıda, zamanı olmayanlar en sonda)
+      // KESIN ÇÖZÜM: Her log için zamanı tekrar çıkar ve sırala
+      logsWithTime.sort((a, b) => {
+        // Her ikisi için de zamanı tekrar hesapla (güvenlik için)
+        let timeA = a.timeMinutes;
+        let timeB = b.timeMinutes;
+        
+        // Eğer geçersizse, log string'inden direkt çıkar
+        if (!timeA || timeA === 0 || timeA === null || isNaN(timeA) || timeA === 9999) {
+          timeA = extractTimeFromLog(a.log) || 9999;
+        }
+        if (!timeB || timeB === 0 || timeB === null || isNaN(timeB) || timeB === 9999) {
+          timeB = extractTimeFromLog(b.log) || 9999;
+        }
+        
+        // Hala geçersizse, log string'inden manuel çıkar
+        if (!timeA || timeA === 0 || timeA === null || isNaN(timeA) || timeA === 9999) {
+          const logStrA = String(a.log || '');
+          const matchA = logStrA.match(/(\d{1,2}):(\d{2}):(\d{2})/) || logStrA.match(/(\d{1,2}):(\d{2})(?!\d)/);
+          if (matchA) {
+            const h = parseInt(matchA[1]);
+            const m = parseInt(matchA[2]);
+            if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+              timeA = h * 60 + m;
+            }
+          }
+          if (!timeA || timeA === 0 || timeA === null || isNaN(timeA)) timeA = 9999;
+        }
+        
+        if (!timeB || timeB === 0 || timeB === null || isNaN(timeB) || timeB === 9999) {
+          const logStrB = String(b.log || '');
+          const matchB = logStrB.match(/(\d{1,2}):(\d{2}):(\d{2})/) || logStrB.match(/(\d{1,2}):(\d{2})(?!\d)/);
+          if (matchB) {
+            const h = parseInt(matchB[1]);
+            const m = parseInt(matchB[2]);
+            if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+              timeB = h * 60 + m;
+            }
+          }
+          if (!timeB || timeB === 0 || timeB === null || isNaN(timeB)) timeB = 9999;
+        }
+        
+        // Zaman bazlı sıralama
+        if (timeA !== timeB) {
+          return timeA - timeB;
+        }
+        // Aynı saatte ise, log string'ine göre sırala
+        return String(a.log || '').localeCompare(String(b.log || ''));
+      });
+      
+      let firstLogTime = null;
+      let lastLogTime = null;
+      let totalDelayMinutes = 0; // Toplam gecikme (dakika)
+      let totalPauseMinutes = 0; // Toplam mola süresi (5dk+ molalar, dakika)
+      let pauseCount = 0; // Mola sayısı
+      
+      if (logsWithTime.length > 0) {
+        // İlk log'un zamanını al
+        const firstLog = logsWithTime[0];
+        firstLogTime = firstLog.timeMinutes || extractTimeFromLog(firstLog.log);
+        
+        // Son log'un zamanını al
+        const lastLog = logsWithTime[logsWithTime.length - 1];
+        lastLogTime = lastLog.timeMinutes || extractTimeFromLog(lastLog.log);
+        
+        // Gecikme hesapla (11:00'dan sonra başladıysa - 11:05 değil, 11:00)
+        if (firstLogTime && firstLogTime > 0 && firstLogTime > WORK_START_MINUTES) {
+          totalDelayMinutes = firstLogTime - WORK_START_MINUTES;
+        }
+        
+        // 5 dakikadan fazla molaları hesapla (sıralı loglar üzerinden)
+        // KESIN MANTIK:
+        // 1. Sabah gecikmesi = 11:00 ile ilk log arasındaki fark (sadece gecikme, mola değil)
+        // 2. İlk log ile ikinci log arasındaki fark = MOLA DEĞİL (işe yeni başlamış, henüz mola vermemiş)
+        // 3. Mola = İkinci log ile üçüncü log arasından itibaren, tüm 5dk+ duraklamalar
+        // Yani: i=0 (ilk log) ve i=0 ile i=1 arası atlanır, i=1 (ikinci log) ile i+1=2 (üçüncü log) arasından başlar
+        // Ama döngü i=1'den başlıyor, yani ikinci log (i=1) ile üçüncü log (i+1=2) arası sayılıyor - BU DOĞRU
+        // ÖNEMLİ: İlk log (i=0) ile ikinci log (i=1) arası ATLANMALI, çünkü bu işe başlama süresi, mola değil
+        
+        // Debug: İlk birkaç log'un zamanlarını göster
+        if (logsWithTime.length >= 2) {
+          const log0Time = logsWithTime[0].timeMinutes || extractTimeFromLog(logsWithTime[0].log) || 0;
+          const log1Time = logsWithTime[1].timeMinutes || extractTimeFromLog(logsWithTime[1].log) || 0;
+          const log0TimeStr = logsWithTime[0].timeStr || `${Math.floor(log0Time/60)}:${String(log0Time%60).padStart(2,'0')}`;
+          const log1TimeStr = logsWithTime[1].timeStr || `${Math.floor(log1Time/60)}:${String(log1Time%60).padStart(2,'0')}`;
+          console.log(`🔍 ${dateKey} - İlk iki log: ${log0TimeStr} → ${log1TimeStr} = ${log1Time - log0Time}min (ATLANACAK - mola değil, işe başlama)`);
+        }
+        
+        // Mola hesaplama: İkinci log'dan itibaren (i=1), bir sonraki log ile fark hesapla
+        console.log(`🔍 ${dateKey} - Mola hesaplama başlıyor: ${logsWithTime.length} log, i=1'den başlıyor (ikinci log ile üçüncü log arası)`);
+        
+        for (let i = 1; i < logsWithTime.length - 1; i++) {
+          const currentItem = logsWithTime[i];
+          const nextItem = logsWithTime[i + 1];
+          
+          // Zaman farkını hesapla (dakika cinsinden)
+          const currentTime = currentItem.timeMinutes || extractTimeFromLog(currentItem.log) || 0;
+          const nextTime = nextItem.timeMinutes || extractTimeFromLog(nextItem.log) || 0;
+          
+          if (currentTime > 0 && nextTime > 0 && nextTime > currentTime) {
+            // Negatif zaman farkları sıralama hatası gösterebilir, bunları atla
+            const timeDiffMinutes = nextTime - currentTime;
+            
+            // 5 dakika veya daha fazla mola (ikinci log'dan itibaren)
+            // ÖNEMLİ: timeDiffMinutes pozitif olmalı (nextTime > currentTime kontrolü yapıldı)
+            if (timeDiffMinutes >= 5) {
+              // Debug: Tüm molaları detaylı göster
+              const currentTimeStr = currentItem.timeStr || `${Math.floor(currentTime/60)}:${String(currentTime%60).padStart(2,'0')}`;
+              const nextTimeStr = nextItem.timeStr || `${Math.floor(nextTime/60)}:${String(nextTime%60).padStart(2,'0')}`;
+              console.log(`⏸️ ${dateKey} - Mola #${pauseCount + 1}: ${currentTimeStr} → ${nextTimeStr} = ${timeDiffMinutes} dakika (Log[${i}] → Log[${i+1}])`);
+              
+              totalPauseMinutes += timeDiffMinutes;
+              pauseCount++;
+            }
+          } else {
+            // Zaman bilgisi yoksa, calculateTimeDifferenceSeconds kullan
+            const log1 = {
+              date: dateKey,
+              log: currentItem.log,
+              aktivite: currentItem.aktivite
+            };
+            const log2 = {
+              date: dateKey,
+              log: nextItem.log,
+              aktivite: nextItem.aktivite
+            };
+            
+            const timeDiff = calculateTimeDifferenceSeconds(log1, log2);
+            
+            if (timeDiff >= 300) { // 5 dakika = 300 saniye
+              const minutes = Math.floor(timeDiff / 60);
+              totalPauseMinutes += minutes;
+              pauseCount++;
+            }
+          }
+        }
+        
+        // Debug: Toplam mola özeti
+        console.log(`📊 ${dateKey} - Mola özeti: ${totalPauseMinutes} dakika, ${pauseCount} adet`);
       }
       
-      // Günler arası boşluk
-      row++;
+      // Gün başlığı ve özeti - Her bilgi ayrı satırda (düzgün dizayn)
+      rows.push([`📅 ${dateKey}`, '', '', '', '']); // Tarih
+      rows.push([`📊 ${dayList.length} log`, '', '', '', '']); // Log sayısı
+      
+      // Gün özeti bilgileri (her biri ayrı satır)
+      if (firstLogTime && firstLogTime > 0) {
+        const startHours = Math.floor(firstLogTime / 60);
+        const startMins = firstLogTime % 60;
+        const startTimeStr = `${String(startHours).padStart(2, '0')}:${String(startMins).padStart(2, '0')}`;
+        
+        if (lastLogTime && lastLogTime > 0) {
+          const endHours = Math.floor(lastLogTime / 60);
+          const endMins = lastLogTime % 60;
+          const endTimeStr = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
+          
+          rows.push([`⏰ ${startTimeStr} - ${endTimeStr}`, '', '', '', '']); // Başlama - Bitiş
+        } else {
+          rows.push([`⏰ Başlama: ${startTimeStr}`, '', '', '', '']); // Sadece başlama
+        }
+        
+        // Gecikme bilgisi
+        if (totalDelayMinutes > 0) {
+          rows.push([`⏳ Gecikme: ${totalDelayMinutes} dakika`, '', '', '', '']); // Gecikme
+        }
+        
+        // Mola özeti
+        if (pauseCount > 0) {
+          rows.push([`⏸️ Toplam Mola: ${totalPauseMinutes} dakika (${pauseCount} mola)`, '', '', '', '']); // Mola
+        }
+      }
+      
+      rows.push(['', '', '', '', '']); // Boş satır (ayırıcı)
+      
+      // Kolon başlıkları
+      rows.push(columns.slice());
+      
+      // Kayıtlar + Alarm satırları (zamana göre sıralı, logsWithTime kullan)
+      for (let i = 0; i < logsWithTime.length; i++) {
+        const item = logsWithTime[i];
+        
+        // Eğer item veya item.log yoksa, bu satırı atla
+        if (!item || !item.log) {
+          console.log(`⚠️ Boş item atlandı: index ${i}`);
+          continue;
+        }
+        
+        const timeStr = item.timeStr || extractTimeStr(item.log);
+        
+        // Normal log satırı - Hizalama düzeltmesi: timeStr her zaman dolu olmalı
+        // Eğer timeStr boşsa, log'dan tekrar çıkar
+        let finalTimeStr = timeStr || '';
+        if (!finalTimeStr && item.log) {
+          finalTimeStr = extractTimeStr(item.log);
+        }
+        
+        // Aktivite ve log kontrolü - eksik veri varsa uyar ama satırı ekle
+        const aktivite = String(item.aktivite || '').trim();
+        const logDetail = String(item.log || '').trim();
+        
+        // Eksik veri uyarısı (ama satırı ekle - istatistikler doğru kalsın)
+        if (!aktivite || aktivite.length === 0) {
+          console.log(`⚠️ Aktivite boş: Saat=${finalTimeStr}, Log="${logDetail?.substring(0, 30)}"`);
+        }
+        
+        if (!logDetail || logDetail.length === 0) {
+          console.log(`⚠️ Log detayı boş: Saat=${finalTimeStr}, Aktivite="${aktivite}"`);
+        }
+        
+        // Satırı ekle (eksik veri olsa bile - kullanıcı sorunu görsün)
+        rows.push([
+          finalTimeStr, // Saat kolonu (A kolonu) - her zaman göster
+          aktivite, // Aktivite kolonu (B kolonu) - boş olabilir
+          logDetail, // Log Detayı kolonu (C kolonu) - boş olabilir
+          String(item.sourceSheet || ''), // Kaynak kolonu (D kolonu)
+          String(item.rowIndex || '') // Satır No kolonu (E kolonu)
+        ]);
+        
+        // Alarm kontrolü: Bir sonraki log ile arasındaki süreyi hesapla
+        if (i < logsWithTime.length - 1) {
+          const currentItem = item;
+          const nextItem = logsWithTime[i + 1];
+          
+          // Log objelerini calculateTimeDifferenceSeconds formatına çevir
+          const log1 = {
+            date: dateKey,
+            log: currentItem.log,
+            aktivite: currentItem.aktivite
+          };
+          const log2 = {
+            date: dateKey,
+            log: nextItem.log,
+            aktivite: nextItem.aktivite
+          };
+          
+          const timeDiff = calculateTimeDifferenceSeconds(log1, log2);
+          
+          // 15 saniyeden az alarm
+          if (timeDiff > 0 && timeDiff < 15) {
+            const boldText = `${timeDiff} saniye`;
+            const detailText = `${boldText} içinde arandı`;
+            
+            rows.push([
+              '', // Saat
+              '⚡ 15 Saniyeden Daha Hızlı Log', // Aktivite (yıldırım simgesi)
+              detailText, // Log Detayı (normal string, sonra RichTextValue yapılacak)
+              '', // Kaynak
+              '' // Satır No
+            ]);
+            
+            // RichTextValue için işaretle
+            alarmRows.push({
+              row: rows.length, // Yeni eklenen satır
+              col: 3, // Log Detayı kolonu
+              text: detailText,
+              boldText: boldText,
+              boldStart: 0
+            });
+          }
+          
+          // 5 dakikadan fazla alarm
+          if (timeDiff >= 300) { // 5 dakika = 300 saniye
+            const minutes = Math.floor(timeDiff / 60);
+            const boldText = `${minutes} dakika`;
+            const detailText = `>${boldText} arama yapılmadı`;
+            
+            rows.push([
+              '', // Saat (boş - alarm satırı)
+              '⏸️ 5 Dakikadan Uzun Hiçbir Log Yok', // Aktivite (duraklama simgesi)
+              detailText, // Log Detayı (normal string, sonra RichTextValue yapılacak)
+              '', // Kaynak (boş)
+              '' // Satır No (boş)
+            ]);
+            
+            // RichTextValue için işaretle
+            alarmRows.push({
+              row: rows.length, // Yeni eklenen satır
+              col: 3, // Log Detayı kolonu
+              text: detailText,
+              boldText: boldText,
+              boldStart: 1, // ">" karakterinden sonra
+              alarmType: '5dk' // Alarm tipi (renklendirme için)
+            });
+          }
+        }
+      }
+      
+      // Gün sonu boş satır (ayırıcı)
+      rows.push(['', '', '', '', '']);
+      rows.push(['', '', '', '', '']);
+    }
+
+    if (rows.length > 0) {
+      const chunkSize = 1000;
+      let written = 0;
+      while (written < rows.length) {
+        const end = Math.min(written + chunkSize, rows.length);
+        const chunk = rows.slice(written, end);
+        sheet.getRange(1 + written, 1, chunk.length, columns.length).setValues(chunk);
+        written = end;
+      }
+      try { SpreadsheetApp.flush(); } catch (_) {}
     }
     
-    // ZAMAN ANALİZİ - TÜM LOG'LAR EKLENDİKTEN SONRA
-    addTimeAnalysis(sheet, logsByDate);
-    
-    // Sütun genişliklerini ayarla
-    sheet.autoResizeColumns(1, 5);
-    
-    console.log(`✅ ${sheetName} sayfası oluşturuldu`);
+    // Alarm satırları için RichTextValue uygula
+    try {
+      for (const alarmRow of alarmRows) {
+        const cell = sheet.getRange(alarmRow.row, alarmRow.col);
+        const richText = SpreadsheetApp.newRichTextValue()
+          .setText(alarmRow.text)
+          .setTextStyle(alarmRow.boldStart, alarmRow.boldStart + alarmRow.boldText.length, SpreadsheetApp.newTextStyle().setBold(true).build())
+          .build();
+        cell.setRichTextValue(richText);
+      }
+    } catch (richTextErr) {
+      console.log('⚠️ RichTextValue uygulama hatası:', richTextErr && richTextErr.message);
+    }
+
+    try { if (rows.length <= 2000) sheet.autoResizeColumns(1, columns.length); } catch (_) {}
+
+    // NEW: Apply color coding to log summary for readability + Alarm renklendirme
+    try {
+      const lastRow = sheet.getLastRow();
+      const lastCol = sheet.getLastColumn();
+      if (lastRow > 0 && lastCol > 0) {
+        const values = sheet.getRange(1, 1, lastRow, lastCol).getDisplayValues();
+        const backgrounds = [];
+        const richTextValues = [];
+
+        function getActivityColor(activityRaw) {
+          try {
+            const s = String(activityRaw || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+            if (!s) return '';
+            if (s.indexOf('ulasil') !== -1 || s.indexOf('ulas') !== -1) return CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
+            if (s.indexOf('ilgilenmiyor') !== -1 || s.indexOf('ilgi yok') !== -1) return CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
+            if (s.indexOf('randevu al') !== -1) return CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+            if (s.indexOf('teyit') !== -1) return CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
+            if (s.indexOf('erte') !== -1) return CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
+            if (s.indexOf('iptal') !== -1) return CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
+            if (s.indexOf('yeniden') !== -1 || s.indexOf('ara') !== -1) return CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
+            if (s.indexOf('bilgi') !== -1) return CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
+            if (s.indexOf('firsat') !== -1 || s.indexOf('fırsat') !== -1 || s.indexOf('ilet') !== -1) return CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+            if (s.indexOf('satış yapildi') !== -1 || s.indexOf('satis yapildi') !== -1) return CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+            return '';
+          } catch (e) {
+            return '';
+          }
+        }
+
+        for (let r = 0; r < lastRow; r++) {
+          const rowBgs = new Array(lastCol).fill('white');
+          const firstCell = String(values[r][0] || '').trim();
+          const activity = String(values[r][1] || '').trim();
+          const logDetail = String(values[r][2] || '').trim();
+          const source = String(values[r][3] || '').trim();
+          const rowNo = String(values[r][4] || '').trim();
+          
+          // Boş satır kontrolü: Eğer tüm kolonlar boşsa, renk uygulama (beyaz bırak)
+          const isRowEmpty = !firstCell && !activity && !logDetail && !source && !rowNo;
+          
+          if (isRowEmpty) {
+            // Tamamen boş satır - beyaz bırak (renk uygulama)
+            backgrounds.push(rowBgs);
+            continue;
+          }
+          
+          // Hangi kolonların dolu olduğunu belirle (sadece dolu kolonlara renk ver)
+          // ÖNEMLİ: Sadece gerçekten içerik olan kolonlara renk ver
+          const filledCols = [];
+          if (firstCell && firstCell.trim() !== '') filledCols.push(0); // A kolonu (Saat)
+          if (activity && activity.trim() !== '') filledCols.push(1); // B kolonu (Aktivite)
+          if (logDetail && logDetail.trim() !== '') filledCols.push(2); // C kolonu (Log Detayı)
+          if (source && source.trim() !== '') filledCols.push(3); // D kolonu (Kaynak)
+          if (rowNo && rowNo.trim() !== '') filledCols.push(4); // E kolonu (Satır No)
+          // F, G ve diğer kolonlar boşsa renk verilmeyecek - hiçbir zaman doldurulmayacak
+          
+          // Gün başlığı ve özeti satırları için özel renklendirme
+          if (firstCell.includes('📅') || firstCell.includes('⏰') || firstCell.includes('⏳') || firstCell.includes('⏸️') || firstCell.includes('📊')) {
+            // Sadece dolu kolonlara renk ver
+            filledCols.forEach(col => rowBgs[col] = '#E3F2FD'); // Açık mavi (gün başlığı)
+            // Gün başlığı satırlarını bold yap
+            sheet.getRange(r + 1, 1, 1, lastCol).setFontWeight('bold');
+          } else if (firstCell === '' && r > 0 && String(values[r - 1][0] || '').includes('📅')) {
+            // Gün başlığından sonraki boş satır (ayırıcı) - sadece dolu kolonlara
+            filledCols.forEach(col => rowBgs[col] = '#F5F5F5'); // Açık gri
+          } else if (activity.includes('15 Saniyeden Daha Hızlı Log') || activity.includes('⚡')) {
+            // Alarm satırları için özel renklendirme - sadece dolu kolonlara
+            filledCols.forEach(col => rowBgs[col] = '#FFEB3B'); // Sarı (daha belirgin)
+          } else if (activity.includes('5 Dakikadan Uzun Hiçbir Log Yok') || activity.includes('⏸️')) {
+            // Alarm satırları için özel renklendirme - sadece dolu kolonlara
+            filledCols.forEach(col => rowBgs[col] = '#E1BEE7'); // Açık mor (daha belirgin)
+          } else if (firstCell && activity && logDetail) {
+            // Normal log satırı - sadece aktivite VE log detayı varsa renklendir
+            const color = getActivityColor(activity);
+            if (color) {
+              // Sadece dolu kolonlara renk ver
+              filledCols.forEach(col => rowBgs[col] = color);
+            }
+          }
+          // Eğer sadece saat varsa (aktivite veya log yoksa), renk uygulama (beyaz bırak)
+          
+          backgrounds.push(rowBgs);
+          
+          // RichTextValue için işaretle (alarm satırlarında - simgeleri de kontrol et)
+          if (activity.includes('15 Saniyeden') || activity.includes('⚡') || 
+              activity.includes('5 Dakikadan') || activity.includes('⏸️')) {
+            richTextValues.push({ row: r + 1, col: 3 }); // Log Detayı kolonu
+          }
+        }
+        
+        // Background renkleri uygula
+        sheet.getRange(1, 1, lastRow, lastCol).setBackgrounds(backgrounds);
+        
+        // RichTextValue'ları uygula (alarm satırları için)
+        for (const rtv of richTextValues) {
+          const cellValue = sheet.getRange(rtv.row, rtv.col).getValue();
+          if (cellValue && typeof cellValue === 'object' && cellValue.getText) {
+            // Zaten RichTextValue ise, tekrar uygulamaya gerek yok
+            continue;
+          }
+          // Eğer string ise, RichTextValue'ya çevir
+          const text = String(sheet.getRange(rtv.row, rtv.col).getValue() || '');
+          if (text) {
+            // 15sn alarmı: "X saniye içinde arandı"
+            const match15sn = text.match(/(\d+)\s*saniye\s*içinde/);
+            if (match15sn) {
+              const boldText = `${match15sn[1]} saniye`;
+              const boldStart = text.indexOf(boldText);
+              if (boldStart !== -1) {
+                const richText = SpreadsheetApp.newRichTextValue()
+                  .setText(text)
+                  .setTextStyle(boldStart, boldStart + boldText.length, SpreadsheetApp.newTextStyle().setBold(true).build())
+                  .build();
+                sheet.getRange(rtv.row, rtv.col).setRichTextValue(richText);
+                continue;
+              }
+            }
+            
+            // 5dk alarmı: ">X dakika arama yapılmadı"
+            const match5dk = text.match(/>(\d+)\s*dakika/);
+            if (match5dk) {
+              const boldText = `${match5dk[1]} dakika`;
+              const boldStart = text.indexOf(boldText);
+              if (boldStart !== -1) {
+                const richText = SpreadsheetApp.newRichTextValue()
+                  .setText(text)
+                  .setTextStyle(boldStart, boldStart + boldText.length, SpreadsheetApp.newTextStyle().setBold(true).build())
+                  .build();
+                sheet.getRange(rtv.row, rtv.col).setRichTextValue(richText);
+                continue;
+              }
+            }
+          }
+        }
+      }
+    } catch (colorErr) {
+      console.log('⚠️ Log summary color coding skipped:', colorErr && colorErr.message);
+    }
+
     return sheet;
-    
   } catch (error) {
-    console.error('❌ createEmployeeLogSummarySheet hatası:', error);
-    throw error;
+    console.error('❌ createEmployeeLogSummarySheet error:', error);
+    return null;
   }
 }
 
@@ -9964,19 +12959,39 @@ function syncAllEmployeesAppend_Randevular() {
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
     if (!managerFile) throw new Error('Yönetici dosyası bulunamadı');
-    const allStats = { totalRecords: 0, employeeStats: {} };
+
+    // Tüm çalışan verilerini tek seferde topla
+    const allEmployeeData = {};
     const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
     for (const code of codes) {
       const dataBySheet = collectEmployeeData(managerFile, code);
       const data = dataBySheet && dataBySheet['Randevular'];
       if (Array.isArray(data) && data.length > 0) {
-        const op = updateManagerSheet(managerFile, 'Randevular', data, code, 'append') || {};
-        allStats.employeeStats[code] = op;
-        allStats.totalRecords += op.totalIncoming || 0;
+        allEmployeeData[code] = data;
       }
     }
+
+    // Tüm veriyi birleştir ve tek seferde işle
+    const combinedData = [];
+    for (const [code, data] of Object.entries(allEmployeeData)) {
+      for (const row of data) {
+        combinedData.push({ temsilciKodu: code, data: row.data });
+      }
+    }
+
+    const allStats = { totalRecords: 0, employeeStats: {} };
+
+    // Tüm veriyi tek seferde işle (duplicate önleme ile)
+    if (combinedData.length > 0) {
+      const op = updateManagerSheet(managerFile, 'Randevular', combinedData, 'ALL', 'replace') || {};
+      allStats.employeeStats['ALL'] = op;
+      allStats.totalRecords = op.totalIncoming || 0;
+    }
+
     showSyncResults(allStats);
-    SpreadsheetApp.getUi().alert('Tamam', 'Tüm kodlar için Randevular üstüne eklendi.', SpreadsheetApp.getUi().ButtonSet.OK);
+    try { sortTRandevularStrict(); } catch (e) { console.log('⚠️ sortTRandevularStrict after sync skipped:', e && e.message); }
+    FAST_SYNC = false;
+    SpreadsheetApp.getUi().alert('Tamam', `Tüm kodlar için ${combinedData.length} randevu eklendi.`, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', 'Randevular (tüm kodlar) üstüne ekle: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
@@ -9990,19 +13005,38 @@ function syncAllEmployeesAppend_Firsatlar() {
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
     if (!managerFile) throw new Error('Yönetici dosyası bulunamadı');
-    const allStats = { totalRecords: 0, employeeStats: {} };
+
+    // Tüm çalışan verilerini tek seferde topla
+    const allEmployeeData = {};
     const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
     for (const code of codes) {
       const dataBySheet = collectEmployeeData(managerFile, code);
       const data = dataBySheet && dataBySheet['Fırsatlar'];
       if (Array.isArray(data) && data.length > 0) {
-        const op = updateManagerSheet(managerFile, 'Fırsatlar', data, code, 'append') || {};
-        allStats.employeeStats[code] = op;
-        allStats.totalRecords += op.totalIncoming || 0;
+        allEmployeeData[code] = data;
       }
     }
+
+    // Tüm veriyi birleştir ve tek seferde işle
+    const combinedData = [];
+    for (const [code, data] of Object.entries(allEmployeeData)) {
+      for (const row of data) {
+        combinedData.push({ temsilciKodu: code, data: row.data });
+      }
+    }
+
+    const allStats = { totalRecords: 0, employeeStats: {} };
+
+    // Tüm veriyi tek seferde işle (duplicate önleme ile)
+    if (combinedData.length > 0) {
+      const op = updateManagerSheet(managerFile, 'Fırsatlar', combinedData, 'ALL', 'replace') || {};
+      allStats.employeeStats['ALL'] = op;
+      allStats.totalRecords = op.totalIncoming || 0;
+    }
+
     showSyncResults(allStats);
-    SpreadsheetApp.getUi().alert('Tamam', 'Tüm kodlar için Fırsatlar üstüne eklendi.', SpreadsheetApp.getUi().ButtonSet.OK);
+    FAST_SYNC = false;
+    SpreadsheetApp.getUi().alert('Tamam', `Tüm kodlar için ${combinedData.length} fırsat eklendi.`, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', 'Fırsatlar (tüm kodlar) üstüne ekle: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
@@ -10016,19 +13050,38 @@ function syncAllEmployeesAppend_Toplantilar() {
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
     if (!managerFile) throw new Error('Yönetici dosyası bulunamadı');
-    const allStats = { totalRecords: 0, employeeStats: {} };
+
+    // Tüm çalışan verilerini tek seferde topla
+    const allEmployeeData = {};
     const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
     for (const code of codes) {
       const dataBySheet = collectEmployeeData(managerFile, code);
       const data = dataBySheet && dataBySheet['Toplantılar'];
       if (Array.isArray(data) && data.length > 0) {
-        const op = updateManagerSheet(managerFile, 'Toplantılar', data, code, 'append') || {};
-        allStats.employeeStats[code] = op;
-        allStats.totalRecords += op.totalIncoming || 0;
+        allEmployeeData[code] = data;
       }
     }
+
+    // Tüm veriyi birleştir ve tek seferde işle
+    const combinedData = [];
+    for (const [code, data] of Object.entries(allEmployeeData)) {
+      for (const row of data) {
+        combinedData.push({ temsilciKodu: code, data: row.data });
+      }
+    }
+
+    const allStats = { totalRecords: 0, employeeStats: {} };
+
+    // Tüm veriyi tek seferde işle (duplicate önleme ile)
+    if (combinedData.length > 0) {
+      const op = updateManagerSheet(managerFile, 'Toplantılar', combinedData, 'ALL', 'replace') || {};
+      allStats.employeeStats['ALL'] = op;
+      allStats.totalRecords = op.totalIncoming || 0;
+    }
+
     showSyncResults(allStats);
-    SpreadsheetApp.getUi().alert('Tamam', 'Tüm kodlar için Toplantılar üstüne eklendi.', SpreadsheetApp.getUi().ButtonSet.OK);
+    FAST_SYNC = false;
+    SpreadsheetApp.getUi().alert('Tamam', `Tüm kodlar için ${combinedData.length} toplantı eklendi.`, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (error) {
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', 'Toplantılar (tüm kodlar) üstüne ekle: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
@@ -10067,4 +13120,1100 @@ function syncReportsAllEmployees() {
 
 /* createTypeBasedMenu kaldırıldı: Tüm Kodlar aksiyonları artık '➕ Sırayla (Üstüne Ekle)' altında */
 
+function sortTRandevularStrict() {
+  console.log('Function started:', { action: 'sortTRandevularStrict' });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('T Randevular') || ss.getSheetByName('Randevular');
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('T Randevular sayfası bulunamadı');
+      return;
+    }
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 2) {
+      SpreadsheetApp.getUi().alert('Sıralanacak veri yok');
+      return;
+    }
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    const lowered = headers.map(h => String(h || '').trim().toLowerCase());
+    function findIdx(cands){ for (const c of cands){ const i = lowered.indexOf(String(c).trim().toLowerCase()); if (i!==-1) return i; } return -1; }
+    const idxStatus = findIdx(['Randevu durumu','Durum']);
+    const idxDate = findIdx(['Randevu Tarihi','Tarih']);
+    const idxTime = findIdx(['Saat']);
+    const rng = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    const values = rng.getDisplayValues();
+    function parseDate(v){
+      if (v instanceof Date && !isNaN(v.getTime())) return v;
+      const d1 = parseDdMmYyyy(v); if (d1) return d1;
+      const d2 = new Date(String(v)); if (!isNaN(d2.getTime())) return d2;
+      return new Date('2099-12-31');
+    }
+    function parseTime(v){
+      if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
+      const s = String(v || '').trim();
+      const m = s.match(/^(\d{1,2}):(\d{2})/);
+      if (m) return Number(m[1])*60 + Number(m[2]);
+      return 0;
+    }
+    function groupRank(row){
+      function norm(x){
+        try { return String(x||'').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,''); } catch(_) { return String(x||'').toLowerCase(); }
+      }
+      const s = norm(idxStatus>=0 ? row[idxStatus] : '');
+      if (s.includes('iptal')) return 0; // Randevu İptal oldu
+      if (s.includes('erte')) return 1; // Randevu Ertelendi
+      return 2; // Diğerleri (Alındı/Teyit/İleri)
+    }
+    values.sort(function(a,b){
+      const ra = groupRank(a), rb = groupRank(b);
+      if (ra !== rb) return ra - rb;
+      const da = parseDate(idxDate>=0 ? a[idxDate] : null);
+      const db = parseDate(idxDate>=0 ? b[idxDate] : null);
+      if (da.getTime() !== db.getTime()) return da - db;
+      if (idxTime >= 0) return parseTime(a[idxTime]) - parseTime(b[idxTime]);
+      return 0;
+    });
+    rng.setValues(values);
+    SpreadsheetApp.getUi().alert('T Randevular: İptal > Ertelendi > Diğerleri ve Randevu Tarihi (artan) ile sıralandı.');
+  } catch (error) {
+    console.error('Function failed:', error);
+  }
+}
+
+// ========================================
+// 📊 YENİ RAPOR SİSTEMİ - YARDIMCI FONKSİYONLAR
+// ========================================
+
+/**
+ * 📅 Hafta başlangıcı (Pazartesi)
+ */
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1 - day); // Pazartesi
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * 📅 Hafta numarası (yılın kaçıncı haftası) - Rapor için
+ */
+function getWeekNumberForReport(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+/**
+ * 📅 Hafta numarası (getWeekNumber ile aynı)
+ */
+function getWeekNumber(date) {
+  return getWeekNumberForReport(date);
+}
+
+/**
+ * 📅 Tarih formatla
+ */
+function formatDate(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd.MM.yyyy');
+}
+
+/**
+ * 📅 Türkçe ay adını döndür
+ * @param {number} month - Ay numarası (0-11)
+ * @returns {string} - Türkçe ay adı
+ */
+function getTurkishMonthName(month) {
+  const monthNames = [
+    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  ];
+  
+  if (month >= 0 && month <= 11) {
+    return monthNames[month];
+  }
+  
+  return '';
+}
+
+/**
+ * 📋 Format Tablo sayfalarından log verisi çekme (geriye dönük veriler için)
+ * @param {Spreadsheet} employeeFile - Temsilci dosyası
+ * @param {Date} startDate - Başlangıç tarihi
+ * @param {Date} endDate - Bitiş tarihi
+ * @returns {Array} - Log verileri array'i
+ */
+function collectLogsFromFormatTables(employeeFile, startDate, endDate) {
+  const logs = [];
+  
+  try {
+    const sheets = employeeFile.getSheets();
+    const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    
+    console.log(`🔍 Format Tablo arama: ${Utilities.formatDate(startDateOnly, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDateOnly, 'Europe/Istanbul', 'dd.MM.yyyy')}`);
+    
+    // Tüm Format Tablo sayfalarını bul
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+      
+      // Sistem sayfalarını atla
+      if (sheetName.includes('T Randevular') || 
+          sheetName.includes('T Fırsatlar') || 
+          sheetName.includes('T Toplantılar') ||
+          sheetName.includes('T Aktivite') ||
+          sheetName.includes('Log Arşivi') ||
+          sheetName.includes('Ham veri')) {
+        continue;
+      }
+      
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const aktiviteIndex = headers.indexOf('Aktivite');
+      const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi') !== -1 ? headers.indexOf('Aktivite Tarihi') : headers.indexOf('Tarih');
+      const logIndex = headers.indexOf('Log');
+      
+      // Format Tablo kontrolü: Aktivite + (Aktivite Tarihi veya Log) olmalı
+      if (aktiviteIndex === -1 || (aktiviteTarihiIndex === -1 && logIndex === -1)) {
+        continue;
+      }
+      
+      // Veri oku (getDisplayValues kullan - tarihler string olarak gelir)
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) continue;
+      
+      const data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getDisplayValues();
+      
+      for (let row = 0; row < data.length; row++) {
+        const aktivite = String(data[row][aktiviteIndex] || '').trim();
+        if (!aktivite) continue;
+        
+        // Tarih bul
+        let aktiviteTarihi = null;
+        if (aktiviteTarihiIndex !== -1) {
+          aktiviteTarihi = data[row][aktiviteTarihiIndex];
+        } else if (logIndex !== -1) {
+          // Log'dan tarih çıkar
+          const logValue = String(data[row][logIndex] || '');
+          const dateMatch = logValue.match(/(\d{2}\.\d{2}\.\d{4})/);
+          if (dateMatch) {
+            aktiviteTarihi = dateMatch[1];
+          }
+        }
+        
+        if (!aktiviteTarihi) continue;
+        
+        // Tarih parse et
+        let logDate = parseDdMmYyyy(aktiviteTarihi);
+        if (!logDate) {
+          try {
+            logDate = new Date(String(aktiviteTarihi));
+            if (isNaN(logDate.getTime())) continue;
+          } catch (e) {
+            continue;
+          }
+        }
+        
+        // Tarih filtresi
+        const logDateOnly = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+        
+        // Debug: İlk birkaç log'un tarih kontrolünü göster
+        if (logs.length < 5) {
+          const dateStr = String(aktiviteTarihi);
+          const parsedStr = Utilities.formatDate(logDate, 'Europe/Istanbul', 'dd.MM.yyyy');
+          const rangeStr = `${Utilities.formatDate(startDateOnly, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDateOnly, 'Europe/Istanbul', 'dd.MM.yyyy')}`;
+          const inRange = logDateOnly >= startDateOnly && logDateOnly <= endDateOnly;
+          console.log(`🔍 Format Tablo: "${sheetName}" - Tarih="${dateStr}", Parse=${parsedStr}, Aralık=${rangeStr}, Uygun=${inRange}, Aktivite="${aktivite}"`);
+        }
+        
+        if (logDateOnly < startDateOnly || logDateOnly > endDateOnly) continue;
+        
+        // Log değeri oluştur
+        const logValue = logIndex !== -1 ? String(data[row][logIndex] || '') : `${aktivite} - ${aktiviteTarihi}`;
+        
+        logs.push({
+          date: aktiviteTarihi,
+          log: logValue,
+          aktivite: aktivite,
+          source: 'Format Tablo',
+          sheetName: sheetName
+        });
+      }
+    }
+  } catch (error) {
+    console.error('❌ Format Tablo\'lardan veri çekme hatası:', error);
+  }
+  
+  return logs;
+}
+
+/**
+ * 📊 Haftalık rapor verisi toplama
+ * Hibrit yaklaşım: Önce Log Arşivi'nden, yoksa Format Tablo'lardan çeker
+ */
+function collectWeeklyReportData(employeeCodes, weekStart, weekEnd) {
+  const reportData = [];
+  
+  console.log(`📊 collectWeeklyReportData başlatıldı`);
+  console.log(`📅 Tarih aralığı: ${Utilities.formatDate(weekStart, 'Europe/Istanbul', 'dd.MM.yyyy HH:mm')} - ${Utilities.formatDate(weekEnd, 'Europe/Istanbul', 'dd.MM.yyyy HH:mm')}`);
+  console.log(`👥 Temsilci sayısı: ${employeeCodes.length}`);
+  
+  // Tüm aktivite türleri
+  const allActivities = [
+    'Randevu Alındı',
+    'İleri Tarih Randevu',
+    'Fırsat İletildi',
+    'Bilgi Verildi',
+    'Yeniden Aranacak',
+    'İlgilenmiyor',
+    'Ulaşılamadı',
+    'Geçersiz Numara',
+    'Kurumsal',
+    'Toplantı Tamamlandı',
+    'Satış Yapıldı'
+  ];
+  
+  for (const code of employeeCodes) {
+    try {
+      const employeeFile = findEmployeeFile(code);
+      if (!employeeFile) {
+        console.log(`⚠️ ${code}: Dosya bulunamadı`);
+        continue;
+      }
+      
+      // Veri yapısını oluştur - tüm aktiviteler için
+      const data = {
+        employeeCode: code,
+        employeeName: CRM_CONFIG.EMPLOYEE_CODES[code] || code,
+        randevuAlindi: 0,
+        ileriTarihRandevu: 0,
+        firsatIletildi: 0,
+        bilgiVerildi: 0,
+        yenidenAranacak: 0,
+        ilgilenmiyor: 0,
+        ulasilamadi: 0,
+        gecersizNumara: 0,
+        kurumsal: 0,
+        toplantiTamamlandi: 0,
+        satisYapildi: 0,
+        toplamAktivite: 0
+      };
+      
+      // HİBRİT YAKLAŞIM: Önce Log Arşivi'nden, yoksa Format Tablo'lardan çek
+      let logsFromArchive = [];
+      let logsFromFormatTables = [];
+      
+      // 1. Log Arşivi'nden veri çek
+      let logArchiveSheet = employeeFile.getSheetByName('📋 Log Arşivi');
+      if (!logArchiveSheet) {
+        logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+      }
+      
+      if (logArchiveSheet && logArchiveSheet.getLastRow() > 1) {
+        console.log(`📊 ${code}: Log Arşivi'nden veri okunuyor...`);
+        const allData = logArchiveSheet.getDataRange().getValues();
+        
+        if (allData.length >= 2) {
+          const headers = allData[0];
+          const aktiviteTarihiIndex = headers.indexOf('Tarih') !== -1 ? headers.indexOf('Tarih') : headers.indexOf('Aktivite Tarihi');
+          const aktiviteIndex = headers.indexOf('Aktivite');
+          
+          if (aktiviteTarihiIndex !== -1 && aktiviteIndex !== -1) {
+            for (let row = 1; row < allData.length; row++) {
+              const aktiviteTarihi = allData[row][aktiviteTarihiIndex];
+              const aktivite = String(allData[row][aktiviteIndex] || '').trim();
+              
+              if (!aktiviteTarihi || !aktivite) continue;
+              
+              // Tarih parse etme
+              let logDate = null;
+              if (aktiviteTarihi instanceof Date) {
+                logDate = new Date(aktiviteTarihi);
+              } else {
+                logDate = parseDdMmYyyy(aktiviteTarihi);
+                if (!logDate) {
+                  try {
+                    logDate = new Date(String(aktiviteTarihi));
+                    if (isNaN(logDate.getTime())) continue;
+                  } catch (e) {
+                    continue;
+                  }
+                }
+              }
+              
+              if (!logDate || isNaN(logDate.getTime())) continue;
+              
+              // Tarih aralığı kontrolü
+              const logDateOnly = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+              const weekStartOnly = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+              const weekEndOnly = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate());
+              
+              // Debug: İlk birkaç log'un tarih kontrolünü göster
+              if (row <= 5) {
+                const dateStr = aktiviteTarihi instanceof Date 
+                  ? Utilities.formatDate(aktiviteTarihi, 'Europe/Istanbul', 'dd.MM.yyyy')
+                  : String(aktiviteTarihi);
+                console.log(`🔍 ${code} - Log[${row}]: Tarih="${dateStr}", Parse=${Utilities.formatDate(logDate, 'Europe/Istanbul', 'dd.MM.yyyy')}, Aralık=${Utilities.formatDate(weekStartOnly, 'Europe/Istanbul', 'dd.MM.yyyy')}-${Utilities.formatDate(weekEndOnly, 'Europe/Istanbul', 'dd.MM.yyyy')}, Uygun=${logDateOnly >= weekStartOnly && logDateOnly <= weekEndOnly}`);
+              }
+              
+              if (logDateOnly >= weekStartOnly && logDateOnly <= weekEndOnly) {
+                logsFromArchive.push({
+                  date: aktiviteTarihi,
+                  aktivite: aktivite,
+                  source: 'Log Arşivi'
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      // 2. Log Arşivi'nde tarih aralığına uygun veri yoksa Format Tablo'lardan çek
+      // NOT: Log Arşivi'nde veri varsa bile, eğer tarih aralığına uygun değilse Format Tablo'lardan çek
+      if (logsFromArchive.length === 0) {
+        console.log(`📊 ${code}: Log Arşivi'nde tarih aralığına uygun veri yok (${logsFromArchive.length} log), Format Tablo'lardan çekiliyor...`);
+        logsFromFormatTables = collectLogsFromFormatTables(employeeFile, weekStart, weekEnd);
+        console.log(`📊 ${code}: Format Tablo'lardan ${logsFromFormatTables.length} log bulundu`);
+      } else {
+        console.log(`📊 ${code}: Log Arşivi'nden ${logsFromArchive.length} log bulundu, Format Tablo kontrol edilmedi`);
+      }
+      
+      // 3. İki kaynağı birleştir ve duplicate'leri temizle
+      // ÖNEMLİ: Aynı tarih + aktivite kombinasyonu sadece bir kez sayılır
+      const allLogs = [...logsFromArchive, ...logsFromFormatTables];
+      const uniqueLogs = new Map();
+      
+      for (const log of allLogs) {
+        // Duplicate kontrolü: tarih + aktivite kombinasyonu (aynı gün aynı aktivite = duplicate)
+        const dateStr = log.date instanceof Date 
+          ? Utilities.formatDate(log.date, 'Europe/Istanbul', 'dd.MM.yyyy')
+          : String(log.date);
+        const aktiviteStr = String(log.aktivite || '').trim();
+        const key = `${dateStr}_${aktiviteStr}`;
+        
+        // Log Arşivi öncelikli (daha güncel ve doğru)
+        if (!uniqueLogs.has(key)) {
+          uniqueLogs.set(key, log);
+        } else {
+          // Eğer mevcut kayıt Format Tablo'dan geliyorsa ve yeni kayıt Log Arşivi'ndense, Log Arşivi'ni kullan
+          const existing = uniqueLogs.get(key);
+          if (existing.source === 'Format Tablo' && log.source === 'Log Arşivi') {
+            uniqueLogs.set(key, log);
+          }
+        }
+      }
+      
+      const finalLogs = Array.from(uniqueLogs.values());
+      console.log(`📊 ${code}: Log Arşivi: ${logsFromArchive.length}, Format Tablo: ${logsFromFormatTables.length}, Toplam (unique): ${finalLogs.length}`);
+      
+      // 4. Aktivite sayımı
+      let activityCounted = 0;
+      for (const log of finalLogs) {
+        const aktivite = String(log.aktivite || '').trim();
+        if (!aktivite) continue;
+        
+        activityCounted++;
+        
+        if (aktivite === 'Randevu Alındı') {
+          data.randevuAlindi++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'İleri Tarih Randevu') {
+          data.ileriTarihRandevu++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'Fırsat İletildi') {
+          data.firsatIletildi++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'Bilgi Verildi') {
+          data.bilgiVerildi++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'Yeniden Aranacak') {
+          data.yenidenAranacak++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'İlgilenmiyor') {
+          data.ilgilenmiyor++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'Ulaşılamadı') {
+          data.ulasilamadi++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'Geçersiz Numara') {
+          data.gecersizNumara++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'Kurumsal') {
+          data.kurumsal++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'Toplantı Tamamlandı') {
+          data.toplantiTamamlandi++;
+          data.toplamAktivite++;
+        } else if (aktivite === 'Satış Yapıldı') {
+          data.satisYapildi++;
+          data.toplamAktivite++;
+        }
+      }
+      
+      console.log(`✅ ${code}: Toplam ${activityCounted} aktivite sayıldı, Toplam: ${data.toplamAktivite}`);
+      
+      reportData.push(data);
+    } catch (error) {
+      console.error(`❌ ${code} veri toplama hatası:`, error);
+      // Hata olsa bile boş data ekle
+      reportData.push({
+        employeeCode: code,
+        employeeName: CRM_CONFIG.EMPLOYEE_CODES[code] || code,
+        randevuAlindi: 0,
+        ileriTarihRandevu: 0,
+        firsatIletildi: 0,
+        bilgiVerildi: 0,
+        yenidenAranacak: 0,
+        ilgilenmiyor: 0,
+        ulasilamadi: 0,
+        gecersizNumara: 0,
+        kurumsal: 0,
+        toplantiTamamlandi: 0,
+        satisYapildi: 0,
+        toplamAktivite: 0
+      });
+    }
+  }
+  
+  // Mantıklı sıralama: Negatifler → Fırsatlar → Randevu/Toplantı/Satış
+  // Sıralama kriteri: Toplam aktiviteye göre (en çoktan en aza)
+  reportData.sort((a, b) => {
+    // Önce toplam aktiviteye göre
+    if (b.toplamAktivite !== a.toplamAktivite) {
+      return b.toplamAktivite - a.toplamAktivite;
+    }
+    // Sonra randevu alındı'ya göre
+    return b.randevuAlindi - a.randevuAlindi;
+  });
+  
+  console.log(`📊 Toplam ${reportData.length} temsilci verisi toplandı`);
+  return reportData;
+}
+
+/**
+ * 📊 Aylık rapor verisi toplama
+ */
+function collectMonthlyReportData(employeeCodes, monthStart, monthEnd) {
+  // Haftalık ile aynı mantık, sadece tarih aralığı farklı
+  return collectWeeklyReportData(employeeCodes, monthStart, monthEnd);
+}
+
+/**
+ * 📊 Günlük rapor verisi toplama
+ */
+function collectDailyReportData(employeeCodes, dayStart, dayEnd) {
+  // Haftalık ile aynı mantık, sadece tarih aralığı farklı
+  return collectWeeklyReportData(employeeCodes, dayStart, dayEnd);
+}
+
+/**
+ * 📊 Haftalık Rapor Sayfası Oluştur
+ */
+function createWeeklyReportSheet(ss, reportData, weekLabel, weekStart, weekEnd, scope, employeeCode = null) {
+  try {
+    const sheetName = scope === 'all' 
+      ? '📊 Haftalık Rapor - Genel'
+      : `📊 Haftalık Rapor - ${employeeCode}`;
+    
+    let sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      ss.deleteSheet(sheet);
+    }
+    sheet = ss.insertSheet(sheetName);
+    
+    let currentRow = 1;
+    
+    // Başlık
+    sheet.getRange(currentRow, 1).setValue(`📊 HAFTALIK PERFORMANS RAPORU`);
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(18).setBackground('#1976D2').setFontColor('#FFFFFF');
+    currentRow++;
+    
+    sheet.getRange(currentRow, 1).setValue(weekLabel);
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#E3F2FD');
+    currentRow += 2;
+    
+    // Tablo başlıkları - Mantıklı sıralama: Negatifler → Fırsatlar → Randevu/Toplantı/Satış
+    // Her aktivite için 2 kolon: Sayı ve Oran
+    const activityHeaders = [
+      // Negatifler
+      { name: 'İlgilenmiyor', key: 'ilgilenmiyor', base: 'toplamAktivite' },
+      { name: 'Ulaşılamadı', key: 'ulasilamadi', base: 'toplamAktivite' },
+      { name: 'Geçersiz Numara', key: 'gecersizNumara', base: 'toplamAktivite' },
+      { name: 'Kurumsal', key: 'kurumsal', base: 'toplamAktivite' },
+      // Fırsatlar
+      { name: 'Yeniden Aranacak', key: 'yenidenAranacak', base: 'toplamAktivite' },
+      { name: 'Bilgi Verildi', key: 'bilgiVerildi', base: 'toplamAktivite' },
+      { name: 'Fırsat İletildi', key: 'firsatIletildi', base: 'toplamAktivite' },
+      // Randevu/Toplantı/Satış
+      { name: 'Randevu Alındı', key: 'randevuAlindi', base: 'toplamAktivite' },
+      { name: 'İleri Tarih Randevu', key: 'ileriTarihRandevu', base: 'toplamAktivite' },
+      { name: 'Toplantı Tamamlandı', key: 'toplantiTamamlandi', base: 'randevuAlindi' },
+      { name: 'Satış Yapıldı', key: 'satisYapildi', base: 'toplantiTamamlandi' },
+      { name: 'Toplam Aktivite', key: 'toplamAktivite', base: null }
+    ];
+    
+    // Header satırı: Aktivite isimleri
+    sheet.getRange(currentRow, 1).setValue('Temsilci');
+    let col = 2;
+    for (const header of activityHeaders) {
+      sheet.getRange(currentRow, col).setValue(header.name);
+      // Toplam Aktivite için merge yapma (sadece 1 kolon)
+      if (header.key !== 'toplamAktivite') {
+        sheet.getRange(currentRow, col, 1, 2).merge(); // Sayı ve oran için merge
+      }
+      col += 2;
+    }
+    
+    sheet.getRange(currentRow, 1, 1, col - 1)
+      .setFontWeight('bold')
+      .setFontSize(11)
+      .setBackground('#4CAF50')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center');
+    currentRow++;
+    
+    // Alt başlık: Sayı / Oran
+    sheet.getRange(currentRow, 1).setValue('');
+    col = 2;
+    for (const header of activityHeaders) {
+      if (header.key === 'toplamAktivite') {
+        sheet.getRange(currentRow, col).setValue('Toplam');
+      } else {
+        sheet.getRange(currentRow, col).setValue('Sayı');
+        sheet.getRange(currentRow, col + 1).setValue('Oran');
+      }
+      col += 2;
+    }
+    sheet.getRange(currentRow, 1, 1, col - 1)
+      .setFontWeight('bold')
+      .setFontSize(10)
+      .setBackground('#81C784')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center');
+    currentRow++;
+    
+    // Verileri yaz
+    for (const data of reportData) {
+      sheet.getRange(currentRow, 1).setValue(`${data.employeeCode} - ${data.employeeName}`);
+      
+      col = 2;
+      for (const header of activityHeaders) {
+        const value = data[header.key] || 0;
+        
+        if (header.key === 'toplamAktivite') {
+          // Toplam Aktivite için sadece sayı
+          sheet.getRange(currentRow, col).setValue(value);
+          sheet.getRange(currentRow, col).setHorizontalAlignment('right');
+        } else {
+          // Sayı
+          sheet.getRange(currentRow, col).setValue(value);
+          sheet.getRange(currentRow, col).setHorizontalAlignment('right');
+          
+          // Oran hesapla
+          let percentage = 0;
+          let baseValue = 0;
+          if (header.base === 'toplamAktivite') {
+            baseValue = data.toplamAktivite || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          } else if (header.base === 'randevuAlindi') {
+            baseValue = data.randevuAlindi || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          } else if (header.base === 'toplantiTamamlandi') {
+            baseValue = data.toplantiTamamlandi || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          }
+          
+          const percentageText = percentage > 0 ? `%${percentage.toFixed(1)}` : '-';
+          sheet.getRange(currentRow, col + 1).setValue(percentageText);
+          sheet.getRange(currentRow, col + 1).setHorizontalAlignment('right');
+          sheet.getRange(currentRow, col + 1).setFontStyle('italic');
+        }
+        
+        col += 2;
+      }
+      
+      // Çift satırlar için alternatif renk
+      if (currentRow % 2 === 0) {
+        sheet.getRange(currentRow, 1, 1, col - 1).setBackground('#F1F8E9');
+      }
+      
+      currentRow++;
+    }
+    
+    // Açıklama satırı
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('📊 Oran Açıklaması:');
+    sheet.getRange(currentRow, 1).setFontWeight('bold');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Negatifler (İlgilenmiyor, Ulaşılamadı, Geçersiz Numara, Kurumsal): Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Fırsatlar (Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi): Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Randevu Alındı: Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Toplantı Tamamlandı: Randevu Alındı\'ya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Satış Yapıldı: Toplantı Tamamlandı\'ya göre');
+    
+    // Kolon genişlikleri - Her aktivite için 2 kolon (sayı + oran)
+    sheet.setColumnWidth(1, 200); // Temsilci
+    col = 2;
+    for (const header of activityHeaders) {
+      if (header.key === 'toplamAktivite') {
+        sheet.setColumnWidth(col, 100);
+      } else {
+        sheet.setColumnWidth(col, 80); // Sayı
+        sheet.setColumnWidth(col + 1, 70); // Oran
+      }
+      col += 2;
+    }
+    
+    sheet.activate();
+    console.log('✅ Haftalık rapor oluşturuldu');
+  } catch (error) {
+    console.error('❌ Haftalık rapor sayfası hatası:', error);
+    throw error;
+  }
+}
+
+/**
+ * 📊 Aylık Rapor Sayfası Oluştur
+ */
+function createMonthlyReportSheet(ss, reportData, monthLabel, monthStart, monthEnd, scope, employeeCode = null) {
+  try {
+    const sheetName = scope === 'all' 
+      ? '📊 Aylık Rapor - Genel'
+      : `📊 Aylık Rapor - ${employeeCode}`;
+    
+    let sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      ss.deleteSheet(sheet);
+    }
+    sheet = ss.insertSheet(sheetName);
+    
+    let currentRow = 1;
+    
+    // Başlık
+    sheet.getRange(currentRow, 1).setValue(`📊 AYLIK PERFORMANS RAPORU`);
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(18).setBackground('#FF9800').setFontColor('#FFFFFF');
+    currentRow++;
+    
+    sheet.getRange(currentRow, 1).setValue(monthLabel);
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FFE0B2');
+    currentRow += 2;
+    
+    // Tablo başlıkları - Mantıklı sıralama: Negatifler → Fırsatlar → Randevu/Toplantı/Satış
+    const activityHeaders = [
+      { name: 'İlgilenmiyor', key: 'ilgilenmiyor', base: 'toplamAktivite' },
+      { name: 'Ulaşılamadı', key: 'ulasilamadi', base: 'toplamAktivite' },
+      { name: 'Geçersiz Numara', key: 'gecersizNumara', base: 'toplamAktivite' },
+      { name: 'Kurumsal', key: 'kurumsal', base: 'toplamAktivite' },
+      { name: 'Yeniden Aranacak', key: 'yenidenAranacak', base: 'toplamAktivite' },
+      { name: 'Bilgi Verildi', key: 'bilgiVerildi', base: 'toplamAktivite' },
+      { name: 'Fırsat İletildi', key: 'firsatIletildi', base: 'toplamAktivite' },
+      { name: 'Randevu Alındı', key: 'randevuAlindi', base: 'toplamAktivite' },
+      { name: 'İleri Tarih Randevu', key: 'ileriTarihRandevu', base: 'toplamAktivite' },
+      { name: 'Toplantı Tamamlandı', key: 'toplantiTamamlandi', base: 'randevuAlindi' },
+      { name: 'Satış Yapıldı', key: 'satisYapildi', base: 'toplantiTamamlandi' },
+      { name: 'Toplam Aktivite', key: 'toplamAktivite', base: null }
+    ];
+    
+    // Header satırı
+    sheet.getRange(currentRow, 1).setValue('Temsilci');
+    let col = 2;
+    for (const header of activityHeaders) {
+      sheet.getRange(currentRow, col).setValue(header.name);
+      // Toplam Aktivite için merge yapma (sadece 1 kolon)
+      if (header.key !== 'toplamAktivite') {
+        sheet.getRange(currentRow, col, 1, 2).merge();
+      }
+      col += 2;
+    }
+    
+    sheet.getRange(currentRow, 1, 1, col - 1)
+      .setFontWeight('bold')
+      .setFontSize(11)
+      .setBackground('#FF9800')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center');
+    currentRow++;
+    
+    // Alt başlık
+    sheet.getRange(currentRow, 1).setValue('');
+    col = 2;
+    for (const header of activityHeaders) {
+      if (header.key === 'toplamAktivite') {
+        sheet.getRange(currentRow, col).setValue('Toplam');
+      } else {
+        sheet.getRange(currentRow, col).setValue('Sayı');
+        sheet.getRange(currentRow, col + 1).setValue('Oran');
+      }
+      col += 2;
+    }
+    sheet.getRange(currentRow, 1, 1, col - 1)
+      .setFontWeight('bold')
+      .setFontSize(10)
+      .setBackground('#FFB74D')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center');
+    currentRow++;
+    
+    // Verileri yaz
+    for (const data of reportData) {
+      sheet.getRange(currentRow, 1).setValue(`${data.employeeCode} - ${data.employeeName}`);
+      
+      col = 2;
+      for (const header of activityHeaders) {
+        const value = data[header.key] || 0;
+        
+        if (header.key === 'toplamAktivite') {
+          sheet.getRange(currentRow, col).setValue(value);
+          sheet.getRange(currentRow, col).setHorizontalAlignment('right');
+        } else {
+          sheet.getRange(currentRow, col).setValue(value);
+          sheet.getRange(currentRow, col).setHorizontalAlignment('right');
+          
+          let percentage = 0;
+          let baseValue = 0;
+          if (header.base === 'toplamAktivite') {
+            baseValue = data.toplamAktivite || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          } else if (header.base === 'randevuAlindi') {
+            baseValue = data.randevuAlindi || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          } else if (header.base === 'toplantiTamamlandi') {
+            baseValue = data.toplantiTamamlandi || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          }
+          
+          const percentageText = percentage > 0 ? `%${percentage.toFixed(1)}` : '-';
+          sheet.getRange(currentRow, col + 1).setValue(percentageText);
+          sheet.getRange(currentRow, col + 1).setHorizontalAlignment('right');
+          sheet.getRange(currentRow, col + 1).setFontStyle('italic');
+        }
+        
+        col += 2;
+      }
+      
+      if (currentRow % 2 === 0) {
+        sheet.getRange(currentRow, 1, 1, col - 1).setBackground('#FFF3E0');
+      }
+      
+      currentRow++;
+    }
+    
+    // Açıklama satırı
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('📊 Oran Açıklaması:');
+    sheet.getRange(currentRow, 1).setFontWeight('bold');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Negatifler (İlgilenmiyor, Ulaşılamadı, Geçersiz Numara, Kurumsal): Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Fırsatlar (Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi): Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Randevu Alındı: Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Toplantı Tamamlandı: Randevu Alındı\'ya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Satış Yapıldı: Toplantı Tamamlandı\'ya göre');
+    
+    // Kolon genişlikleri - Her aktivite için 2 kolon (sayı + oran)
+    sheet.setColumnWidth(1, 200); // Temsilci
+    col = 2;
+    for (const header of activityHeaders) {
+      if (header.key === 'toplamAktivite') {
+        sheet.setColumnWidth(col, 100);
+      } else {
+        sheet.setColumnWidth(col, 80); // Sayı
+        sheet.setColumnWidth(col + 1, 70); // Oran
+      }
+      col += 2;
+    }
+    
+    sheet.activate();
+    console.log('✅ Aylık rapor oluşturuldu');
+  } catch (error) {
+    console.error('❌ Aylık rapor sayfası hatası:', error);
+    throw error;
+  }
+}
+
+/**
+ * 📊 Günlük Rapor Sayfası Oluştur
+ */
+function createDailyReportSheet(ss, reportData, dayLabel, dayStart, dayEnd, scope, employeeCode = null) {
+  try {
+    const sheetName = scope === 'all' 
+      ? '📊 Günlük Rapor - Genel'
+      : `📊 Günlük Rapor - ${employeeCode}`;
+    
+    let sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      ss.deleteSheet(sheet);
+    }
+    sheet = ss.insertSheet(sheetName);
+    
+    let currentRow = 1;
+    
+    // Başlık
+    sheet.getRange(currentRow, 1).setValue(`📊 GÜNLÜK PERFORMANS RAPORU`);
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(18).setBackground('#9C27B0').setFontColor('#FFFFFF');
+    currentRow++;
+    
+    sheet.getRange(currentRow, 1).setValue(dayLabel);
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#E1BEE7');
+    currentRow += 2;
+    
+    // Tablo başlıkları - Mantıklı sıralama: Negatifler → Fırsatlar → Randevu/Toplantı/Satış
+    const activityHeaders = [
+      { name: 'İlgilenmiyor', key: 'ilgilenmiyor', base: 'toplamAktivite' },
+      { name: 'Ulaşılamadı', key: 'ulasilamadi', base: 'toplamAktivite' },
+      { name: 'Geçersiz Numara', key: 'gecersizNumara', base: 'toplamAktivite' },
+      { name: 'Kurumsal', key: 'kurumsal', base: 'toplamAktivite' },
+      { name: 'Yeniden Aranacak', key: 'yenidenAranacak', base: 'toplamAktivite' },
+      { name: 'Bilgi Verildi', key: 'bilgiVerildi', base: 'toplamAktivite' },
+      { name: 'Fırsat İletildi', key: 'firsatIletildi', base: 'toplamAktivite' },
+      { name: 'Randevu Alındı', key: 'randevuAlindi', base: 'toplamAktivite' },
+      { name: 'İleri Tarih Randevu', key: 'ileriTarihRandevu', base: 'toplamAktivite' },
+      { name: 'Toplantı Tamamlandı', key: 'toplantiTamamlandi', base: 'randevuAlindi' },
+      { name: 'Satış Yapıldı', key: 'satisYapildi', base: 'toplantiTamamlandi' },
+      { name: 'Toplam Aktivite', key: 'toplamAktivite', base: null }
+    ];
+    
+    // Header satırı
+    sheet.getRange(currentRow, 1).setValue('Temsilci');
+    let col = 2;
+    for (const header of activityHeaders) {
+      sheet.getRange(currentRow, col).setValue(header.name);
+      // Toplam Aktivite için merge yapma (sadece 1 kolon)
+      if (header.key !== 'toplamAktivite') {
+        sheet.getRange(currentRow, col, 1, 2).merge();
+      }
+      col += 2;
+    }
+    
+    sheet.getRange(currentRow, 1, 1, col - 1)
+      .setFontWeight('bold')
+      .setFontSize(11)
+      .setBackground('#9C27B0')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center');
+    currentRow++;
+    
+    // Alt başlık
+    sheet.getRange(currentRow, 1).setValue('');
+    col = 2;
+    for (const header of activityHeaders) {
+      if (header.key === 'toplamAktivite') {
+        sheet.getRange(currentRow, col).setValue('Toplam');
+      } else {
+        sheet.getRange(currentRow, col).setValue('Sayı');
+        sheet.getRange(currentRow, col + 1).setValue('Oran');
+      }
+      col += 2;
+    }
+    sheet.getRange(currentRow, 1, 1, col - 1)
+      .setFontWeight('bold')
+      .setFontSize(10)
+      .setBackground('#BA68C8')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center');
+    currentRow++;
+    
+    // Verileri yaz
+    for (const data of reportData) {
+      sheet.getRange(currentRow, 1).setValue(`${data.employeeCode} - ${data.employeeName}`);
+      
+      col = 2;
+      for (const header of activityHeaders) {
+        const value = data[header.key] || 0;
+        
+        if (header.key === 'toplamAktivite') {
+          sheet.getRange(currentRow, col).setValue(value);
+          sheet.getRange(currentRow, col).setHorizontalAlignment('right');
+        } else {
+          sheet.getRange(currentRow, col).setValue(value);
+          sheet.getRange(currentRow, col).setHorizontalAlignment('right');
+          
+          let percentage = 0;
+          let baseValue = 0;
+          if (header.base === 'toplamAktivite') {
+            baseValue = data.toplamAktivite || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          } else if (header.base === 'randevuAlindi') {
+            baseValue = data.randevuAlindi || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          } else if (header.base === 'toplantiTamamlandi') {
+            baseValue = data.toplantiTamamlandi || 0;
+            percentage = baseValue > 0 ? (value / baseValue) * 100 : 0;
+          }
+          
+          const percentageText = percentage > 0 ? `%${percentage.toFixed(1)}` : '-';
+          sheet.getRange(currentRow, col + 1).setValue(percentageText);
+          sheet.getRange(currentRow, col + 1).setHorizontalAlignment('right');
+          sheet.getRange(currentRow, col + 1).setFontStyle('italic');
+        }
+        
+        col += 2;
+      }
+      
+      if (currentRow % 2 === 0) {
+        sheet.getRange(currentRow, 1, 1, col - 1).setBackground('#F3E5F5');
+      }
+      
+      currentRow++;
+    }
+    
+    // Açıklama satırı
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('📊 Oran Açıklaması:');
+    sheet.getRange(currentRow, 1).setFontWeight('bold');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Negatifler (İlgilenmiyor, Ulaşılamadı, Geçersiz Numara, Kurumsal): Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Fırsatlar (Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi): Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Randevu Alındı: Toplam aramaya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Toplantı Tamamlandı: Randevu Alındı\'ya göre');
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('• Satış Yapıldı: Toplantı Tamamlandı\'ya göre');
+    
+    // Kolon genişlikleri - Her aktivite için 2 kolon (sayı + oran)
+    sheet.setColumnWidth(1, 200); // Temsilci
+    col = 2;
+    for (const header of activityHeaders) {
+      if (header.key === 'toplamAktivite') {
+        sheet.setColumnWidth(col, 100);
+      } else {
+        sheet.setColumnWidth(col, 80); // Sayı
+        sheet.setColumnWidth(col + 1, 70); // Oran
+      }
+      col += 2;
+    }
+    
+    sheet.activate();
+    console.log('✅ Günlük rapor oluşturuldu');
+  } catch (error) {
+    console.error('❌ Günlük rapor sayfası hatası:', error);
+    throw error;
+  }
+}
+
+/**
+ * 👤 Temsilci kodu seçimi için prompt
+ */
+function promptEmployeeCodeForReports() {
+  const ui = SpreadsheetApp.getUi();
+  const employeeCodes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+  const employeeList = employeeCodes.map(code => `${code} - ${CRM_CONFIG.EMPLOYEE_CODES[code]}`).join('\n');
+  
+  const response = ui.prompt(
+    'Temsilci Seçin',
+    `Lütfen temsilci kodunu girin:\n\n${employeeList}`,
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const code = response.getResponseText().trim();
+    if (employeeCodes.includes(code)) {
+      return code;
+    } else {
+      ui.alert('Hata', 'Geçersiz temsilci kodu!', ui.ButtonSet.OK);
+      return null;
+    }
+  }
+  
+  return null;
+}
+
+function recolorTRandevularOnly(){ try{ const ss=SpreadsheetApp.getActiveSpreadsheet(); const sh=ss.getSheetByName('T Randevular'); if(sh && sh.getLastRow()>1){ applyColorCodingToManagerData(sh,'T Randevular',2,sh.getLastRow()-1); SpreadsheetApp.getUi().alert('Tamam','T Randevular renklendirildi.',SpreadsheetApp.getUi().ButtonSet.OK);} else { SpreadsheetApp.getUi().alert('Uyarı','T Randevular sayfası bulunamadı veya boş.',SpreadsheetApp.getUi().ButtonSet.OK);} }catch(e){ SpreadsheetApp.getUi().alert('Hata', String(e && e.message || e), SpreadsheetApp.getUi().ButtonSet.OK);} }
+function recolorTFirsatlarOnly(){ try{ const ss=SpreadsheetApp.getActiveSpreadsheet(); const sh=ss.getSheetByName('T Fırsatlar'); if(sh && sh.getLastRow()>1){ applyColorCodingToManagerData(sh,'T Fırsatlar',2,sh.getLastRow()-1); SpreadsheetApp.getUi().alert('Tamam','T Fırsatlar renklendirildi.',SpreadsheetApp.getUi().ButtonSet.OK);} else { SpreadsheetApp.getUi().alert('Uyarı','T Fırsatlar sayfası bulunamadı veya boş.',SpreadsheetApp.getUi().ButtonSet.OK);} }catch(e){ SpreadsheetApp.getUi().alert('Hata', String(e && e.message || e), SpreadsheetApp.getUi().ButtonSet.OK);} }
+function recolorTToplantilarOnly(){ try{ const ss=SpreadsheetApp.getActiveSpreadsheet(); const sh=ss.getSheetByName('T Toplantılar'); if(sh && sh.getLastRow()>1){ applyColorCodingToManagerData(sh,'T Toplantılar',2,sh.getLastRow()-1); SpreadsheetApp.getUi().alert('Tamam','T Toplantılar renklendirildi.',SpreadsheetApp.getUi().ButtonSet.OK);} else { SpreadsheetApp.getUi().alert('Uyarı','T Toplantılar sayfası bulunamadı veya boş.',SpreadsheetApp.getUi().ButtonSet.OK);} }catch(e){ SpreadsheetApp.getUi().alert('Hata', String(e && e.message || e), SpreadsheetApp.getUi().ButtonSet.OK);} }
+
+function highlightDuplicateMeetingsByCompany(){
+  console.log('Function started:', { action: 'highlightDuplicateMeetingsByCompany' });
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('T Toplantılar') || ss.getActiveSheet();
+    if (!sheet) { SpreadsheetApp.getUi().alert('Hata','Sayfa bulunamadı', SpreadsheetApp.getUi().ButtonSet.OK); return; }
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastRow <= 2 || lastCol < 1) { SpreadsheetApp.getUi().alert('Uyarı','Veri yok', SpreadsheetApp.getUi().ButtonSet.OK); return; }
+    const headers = sheet.getRange(1,1,1,lastCol).getDisplayValues()[0];
+    const lowered = headers.map(h => String(h||'').trim().toLowerCase());
+    function findIdx(cands){ for(const c of cands){ const i = lowered.indexOf(String(c).trim().toLowerCase()); if(i!==-1) return i; } return -1; }
+    const idxCompany = findIdx(['company name','firma','şirket','sirket']);
+    const idxDate    = findIdx(['toplantı tarihi','toplanti tarihi','tarih']);
+    const idxTime    = findIdx(['saat']);
+    if (idxCompany === -1) { SpreadsheetApp.getUi().alert('Hata','Company name sütunu bulunamadı', SpreadsheetApp.getUi().ButtonSet.OK); return; }
+
+    const values = sheet.getRange(2,1,lastRow-1,lastCol).getDisplayValues();
+    function canon(s){ return String(s||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+    function parseDate(v){
+      if (v instanceof Date && !isNaN(v.getTime())) return v;
+      const s = String(v||'').trim();
+      const m = s.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      if (m){ return new Date(Number(m[3]), Number(m[2])-1, Number(m[1])); }
+      const d = new Date(s); return isNaN(d.getTime()) ? null : d;
+    }
+    function minutes(v){
+      if (v instanceof Date && !isNaN(v.getTime())) return v.getHours()*60+v.getMinutes();
+      const s = String(v||'').trim(); const m = s.match(/(\d{1,2}):(\d{2})/); return m? Number(m[1])*60+Number(m[2]) : 0;
+    }
+
+    // Grupla: key = şirket
+    const groups = new Map();
+    for (let r=0;r<values.length;r++){
+      const row = values[r];
+      const key = canon(row[idxCompany]);
+      if (!key) continue;
+      const d = idxDate>=0 ? parseDate(row[idxDate]) : null;
+      const t = idxTime>=0 ? minutes(row[idxTime]) : 0;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({r:r+2, d, t});
+    }
+
+    const dupColor   = (CRM_CONFIG && CRM_CONFIG.COLOR_CODES && CRM_CONFIG.COLOR_CODES['Çift Kayıt']) || 'rgb(255, 249, 196)';
+    const masterColor= CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'] || 'rgb(200, 230, 201)';
+    let masters = 0, dups = 0;
+
+    groups.forEach(list => {
+      if (list.length <= 1) return;
+      // En eski (tarih+saat) MASTER, geri kalan DUP
+      list.sort((a,b)=>{
+        const da = a.d ? a.d.getTime() : Number.POSITIVE_INFINITY;
+        const db = b.d ? b.d.getTime() : Number.POSITIVE_INFINITY;
+        if (da !== db) return da - db;
+        return a.t - b.t;
+      });
+      const master = list[0];
+      sheet.getRange(master.r, 1, 1, lastCol).setBackground(masterColor).setNote(''); masters++;
+      for (let i=1;i<list.length;i++){
+        const noteText = `DUPE OF #${master.r}`;
+        sheet.getRange(list[i].r, 1, 1, lastCol).setBackground(dupColor).setNote(noteText); dups++;
+      }
+    });
+
+    SpreadsheetApp.getUi().alert('Tamam', `Gruplar işaretlendi. Master: ${masters}, Çift: ${dups}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
 console.log("🔧 DEBUG: Ana dosyaya eklendi");
+
+
+
+

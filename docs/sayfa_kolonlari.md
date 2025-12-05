@@ -52,7 +52,9 @@ Aktivite (dropdown):
 - Bilgi Verildi  
 - Fırsat İletildi  
 - İlgilenmiyor  
-- Ulaşılamadı
+- Ulaşılamadı  
+- Geçersiz Numara  
+- Kurumsal
 
 Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 
@@ -63,38 +65,33 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 |---|---|
 | Kod | input |
 | Kaynak | input |
-| Keyword | input |
-| Location | input |
 | Company name | input |
-| Category | input |
-| Website | input |
+| İsim Soyisim | input |
 | Phone | input |
 | Yetkili Tel | input |
+| Website | input |
 | Mail | input |
-| İsim Soyisim | input |
+| Toplantı formatı | dropdown |
 | Randevu durumu | dropdown |
 | Randevu Tarihi | datepicker |
+| Ay | text |
 | Saat | datepicker |
 | Yorum | input |
 | Yönetici Not | input |
-| CMS Adı | input |
-| CMS Grubu | input |
-| E-Ticaret İzi | input |
-| Site Hızı | input |
-| Site Trafiği | input |
-| Log | input |
-| Toplantı formatı | dropdown |
 | Address | input |
-| City | input |
-| Rating count | input |
-| Review | input |
-| Toplantı Sonucu | dropdown |
-| Toplantı Tarihi | datepicker |
 | Maplink | input |
 
+**Not:** Log kolonu kaldırıldı - Log Arşivi'nden okunuyor. Keyword, Location, Category, CMS Adı kolonları kaldırıldı.
+
+
+
 Randevu durumu (dropdown):  
-- Ana: Randevu Alındı  
-- Alt: Randevu Teyitlendi, Randevu Ertelendi, Randevu İptal oldu
+- Randevu Alındı  
+- İleri Tarih Randevu
+- Randevu Teyitlendi
+- Randevu Ertelendi
+- Randevu İptal oldu
+- Toplantı Gerçekleşti (✅ YENİ: Otomatik Toplantılarım'a taşınır, koyu yeşil renk)
 
 Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon  
 Toplantı Sonucu (dropdown): Satış Yapıldı, Teklif İletildi, Beklemede, Satış İptal
@@ -106,33 +103,29 @@ Toplantı Sonucu (dropdown): Satış Yapıldı, Teklif İletildi, Beklemede, Sat
 |---|---|
 | Kod | input |
 | Kaynak | input |
-| Keyword | input |
-| Location | input |
 | Company name | input |
-| Category | input |
-| Website | input |
+| İsim Soyisim | input |
 | Phone | input |
 | Yetkili Tel | input |
+| Website | input |
 | Mail | input |
-| İsim Soyisim | input |
+| Toplantı formatı | dropdown |
 | Fırsat Durumu | dropdown |
 | Fırsat Tarihi | datepicker |
+| Ay | text |
+| Saat | datepicker |
 | Yorum | input |
 | Yönetici Not | input |
-| CMS Adı | input |
-| CMS Grubu | input |
-| E-Ticaret İzi | input |
-| Site Hızı | input |
-| Site Trafiği | input |
-| Log | input |
-| Toplantı formatı | dropdown |
 | Address | input |
-| City | input |
-| Rating count | input |
-| Review | input |
 | Maplink | input |
 
-Fırsat Durumu (dropdown): Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi  
+**Not:** Log kolonu kaldırıldı - Log Arşivi'nden okunuyor. Keyword, Location, Category, CMS Adı, CMS Grubu, E-Ticaret İzi, Site Hızı, Site Trafiği kolonları kaldırıldı.
+
+Fırsat Durumu (dropdown):  
+- Yeniden Aranacak
+- Bilgi Verildi
+- Fırsat İletildi
+- Fırsat Kaybedildi (✅ YENİ: İptal gibi en aşağıya çekilir, açık kırmızı renk)  
 Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 
 ---
@@ -142,38 +135,26 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 |---|---|
 | Kod | input |
 | Kaynak | input |
-| Keyword | input |
-| Location | input |
 | Company name | input |
 | İsim Soyisim | input |
+| Phone | input |
+| Yetkili Tel | input |
+| Website | input |
+| Mail | input |
+| Toplantı formatı | dropdown |
+| Toplantıyı Yapan | input |
+| Toplantı Tarihi | datepicker |
+| Ay | text |
 | Toplantı Sonucu | dropdown |
 | Teklif Detayı | multiselect |
 | Satış Potansiyeli | dropdown |
-| Toplantı Tarihi | datepicker |
 | Yeni Takip Tarihi | datepicker |
-| Toplantıyı Yapan | input |
-| Category | input |
-| Website | input |
-| Phone | input |
-| Yetkili Tel | input |
-| Mail | input |
-| Randevu durumu | dropdown |
-| Randevu Tarihi | datepicker |
-| Saat | datepicker |
 | Yorum | input |
 | Yönetici Not | input |
-| CMS Adı | input |
-| CMS Grubu | input |
-| E-Ticaret İzi | input |
-| Site Hızı | input |
-| Site Trafiği | input |
-| Log | input |
-| Toplantı formatı | dropdown |
 | Address | input |
-| City | input |
-| Rating count | input |
-| Review | input |
+| Maplink | input |
 
+**Not:** Log kolonu kaldırıldı - Log Arşivi'nden okunuyor. Keyword, Location, Category, CMS Adı, CMS Grubu, E-Ticaret İzi, Site Hızı, Site Trafiği kolonları kaldırıldı.
 Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon  
 Toplantı Sonucu (dropdown): Satış Yapıldı, Teklif iletildi, Beklemede, Satış İptal  
 Teklif Detayı (multiselect): Custom, Elite, Platinium Plus, Platinium, Entegre, Digifirst Custom, Digifirst Plus, Digifirst, Digifirst Setup  

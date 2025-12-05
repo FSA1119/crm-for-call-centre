@@ -17,80 +17,70 @@ function cmsDetectFunctionStarted(parameters) {
  * @returns {string} Sonuç (ör: "Shopify" | "WooCommerce" | "Sitesi Yok" | "Düşük Kalite" | "Yüksek Kalite")
  */
 function detectCMSForUrl(rawUrl) {
+  cmsDetectFunctionStarted({ rawUrl });
   try {
-    if (!rawUrl) return '';
-    
-    // ⚡ MUTLAK SOSYAL MEDYA KONTROLÜ - İLK ŞEY!
-    const rawStr = String(rawUrl).toLowerCase().trim();
-    
-    // Kesin liste - direkt return
-    const socialSites = ['instagram', 'facebook', 'tiktok', 'twitter', 'trendyol', 'hepsiburada', 'n11.com', 'youtube', 'linkedin'];
-    for (const site of socialSites) {
-      if (rawStr.includes(site)) {
-        return 'Sitesi Yok';
-      }
-    }
-    
     const url = normalizeUrl(rawUrl);
     if (!url) return '';
+
+    // ⚠️ KRİTİK: İLK ÖNCE domain kontrolü (fetch'ten ÖNCE!)
+    const domain = extractDomain(url);
+    console.log('🔍 Domain çıkarıldı:', { url, domain });
     
-    const domain = extractDomain(rawUrl);
     if (isMarketplaceOrSocial(domain)) {
+      console.log('🛑 Pazar yeri/sosyal medya tespit edildi:', domain);
       return 'Sitesi Yok';
     }
 
-    let fetched = fetchSiteWithRedirects(url);
+    const fetched = fetchSiteWithRedirects(url);
     if (fetched && fetched.unreachable) {
+      console.log('⛔ Site erişilemez:', url);
       return 'Erişilemedi';
     }
-    let signals = buildSignals(fetched);
-    let lastMetaUrl = '';
+    const signals = buildSignals(fetched);
+    console.log('📊 Signals oluşturuldu:', { domain: signals.domain, htmlLength: signals.html.length });
 
-    for (let hop = 0; hop < 2; hop++) {
-      const metaUrl = extractMetaRefreshUrl(signals.html, fetched.finalUrl);
-      if (!metaUrl || metaUrl === fetched.finalUrl) {
-        if (hop === 0) {
-          console.log('Meta refresh not found on initial fetch', { url: fetched.finalUrl, snippet: signals.html ? signals.html.substring(0, 200) : '' });
+    let known = detectKnownCMS(signals);
+    if (known) {
+      // Eğer Shopify ve site kapalı ise (4xx/5xx veya body'de offline ibareleri), Erişilemedi yaz
+      if (known === 'Shopify') {
+        const offlineHint = /(store\s+is\s+unavailable|we\'re\s+currently\s+unavailable|site\s+is\s+down|coming\s+soon|password\s+page)/i;
+        if ((signals.statusCode && signals.statusCode >= 400) || offlineHint.test(signals.html)) {
+          return 'Erişilemedi';
         }
-        break;
       }
-      console.log('Meta refresh redirect detected:', { from: fetched.finalUrl, to: metaUrl, hop });
-      lastMetaUrl = metaUrl;
-      const next = fetchSiteWithRedirects(metaUrl);
-      if (!next || next.unreachable) {
-        console.log('Meta refresh target unreachable', { metaUrl });
-        break;
-      }
-      fetched = next;
-      signals = buildSignals(fetched);
+      console.log('Known CMS matched:', known, { url: fetched.finalUrl });
+      return known;
     }
 
-    let result = resolveCmsFromSignals(signals, { context: 'detectCMSForUrl', useDeepProbe: true });
-
-    if (result === 'Shopify') {
-      const offlineHint = /(store\s+is\s+unavailable|we\'re\s+currently\s+unavailable|site\s+is\s+down|coming\s+soon|password\s+page)/i;
-      if ((signals.statusCode && signals.statusCode >= 400) || offlineHint.test(signals.html)) {
-        return 'Erişilemedi';
-      }
+    // Deep probe (accurate mode fallback)
+    known = deepProbeCMS(fetched.finalUrl);
+    if (known) {
+      console.log('Deep probe matched:', known, { url: fetched.finalUrl });
+      return known;
     }
 
-    if ((!result || /kalite|tespit edilemedi/i.test(result)) && lastMetaUrl) {
-      try {
-        console.log('Meta refresh fallback fetch starting', { lastMetaUrl });
-        const fallback = fetchSiteWithRedirects(lastMetaUrl);
-        if (fallback && !fallback.unreachable) {
-          const fallbackSignals = buildSignals(fallback);
-          const fallbackResult = resolveCmsFromSignals(fallbackSignals, { context: 'detectCMSForUrl:meta-fallback', useDeepProbe: true });
-          if (fallbackResult && !/kalite|tespit edilemedi/i.test(fallbackResult)) {
-            return fallbackResult;
-          }
-        }
-      } catch (metaErr) {
-        console.log('Meta refresh fallback failed', { error: metaErr && metaErr.message });
+    // E-ticaret sinyali varsa ama CMS bulunamadıysa, önce kalite kontrol et
+    const hasEcommerceSignals = /sepet|cart|basket|üye ol|giriş yap|ödeme|payment|checkout|kategori|ürün|product|add to cart|sepete ekle/i.test(signals.html);
+    
+    if (hasEcommerceSignals) {
+      // E-ticaret sitesi ama CMS tespit edilemedi - kalite bazlı karar
+      const quality = classifyCustomQuality(signals);
+      
+      // Yüksek kaliteli custom e-ticaret -> özel sistem olarak işaretle
+      if (quality === 'Yüksek Kalite') {
+        console.log('High quality custom e-commerce detected:', { url: fetched.finalUrl });
+        return 'Özel E-ticaret'; // Custom ama kaliteli
       }
+      
+      // Düşük/orta kalite -> tespit edilemedi
+      console.log('E-commerce signals found but CMS unknown:', quality, { url: fetched.finalUrl });
+      return quality; // "Orta Kalite" | "Normal Kalite" | "Düşük Kalite"
     }
 
-    return result || 'Tespit Edilemedi';
+    // E-ticaret değil, normal site - kalite analizi
+    const quality = classifyCustomQuality(signals);
+    console.log('Custom build classified:', quality, { url: fetched.finalUrl });
+    return quality;
   } catch (error) {
     console.error('Function failed:', error);
     try { SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK); } catch(_) {}
@@ -105,19 +95,42 @@ function deepProbeCMS(finalUrl) {
     var base = '';
     try { base = (new (this.URL || Url)(finalUrl)).origin; } catch(_) { base = finalUrl.replace(/^(https?:\/\/[^\/]+).*/, '$1'); }
     const probes = [
+      // Shopify tespit endpoint'leri
       { name: 'Shopify', url: base + '/cart.js', type: 'json', mustContain: 'items' },
       { name: 'Shopify', url: base + '/collections.json', type: 'json' },
+      { name: 'Shopify', url: base + '/products.json', type: 'json' },
+      { name: 'Shopify', url: base + '/admin', type: 'text', mustContain: 'Shopify' },
+      // WordPress & WooCommerce tespit endpoint'leri
       { name: 'WordPress', url: base + '/wp-json/', type: 'json' },
       { name: 'WordPress', url: base + '/wp-login.php', type: 'text', mustContain: 'WordPress' },
+      { name: 'WordPress', url: base + '/wp-admin/', type: 'text', mustContain: 'WordPress' },
       { name: 'WooCommerce', url: base + '/wp-content/plugins/woocommerce/readme.txt', type: 'text', mustContain: 'WooCommerce' },
       { name: 'WooCommerce', url: base + '/?wc-ajax=cart', type: 'json' },
-      // IdeaSoft admin giriş sayfaları genellikle marka içerir
+      { name: 'WooCommerce', url: base + '/wp-json/wc/v3/', type: 'json' },
+      // Magento tespit endpoint'leri
+      { name: 'Magento', url: base + '/rest/V1/', type: 'json' },
+      { name: 'Magento', url: base + '/admin', type: 'text', mustContain: 'Magento' },
+      // IdeaSoft tespit endpoint'leri (genişletilmiş)
       { name: 'IdeaSoft', url: base + '/admin', type: 'text', mustContain: 'IdeaSoft' },
       { name: 'IdeaSoft', url: base + '/admin/login', type: 'text', mustContain: 'IdeaSoft' },
       { name: 'IdeaSoft', url: base + '/Admin', type: 'text', mustContain: 'IdeaSoft' },
-      // Ticimax endpoint'leri
+      { name: 'IdeaSoft', url: base + '/Admin/Login', type: 'text', mustContain: 'IdeaSoft' },
+      { name: 'IdeaSoft', url: base + '/api/', type: 'json' },
+      { name: 'IdeaSoft', url: base + '/api/cart', type: 'json' },
+      { name: 'IdeaSoft', url: base + '/api/products', type: 'json' },
+      { name: 'IdeaSoft', url: base + '/Service/', type: 'json' },
+      { name: 'IdeaSoft', url: base + '/service/product', type: 'json' },
+      // Ticimax tespit endpoint'leri
       { name: 'Ticimax', url: base + '/admin', type: 'text', mustContain: 'Ticimax' },
-      { name: 'Ticimax', url: base + '/Service/GetProductList', type: 'json' }
+      { name: 'Ticimax', url: base + '/admin/login', type: 'text', mustContain: 'Ticimax' },
+      { name: 'Ticimax', url: base + '/api/cart', type: 'json' },
+      { name: 'Ticimax', url: base + '/api/products', type: 'json' },
+      // T-Soft tespit endpoint'leri
+      { name: 'T-Soft', url: base + '/admin', type: 'text', mustContain: 'T-Soft' },
+      { name: 'T-Soft', url: base + '/admin/login', type: 'text', mustContain: 'TEKROM' },
+      // İkas tespit endpoint'leri
+      { name: 'İkas', url: base + '/admin', type: 'text', mustContain: 'ikas' },
+      { name: 'İkas', url: base + '/api/', type: 'json' }
     ];
     const reqs = probes.map(p => ({ url: p.url, muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (LeadBot; CRM-Detector)' } }));
     const resps = UrlFetchApp.fetchAll(reqs);
@@ -126,13 +139,7 @@ function deepProbeCMS(finalUrl) {
         const ct = String(resps[i].getHeaders()['Content-Type'] || '').toLowerCase();
         const body = resps[i].getContentText();
         const p = probes[i];
-        if (p.type === 'json') {
-          if (/json/.test(ct)) return p.name;
-          try {
-            JSON.parse(body);
-            return p.name;
-          } catch (_) {}
-        }
+        if (p.type === 'json' && /json/.test(ct)) return p.name;
         if (p.type === 'text') {
           if (!p.mustContain || body.indexOf(p.mustContain) !== -1) return p.name;
         }
@@ -171,63 +178,44 @@ function detectCMSBatchFast(urls) {
   try {
     if (!Array.isArray(urls) || urls.length === 0) return [];
     
-    // ⚡ MUTLAK SOSYAL MEDYA KONTROLÜ
-    const socialKeywords = ['instagram', 'facebook', 'tiktok', 'twitter', 'trendyol', 'hepsiburada', 'n11.com', 'youtube', 'linkedin'];
+    // ⚠️ KRİTİK: İLK ÖNCE tüm URL'lerin domain'lerini kontrol et!
+    const urlData = urls.map(rawUrl => {
+      const url = normalizeUrl(rawUrl);
+      const domain = extractDomain(url);
+      return { rawUrl, url, domain };
+    });
     
-    const urlsToFetch = [];
+    // Pazar yeri/sosyal medya olanları hemen ayır
     const out = [];
+    const needsFetch = [];
     
-    for (let i = 0; i < urls.length; i++) {
-      const rawStr = String(urls[i] || '').toLowerCase().trim();
-      
-      // Sosyal medya kontrolü
-      let isSocial = false;
-      for (const keyword of socialKeywords) {
-        if (rawStr.includes(keyword)) {
-          out.push('Sitesi Yok');
-          isSocial = true;
-          break;
-        }
-      }
-      
-      if (!isSocial) {
-        urlsToFetch.push({ index: i, url: normalizeUrl(urls[i]) });
-        out.push(null);
+    for (let i = 0; i < urlData.length; i++) {
+      if (isMarketplaceOrSocial(urlData[i].domain)) {
+        console.log(`🛑 Pazar yeri/sosyal: ${urlData[i].domain}`);
+        out[i] = 'Sitesi Yok';
+      } else {
+        out[i] = null; // Henüz tespit edilmedi
+        needsFetch.push({ index: i, url: urlData[i].url });
       }
     }
     
-    // Eğer tüm siteler pazar yeri/sosyal ise fetch yapma
-    if (urlsToFetch.length === 0) return out;
-    
     // Sadece gerçek siteleri fetch et
-    const reqs = urlsToFetch.map(item => ({ url: item.url, muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (LeadBot; CRM-Detector)' } }));
+    if (needsFetch.length === 0) return out;
+    
+    console.log(`📡 ${needsFetch.length}/${urls.length} site fetch edilecek`);
+    const reqs = needsFetch.map(item => ({ url: item.url, muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (LeadBot; CRM-Detector)' } }));
     const resps = UrlFetchApp.fetchAll(reqs);
     
     for (let i = 0; i < resps.length; i++) {
       try {
-        const finalUrl = urlsToFetch[i].url;
-        const fetched = {
-          html: resps[i].getContentText(),
-          headers: resps[i].getAllHeaders(),
-          finalUrl,
-          statusCode: resps[i].getResponseCode ? resps[i].getResponseCode() : 0,
-          unreachable: false
-        };
-
-        let signals = buildSignals(fetched);
-        const metaUrl = extractMetaRefreshUrl(signals.html, signals.finalUrl);
-        if (metaUrl && metaUrl !== signals.finalUrl) {
-          console.log('Fast batch meta refresh detected', { from: signals.finalUrl, to: metaUrl });
-          const next = fetchSiteWithRedirects(metaUrl);
-          if (next && !next.unreachable) {
-            signals = buildSignals(next);
-          }
-        }
-
-        const resolved = resolveCmsFromSignals(signals, { context: 'detectCMSBatchFast', useDeepProbe: false });
-        out[urlsToFetch[i].index] = resolved || 'Tespit Edilemedi';
+        const html = resps[i].getContentText();
+        const headers = normalizeHeaders(resps[i].getAllHeaders());
+        const finalUrl = needsFetch[i].url;
+        const signals = { html, headers, finalUrl, domain: extractDomain(finalUrl) };
+        const known = detectKnownCMS(signals);
+        out[needsFetch[i].index] = known || classifyCustomQuality(signals);
       } catch (e) {
-        out[urlsToFetch[i].index] = 'Tespit Edilemedi';
+        out[needsFetch[i].index] = 'Tespit Edilemedi';
       }
     }
     
@@ -245,6 +233,7 @@ function mapCmsGroup(name) {
   // Kalite kategorileri
   if (n.indexOf('yüksek kalite') !== -1) return 'Yüksek Kalite';
   if (n.indexOf('normal kalite') !== -1) return 'Normal Kalite';
+  if (n.indexOf('orta kalite') !== -1) return 'Orta Kalite';
   if (n.indexOf('düşük kalite') !== -1) return 'Düşük Kalite';
   if (n.indexOf('özel e-ticaret') !== -1) return 'Özel E-ticaret';
   
@@ -253,12 +242,12 @@ function mapCmsGroup(name) {
   if (n.indexOf('erişilemedi') !== -1) return 'Erişilemedi';
   if (n.indexOf('tespit edilemedi') !== -1) return 'Tespit Edilemedi';
   
-  // Platform grupları (Türkçe karakter normalize!)
-  if (['ticimax','t-soft','ikas','İkas'].some(k=>n.indexOf(k.toLowerCase())!==-1)) return 'Rakip';
-  if (['ideasoft'].some(k=>n.indexOf(k)!==-1)) return 'Bizim';
+  // Platform grupları
+  if (['ticimax','t-soft','ikas'].some(k=>n.indexOf(k)!==-1)) return 'Rakip';
+  if (['ideasoft','eticaret.com'].some(k=>n.indexOf(k)!==-1)) return 'Bizim';
   if (['shopify','wix','bigcommerce','squarespace','ecwid','webflow','weebly','volusion','shift4shop','bigcartel','selz','godaddy'].some(k=>n.indexOf(k)!==-1)) return 'SaaS';
   if (['wordpress','woocommerce','magento','prestashop','opencart','shopware','oscommerce','zencart','nopcommerce','bagisto','saleor','sylius','spree'].some(k=>n.indexOf(k)!==-1)) return 'Açık Kaynak';
-  if (['ticimax','t-soft','ikas','ideasoft','platinmarket','projesoft','faprika','neticaret','eticaretsoft','smart e-ticaret','shopphp','softtr','demresa','bilgikurumsal','quka','imagaza','akinsoft','hipotenus','ticifly','alkissoft','kobimaster','vatansoft','inplato','eticaretim','jettycart','dogruajans'].some(k=>n.indexOf(k)!==-1)) return 'TR Hazır';
+  if (['ticimax','t-soft','ikas','ideasoft','eticaret.com','platinmarket','projesoft','faprika','neticaret','eticaretsoft','smart e-ticaret','shopphp','softtr','demresa','bilgikurumsal','quka','imagaza','akinsoft','hipotenus','ticifly','alkissoft','kobimaster','vatansoft','inplato','eticaretim','jettycart','dogruajans'].some(k=>n.indexOf(k)!==-1)) return 'TR Hazır';
   
   return 'Custom';
 }
@@ -273,11 +262,65 @@ function getCmsDefaults() {
     DEFAULT_CHUNK_SIZE: 100,
     MAX_CHUNK_SIZE: 200,
     DEFAULT_LIMIT_ROWS: 100,
-    TARGET_SHEETS: ['Randevularım','Randevular'],
+    TARGET_SHEETS: ['Randevularım','Randevular','Fırsatlarım','Fırsatlar','Toplantılarım','Toplantılar'],
     WEBSITE_COLUMN: 'Website',
     CMS_NAME_COLUMN: 'CMS Adı',
-    CMS_GROUP_COLUMN: 'CMS Grubu'
+    CMS_GROUP_COLUMN: 'CMS Grubu',
+    // Alternatif kolon isimleri (Türkçe karakter varyasyonları dahil!)
+    ALT_WEBSITE_COLUMNS: ['Website', 'Web Site', 'website', 'Site', 'URL', 'Web Sitesi', 'WEBSITE', 'WebSite'],
+    ALT_CMS_NAME_COLUMNS: ['CMS Adı', 'CMS Adi', 'CMS ADI', 'CMS AdI', 'CMS', 'Alt Yapı', 'Altyapı', 'Alt YapI', 'AltYapi'],
+    ALT_CMS_GROUP_COLUMNS: ['CMS Grubu', 'CMS Grubu', 'CMS Group', 'CMS GRUBU', 'CMS GrubU', 'Grup', 'Platform Grubu', 'GRUP']
   };
+}
+
+/**
+ * 🔍 Esnek kolon bulma - alternatif isimleri de kontrol eder
+ * Türkçe karakter sorunlarını çözer (ı/i, İ/I, ş/s, ğ/g, ü/u, ö/o, ç/c)
+ */
+function findColumnIndex(headers, preferredName, alternatives) {
+  // Türkçe karakterleri normalize et
+  const normalizeTurkish = (str) => {
+    return String(str)
+      .toLowerCase()
+      .replace(/ı/g, 'i')
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/ö/g, 'o')
+      .replace(/ç/g, 'c')
+      .trim();
+  };
+  
+  // Önce exact match (tam eşleşme)
+  let idx = headers.indexOf(preferredName);
+  if (idx !== -1) return idx;
+  
+  // Alternatif isimleri ara (exact)
+  if (alternatives && Array.isArray(alternatives)) {
+    for (const alt of alternatives) {
+      idx = headers.indexOf(alt);
+      if (idx !== -1) return idx;
+    }
+  }
+  
+  // Türkçe karakterleri normalize ederek ara
+  const normalizedPreferred = normalizeTurkish(preferredName);
+  
+  for (let i = 0; i < headers.length; i++) {
+    const normalizedHeader = normalizeTurkish(headers[i]);
+    
+    // Tercih edilen isim ile karşılaştır
+    if (normalizedHeader === normalizedPreferred) return i;
+    
+    // Alternatifler ile karşılaştır
+    if (alternatives && Array.isArray(alternatives)) {
+      for (const alt of alternatives) {
+        if (normalizedHeader === normalizeTurkish(alt)) return i;
+      }
+    }
+  }
+  
+  return -1;
 }
 
 /**
@@ -300,10 +343,39 @@ function runCMSDetectionForCurrentAgent(options) {
       const lastRow = sh.getLastRow();
       if (lastRow <= 1) continue;
       const headers = sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0];
-      const iWebsite = headers.indexOf(DEF.WEBSITE_COLUMN);
-      if (iWebsite === -1) continue;
-      const iCms = headers.indexOf(DEF.CMS_NAME_COLUMN) !== -1 ? headers.indexOf(DEF.CMS_NAME_COLUMN) : -1;
-      const iGroup = headers.indexOf(DEF.CMS_GROUP_COLUMN) !== -1 ? headers.indexOf(DEF.CMS_GROUP_COLUMN) : -1;
+      
+      // Esnek kolon bulma
+      const iWebsite = findColumnIndex(headers, DEF.WEBSITE_COLUMN, DEF.ALT_WEBSITE_COLUMNS);
+      if (iWebsite === -1) {
+        console.log(`⏭️ ${name} sayfası atlandı: Website kolonu yok`);
+        continue;
+      }
+      
+      let iCms = findColumnIndex(headers, DEF.CMS_NAME_COLUMN, DEF.ALT_CMS_NAME_COLUMNS);
+      let iGroup = findColumnIndex(headers, DEF.CMS_GROUP_COLUMN, DEF.ALT_CMS_GROUP_COLUMNS);
+      
+      // CMS kolonları yoksa otomatik ekle
+      if (iCms === -1 || iGroup === -1) {
+        let insertPos = iWebsite + 1;
+        
+        if (iCms === -1) {
+          sh.insertColumnAfter(iWebsite);
+          sh.getRange(1, insertPos + 1).setValue('CMS Adı');
+          console.log(`✅ '${name}' sayfasına 'CMS Adı' kolonu eklendi`);
+          insertPos++;
+        }
+        
+        if (iGroup === -1) {
+          sh.insertColumnAfter(insertPos);
+          sh.getRange(1, insertPos + 1).setValue('CMS Grubu');
+          console.log(`✅ '${name}' sayfasına 'CMS Grubu' kolonu eklendi`);
+        }
+        
+        // Kolonları yeniden bul
+        const newHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0];
+        iCms = findColumnIndex(newHeaders, DEF.CMS_NAME_COLUMN, DEF.ALT_CMS_NAME_COLUMNS);
+        iGroup = findColumnIndex(newHeaders, DEF.CMS_GROUP_COLUMN, DEF.ALT_CMS_GROUP_COLUMNS);
+      }
 
       const rowsCount = limitRows>0 ? Math.min(limitRows, lastRow-1) : (lastRow-1);
       const urls = sh.getRange(2, iWebsite+1, rowsCount, 1).getDisplayValues().map(r=>String(r[0]||''));
@@ -368,13 +440,55 @@ function runCMSDetectionForSelection(options) {
     }
 
     const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-    const iWebsite = headers.indexOf(DEF.WEBSITE_COLUMN);
-    const iCms = headers.indexOf(DEF.CMS_NAME_COLUMN);
-    const iGroup = headers.indexOf(DEF.CMS_GROUP_COLUMN);
+    console.log('📋 Kolonlar (hızlı mod):', { headers, sheetName });
+    
+    // Esnek kolon bulma
+    let iWebsite = findColumnIndex(headers, DEF.WEBSITE_COLUMN, DEF.ALT_WEBSITE_COLUMNS);
+    let iCms = findColumnIndex(headers, DEF.CMS_NAME_COLUMN, DEF.ALT_CMS_NAME_COLUMNS);
+    let iGroup = findColumnIndex(headers, DEF.CMS_GROUP_COLUMN, DEF.ALT_CMS_GROUP_COLUMNS);
+    
+    console.log('📍 Kolon indeksleri (hızlı):', { iWebsite, iCms, iGroup });
 
     if (iWebsite === -1) {
-      ui.alert('Hata', `'${DEF.WEBSITE_COLUMN}' kolonu bulunamadı.`, ui.ButtonSet.OK);
+      ui.alert('Hata', `'Website' kolonu bulunamadı.\n\nMevcut kolonlar: ${headers.join(', ')}`, ui.ButtonSet.OK);
       return { total: 0, updated: 0 };
+    }
+    
+    // CMS kolonları yoksa otomatik ekle
+    if (iCms === -1 || iGroup === -1) {
+      console.log('⚠️ CMS kolonları eksik (hızlı mod), otomatik ekleniyor...');
+      
+      const response = ui.alert(
+        'CMS Kolonları Eksik', 
+        `'CMS Adı' ve/veya 'CMS Grubu' kolonları bulunamadı.\n\nOtomatik olarak Website kolonundan sonra eklensin mi?`,
+        ui.ButtonSet.YES_NO
+      );
+      
+      if (response === ui.Button.YES) {
+        let insertPos = iWebsite + 1;
+        
+        if (iCms === -1) {
+          sheet.insertColumnAfter(iWebsite);
+          sheet.getRange(1, insertPos + 1).setValue('CMS Adı');
+          console.log(`✅ 'CMS Adı' kolonu eklendi: Kolon ${insertPos + 1}`);
+          insertPos++;
+        }
+        
+        if (iGroup === -1) {
+          sheet.insertColumnAfter(insertPos);
+          sheet.getRange(1, insertPos + 1).setValue('CMS Grubu');
+          console.log(`✅ 'CMS Grubu' kolonu eklendi: Kolon ${insertPos + 1}`);
+        }
+        
+        // Kolonları yeniden bul
+        const newHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+        iCms = findColumnIndex(newHeaders, DEF.CMS_NAME_COLUMN, DEF.ALT_CMS_NAME_COLUMNS);
+        iGroup = findColumnIndex(newHeaders, DEF.CMS_GROUP_COLUMN, DEF.ALT_CMS_GROUP_COLUMNS);
+        
+        console.log('✅ Yeni kolon indeksleri:', { iWebsite, iCms, iGroup });
+      } else {
+        return { total: 0, updated: 0 };
+      }
     }
 
     // Seçili satırları topla
@@ -420,17 +534,36 @@ function runCMSDetectionForSelection(options) {
     }
 
     let updated = 0;
+    console.log(`🚀 Toplu tarama başlıyor: ${workItems.length} URL, chunk size: ${chunkSize}`);
+    
     for (let s = 0; s < workItems.length; s += chunkSize) {
       const slice = workItems.slice(s, s + chunkSize);
+      console.log(`📦 Chunk ${Math.floor(s/chunkSize) + 1}: ${slice.length} URL taranıyor...`);
+      
       const res = detectCMSBatchFast(slice.map(x => x.url));
+      console.log(`✅ Chunk tamamlandı, sonuçlar yazılıyor...`);
+      
       for (let j = 0; j < res.length; j++) {
         const cmsName = res[j] || '';
         const rowIndex = slice[j].row;
-        if (iCms !== -1) sheet.getRange(rowIndex, iCms + 1).setValue(cmsName);
-        if (iGroup !== -1) sheet.getRange(rowIndex, iGroup + 1).setValue(mapCmsGroup(cmsName));
+        
+        if (iCms !== -1) {
+          sheet.getRange(rowIndex, iCms + 1).setValue(cmsName);
+        }
+        
+        if (iGroup !== -1) {
+          sheet.getRange(rowIndex, iGroup + 1).setValue(mapCmsGroup(cmsName));
+        }
+        
         updated++;
       }
+      
+      // Her chunk'tan sonra flush
+      SpreadsheetApp.flush();
+      console.log(`💾 Chunk yazıldı: ${updated}/${workItems.length} tamamlandı`);
     }
+    
+    console.log(`✅ Tüm tarama tamamlandı: ${updated} satır işlendi`);
 
     ui.alert('CMS Analizi', `${sheetName} → ${updated}/${workItems.length} satır işlendi`, ui.ButtonSet.OK);
     console.log('Processing complete:', { updated, total: workItems.length });
@@ -482,12 +615,65 @@ function runCMSDetectionForSelectionAccurate() {
     }
 
     const headersRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-    const iWebsite = headersRow.indexOf(DEF.WEBSITE_COLUMN);
-    const iCms = headersRow.indexOf(DEF.CMS_NAME_COLUMN);
-    const iGroup = headersRow.indexOf(DEF.CMS_GROUP_COLUMN);
+    console.log('📋 Kolonlar:', { headers: headersRow, sheetName });
+    
+    // Esnek kolon bulma - alternatif isimleri de kontrol et
+    const iWebsite = findColumnIndex(headersRow, DEF.WEBSITE_COLUMN, DEF.ALT_WEBSITE_COLUMNS);
+    const iCms = findColumnIndex(headersRow, DEF.CMS_NAME_COLUMN, DEF.ALT_CMS_NAME_COLUMNS);
+    const iGroup = findColumnIndex(headersRow, DEF.CMS_GROUP_COLUMN, DEF.ALT_CMS_GROUP_COLUMNS);
+    
+    console.log('📍 Kolon indeksleri:', { iWebsite, iCms, iGroup });
+    
     if (iWebsite === -1) {
-      ui.alert('Hata', `'${DEF.WEBSITE_COLUMN}' kolonu bulunamadı.`, ui.ButtonSet.OK);
+      console.error('❌ Website kolonu bulunamadı!');
+      ui.alert('Hata', `'Website' kolonu bulunamadı.\n\nMevcut kolonlar: ${headersRow.join(', ')}\n\nAranan: ${DEF.ALT_WEBSITE_COLUMNS.join(', ')}`, ui.ButtonSet.OK);
       return { total: 0, updated: 0 };
+    }
+    
+    // CMS kolonları yoksa otomatik ekle!
+    if (iCms === -1 || iGroup === -1) {
+      console.log('⚠️ CMS kolonları eksik, otomatik ekleniyor...');
+      
+      const response = ui.alert(
+        'CMS Kolonları Eksik', 
+        `'CMS Adı' ve/veya 'CMS Grubu' kolonları bulunamadı.\n\nOtomatik olarak Website kolonundan sonra eklensin mi?`,
+        ui.ButtonSet.YES_NO
+      );
+      
+      if (response === ui.Button.YES) {
+        // Website kolonundan sonra ekle
+        let insertPos = iWebsite + 1;
+        
+        // CMS Adı yoksa ekle
+        if (iCms === -1) {
+          sheet.insertColumnAfter(iWebsite);
+          sheet.getRange(1, insertPos + 1).setValue('CMS Adı');
+          console.log(`✅ 'CMS Adı' kolonu eklendi: Kolon ${insertPos + 1}`);
+          insertPos++;
+        }
+        
+        // CMS Grubu yoksa ekle
+        if (iGroup === -1) {
+          sheet.insertColumnAfter(insertPos);
+          sheet.getRange(1, insertPos + 1).setValue('CMS Grubu');
+          console.log(`✅ 'CMS Grubu' kolonu eklendi: Kolon ${insertPos + 1}`);
+        }
+        
+        // Kolonları yeniden bul
+        const newHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+        const newICms = findColumnIndex(newHeaders, DEF.CMS_NAME_COLUMN, DEF.ALT_CMS_NAME_COLUMNS);
+        const newIGroup = findColumnIndex(newHeaders, DEF.CMS_GROUP_COLUMN, DEF.ALT_CMS_GROUP_COLUMNS);
+        
+        console.log('✅ Yeni kolon indeksleri:', { iWebsite, iCms: newICms, iGroup: newIGroup });
+        
+        // Değişkenleri güncelle
+        iCms = newICms;
+        iGroup = newIGroup;
+        
+        ui.alert('Başarılı', 'CMS kolonları eklendi. Şimdi analiz başlıyor...', ui.ButtonSet.OK);
+      } else {
+        return { total: 0, updated: 0 };
+      }
     }
 
     const rangeList = sheet.getActiveRangeList();
@@ -498,12 +684,39 @@ function runCMSDetectionForSelectionAccurate() {
     let updated = 0;
     for (const row of rows) {
       const url = String(sheet.getRange(row, iWebsite+1).getDisplayValue() || '').trim();
-      if (!url) continue;
+      console.log(`🔍 Satır ${row} taranıyor:`, { url });
+      
+      if (!url) {
+        console.log(`⏭️ Satır ${row} atlandı (boş URL)`);
+        continue;
+      }
+      
       const cmsName = detectCMSForUrl(url) || '';
-      if (iCms !== -1) sheet.getRange(row, iCms+1).setValue(cmsName);
-      if (iGroup !== -1) sheet.getRange(row, iGroup+1).setValue(mapCmsGroup(cmsName));
+      console.log(`✅ Satır ${row} tespit:`, { cmsName, group: mapCmsGroup(cmsName) });
+      
+      if (iCms !== -1) {
+        sheet.getRange(row, iCms+1).setValue(cmsName);
+        console.log(`📝 CMS Adı yazıldı: Satır ${row}, Kolon ${iCms+1}, Değer: ${cmsName}`);
+      }
+      
+      if (iGroup !== -1) {
+        const group = mapCmsGroup(cmsName);
+        sheet.getRange(row, iGroup+1).setValue(group);
+        console.log(`📝 CMS Grubu yazıldı: Satır ${row}, Kolon ${iGroup+1}, Değer: ${group}`);
+      }
+      
       updated++;
+      
+      // Her 10 satırda bir flush (performans)
+      if (updated % 10 === 0) {
+        SpreadsheetApp.flush();
+        console.log(`💾 Flush yapıldı: ${updated} satır`);
+      }
     }
+    
+    // Final flush
+    SpreadsheetApp.flush();
+    console.log(`✅ Tüm yazma işlemleri tamamlandı: ${updated} satır`);
 
     ui.alert('CMS Analizi (Doğruluk)', `${sheetName} → ${updated}/${rows.length} satır işlendi`, ui.ButtonSet.OK);
     return { total: rows.length, updated };
@@ -677,75 +890,14 @@ function normalizeUrl(raw) {
 
 function extractDomain(url) {
   try {
-    let cleanUrl = String(url || '').trim();
-    if (!cleanUrl) return '';
-    
-    // Sadece domain yazılmışsa (örn: "instagram.com")
-    if (!/^https?:\/\//i.test(cleanUrl)) {
-      // "/" var mı kontrol et (instagram.com/user gibi)
-      if (cleanUrl.includes('/')) {
-        // İlk / öncesini al
-        cleanUrl = cleanUrl.split('/')[0];
-      }
-      
-      // www. kaldır
-      cleanUrl = cleanUrl.replace(/^www\./i, '');
-      
-      // Direkt domain dön (URL parse etmeye gerek yok)
-      return cleanUrl.toLowerCase();
-    }
-    
-    // Tam URL varsa parse et
-    const u = new URL(cleanUrl);
-    const hostname = u.hostname.toLowerCase();
-    return hostname.replace(/^www\./i, '');
-    
-  } catch (e) {
-    // URL parse başarısız - regex ile temizle
-    try {
-      let fallback = String(url || '').trim()
-        .replace(/^https?:\/\//i, '')
-        .replace(/^www\./i, '')
-        .split('/')[0]
-        .toLowerCase();
-      console.log('extractDomain fallback:', fallback);
-      return fallback;
-    } catch (_) {
-      return '';
-    }
-  }
+    const u = new URL(url);
+    return u.hostname.toLowerCase();
+  } catch (_) { return ''; }
 }
 
 function isMarketplaceOrSocial(domain) {
-  if (!domain) {
-    console.log('⚠️ isMarketplaceOrSocial: domain boş!');
-    return false;
-  }
-  
   const LIST = REF_LIST.pazar_yerleri_sosyal_magazalar;
-  const cleanDomain = String(domain).toLowerCase().replace(/^www\./i, '');
-  
-  console.log('🔎 Pazar yeri kontrolü:', { originalDomain: domain, cleanDomain });
-  
-  // Exact match veya subdomain kontrolü
-  for (const host of LIST) {
-    if (cleanDomain === host) {
-      console.log('✅ PAZAR YERİ BULUNDU (exact):', { cleanDomain, host });
-      return true;
-    }
-    if (cleanDomain.endsWith('.' + host)) {
-      console.log('✅ PAZAR YERİ BULUNDU (subdomain):', { cleanDomain, host });
-      return true;
-    }
-    // instagram.com/user gibi path'li URL'ler için
-    if (cleanDomain.includes(host)) {
-      console.log('✅ PAZAR YERİ BULUNDU (contains):', { cleanDomain, host });
-      return true;
-    }
-  }
-  
-  console.log('❌ Pazar yeri değil:', cleanDomain);
-  return false;
+  return LIST.some(host => domain === host || domain.endsWith('.' + host));
 }
 
 function fetchSiteWithRedirects(url) {
@@ -833,38 +985,6 @@ function resolveUrl(base, relative) {
   }
 }
 
-function extractMetaRefreshUrl(html, baseUrl) {
-  try {
-    if (!html) return '';
-    const snippet = html.substring(0, 400);
-    const match = /<meta[^>]+http-equiv=["']?refresh["']?[^>]*content=["']?\s*\d+\s*;\s*url=['"]?([^"'>]+)/i.exec(html);
-    if (match && match[1]) {
-      const raw = match[1].replace(/["']/g, '').trim();
-      if (!raw) {
-        console.log('Meta refresh raw empty', { baseUrl, snippet });
-        return '';
-      }
-      if (/^https?:\/\//i.test(raw)) {
-        console.log('Meta refresh parsed absolute', { baseUrl, raw });
-        return raw;
-      }
-      if (/^\/\//.test(raw)) {
-        const scheme = (baseUrl && /^https:/i.test(baseUrl)) ? 'https:' : 'http:';
-        const absolute = scheme + raw;
-        console.log('Meta refresh parsed protocol-relative', { baseUrl, raw, absolute });
-        return absolute;
-      }
-      const resolved = resolveUrl(baseUrl || '', raw);
-      console.log('Meta refresh parsed', { baseUrl, raw, resolved });
-      return resolved;
-    }
-    console.log('Meta refresh regex no match', { baseUrl, snippet });
-  } catch (err) {
-    console.log('Meta refresh parse error', { baseUrl, error: err && err.message });
-  }
-  return '';
-}
-
 function buildSignals(fetched) {
   const html = (fetched.html || '');
   const headers = normalizeHeaders(fetched.headers || {});
@@ -872,48 +992,6 @@ function buildSignals(fetched) {
   const domain = extractDomain(finalUrl);
   const statusCode = fetched.statusCode || 0;
   return { html, headers, finalUrl, domain, statusCode };
-}
-
-function resolveCmsFromSignals(signals, options) {
-  if (!signals) return '';
-  const opts = options || {};
-  const context = opts.context || 'cms-resolver';
-  const useDeepProbe = opts.useDeepProbe !== false;
-
-  const directShopify = /myshopify\.com|shopifycdn|shopify\.shop|window\.Shopify|Shopify\.shop\s*=|Shopify\.theme/i;
-  if (directShopify.test(signals.finalUrl) || directShopify.test(signals.html)) {
-    console.log('Direct Shopify signals detected', { url: signals.finalUrl, context });
-    return 'Shopify';
-  }
-
-  let known = detectKnownCMS(signals);
-  if (known) {
-    console.log('Known CMS matched:', known, { url: signals.finalUrl, context });
-    return known;
-  }
-
-  if (useDeepProbe) {
-    known = deepProbeCMS(signals.finalUrl);
-    if (known) {
-      console.log('Deep probe matched:', known, { url: signals.finalUrl, context });
-      return known;
-    }
-  }
-
-  const hasEcommerce = /sepet|cart|basket|üye ol|giriş yap|ödeme|odeme|payment|checkout|kategori|ürün|product|add to cart/i.test(signals.html);
-  if (hasEcommerce) {
-    const quality = classifyCustomQuality(signals);
-    if (quality === 'Yüksek Kalite') {
-      console.log('High quality custom e-commerce:', { url: signals.finalUrl, context });
-      return 'Özel E-ticaret';
-    }
-    console.log('E-commerce detected, quality:', quality, { url: signals.finalUrl, context });
-    return quality;
-  }
-
-  const quality = classifyCustomQuality(signals);
-  console.log('Custom build classified:', quality, { url: signals.finalUrl, context });
-  return quality;
 }
 
 function normalizeHeaders(h) {
@@ -930,12 +1008,13 @@ function escapeRegExp(s) {
 
 const CMS_SIGNATURES = (function buildCMS() {
   const sig = [];
-  // Türkiye hazır e-ticaret
-  addDomainSig(sig, 'Ticimax', ['ticimax.com', 'ticimax.com.tr', 'ticimaxcdn.com', 'ticimaxcdn.com.tr', 'cdn.ticimax.com', 'static.ticimax.com', 'img.ticimax.com', 'img-static.ticimax.com', 'images.ticimax.com', 'ticimax.net', 'ticimaxstatic.com', 'ticimaxstatic.com.tr']);
-  addDomainSig(sig, 'IdeaSoft', ['ideasoft.com.tr','ideasoftcdn.com','ideacdn.net','ideasoftstore.com','ideacdn.com','cdn.ideasoft.com.tr','cdn.ideasofthosting.com','ideasoft.net']);
-  addDomainSig(sig, 'T-Soft', ['tsoft.com.tr','tsoftcdn.com','tsoftcdn2.com','tsoftstatic.com']);
-  addDomainSig(sig, 'İkas', ['ikas.com','cdn.ikas.com','ikascdn.com']);
+  // Türkiye hazır e-ticaret (genişletilmiş)
+  addDomainSig(sig, 'Ticimax', ['ticimax.com', 'ticimaxcdn.com', 'ticimax.net', 'ticimaxstatic.com', 'ticimaxassets.com', 'ticimax.io', 'ticimaxstore.com', 'cdn.ticimax.com']);
+  addDomainSig(sig, 'IdeaSoft', ['ideasoft.com.tr','ideasoftcdn.com','ideacdn.net','ideasoftstore.com','ideacdn.com','cdn.ideasofthosting.com','cdn.ideasofthosting.net','ideasoftstatic.com','ideasoft.net','ideasoft.com','cdn.ideasoft.com.tr','static.ideasoft.com.tr','img.ideasoft.com.tr','ideacdn.com.tr']);
+  addDomainSig(sig, 'T-Soft', ['tsoft.com.tr','tsoftcdn.com','tsoftcdn2.com','tsoftstatic.com','cdn.tsoft.com.tr']);
+  addDomainSig(sig, 'İkas', ['ikas.com','cdn.ikas.com','ikascdn.com','ikasstatic.com','ikasassets.com']);
   addDomainSig(sig, 'PlatinMarket', ['platinmarket.com']);
+  addDomainSig(sig, 'Eticaret.com', ['eticaret.com', 'eticaretcdn.com', 'cdn.eticaret.com']);
   addDomainSig(sig, 'Projesoft', ['projesoft.com.tr']);
   addDomainSig(sig, 'Faprika', ['faprika.com']);
   addDomainSig(sig, 'Neticaret', ['neticaret.com']);
@@ -957,69 +1036,77 @@ const CMS_SIGNATURES = (function buildCMS() {
   addDomainSig(sig, 'Vatansoft', ['vatansoft.com']);
   addDomainSig(sig, 'Inplato', ['inplato.com']);
   addDomainSig(sig, 'eticaretim', ['eticaretim.com']);
-  // Dünya SaaS
-  addDomainSig(sig, 'Shopify', ['cdn.shopify.com', 'myshopify.com', 'cdn.shopifycdn.net', 'cdn.shopifycloud.com']);
-  addDomainSig(sig, 'Wix', ['wixstatic.com', 'wix.com', 'wixsite.com', 'parastorage.com']);
-  addDomainSig(sig, 'BigCommerce', ['bigcommerce.com']);
-  addDomainSig(sig, 'Squarespace', ['squarespace-cdn.com', 'squarespace.com']);
-  addDomainSig(sig, 'Ecwid', ['ecwid.com']);
-  addDomainSig(sig, 'Webflow', ['webflow.com', 'webflow.io']);
-  addDomainSig(sig, 'GoDaddy', ['godaddy.com', 'secureserver.net']);
+  // Dünya SaaS (genişletilmiş)
+  addDomainSig(sig, 'Shopify', ['cdn.shopify.com', 'myshopify.com', 'shopifycdn.com', 'shopify-assets.com', 'shopifystatic.com']);
+  addDomainSig(sig, 'Wix', ['wixstatic.com', 'wix.com', 'wixsite.com', 'parastorage.com', 'wixdns.net', 'wixapps.net']);
+  addDomainSig(sig, 'BigCommerce', ['bigcommerce.com', 'mybigcommerce.com', 'bigcommercecdn.com']);
+  addDomainSig(sig, 'Squarespace', ['squarespace-cdn.com', 'squarespace.com', 'sqspcdn.com']);
+  addDomainSig(sig, 'Ecwid', ['ecwid.com', 'ecwid.net']);
+  addDomainSig(sig, 'Webflow', ['webflow.com', 'webflow.io', 'webflowcdn.com']);
   // Açık kaynak / self-hosted işaretler (WooCommerce > WordPress önceliği)
-  sig.push({ name: 'WooCommerce', html: [/woocommerce(?!\s*\.com)/i, /wc-ajax/i, /woocommerce_params/i, /wc_cart_fragments/i], headers: [/woocommerce_session/i] });
-  sig.push({ name: 'WordPress', html: [/wp-content\//i, /wp-include/i], headers: [/x-powered-by.*wordpress/i] });
-  sig.push({ name: 'Shopify', html: [/cdn\.shopify/i, /myshopify/i, /Shopify\.theme/i, /shopify-buy/i, /Shopify/i, /shopify\.com/i, /shopify/i, /\/cdn\/shop\//i, /shopifycdn/i, /\/\/.*shopify/i], headers: [/shopify/i, /_shopify/i, /shopify-analytics/i] });
-  sig.push({ name: 'GoDaddy', html: [/godaddy/i, /secureserver\.net/i] });
-  sig.push({ name: 'Magento', html: [/Magento/i, /mage\.(init|require)/i, /magentosite/i, /magento_/i, /Mage\.Cookies/i, /magento/i, /\/\/.*magento/i] });
-  sig.push({ name: 'PrestaShop', html: [/PrestaShop/i, /prestashop/i] });
-  sig.push({ name: 'OpenCart', html: [/index\.php\?route=/i, /opencart/i, /catalog\/view\//i, /\/image\/cache\//i] });
-  sig.push({ name: 'Shopware', html: [/shopware/i] });
-  sig.push({ name: 'OsCommerce', html: [/oscommerce/i] });
-  sig.push({ name: 'Zen Cart', html: [/zencart/i] });
-  sig.push({ name: 'NopCommerce', html: [/nopcommerce/i] });
-  // Footer attribution / metin tabanlı imzalar (TR sağlayıcılar - ÖNCELİK SIRASI ÖNEMLİ!)
-  // TR Platformlar - ÖNCE SPESİFİK PATTERN'LER!
-  // IdeaSoft EN ÖNCE (en önemli!) - ama sadece SPESİFİK imzalar
+  sig.push({ name: 'WooCommerce', html: [/woocommerce(?!\s*\.com)/i, /wc-ajax/i, /woocommerce_params/i, /wc_cart_fragments/i, /wc-api/i, /woocommerce\.js/i], headers: [/woocommerce_session/i, /wc_session/i] });
+  sig.push({ name: 'IdeaSoft', headers: [/ideasoft/i, /ideacdn/i, /x-powered-by.*ideasoft/i] });
+  sig.push({ name: 'WordPress', html: [/wp-content\//i, /wp-include/i, /wp-json/i, /wordpress/i], headers: [/x-powered-by.*wordpress/i] });
+  sig.push({ name: 'Magento', html: [/Magento/i, /mage\.(init|require)/i, /Mage\.Cookies/i, /magento_version/i], headers: [/x-magento/i] });
+  sig.push({ name: 'PrestaShop', html: [/PrestaShop/i, /prestashop/i, /ps_version/i, /prestashop-core/i] });
+  sig.push({ name: 'OpenCart', html: [/index\.php\?route=/i, /opencart/i, /catalog\/view\//i, /\/image\/cache\//i, /common\.js.*opencart/i] });
+  sig.push({ name: 'Shopware', html: [/shopware/i, /sw-version/i, /shopware-ag/i] });
+  sig.push({ name: 'OsCommerce', html: [/oscommerce/i, /osCsid/i] });
+  sig.push({ name: 'Zen Cart', html: [/zencart/i, /zen-cart/i] });
+  sig.push({ name: 'NopCommerce', html: [/nopcommerce/i, /nopAjaxCart/i] });
+  // Ek platformlar
+  sig.push({ name: 'Shopify', html: [/Shopify/i, /cdn\.shopify/i, /shopifycdn/i, /myshopify/i, /Shopify\.theme/i, /shopify-buy-button/i] });
+  sig.push({ name: 'Wix', html: [/wix\.com/i, /wixstatic/i, /parastorage/i, /wix-code/i, /wix-platform/i] });
+  // Footer attribution / metin tabanlı imzalar (TR sağlayıcılar - güçlendirilmiş)
   sig.push({ name: 'IdeaSoft', html: [
-    /ideacdn\.(?:com|net)(?:\.tr)?/i,
-    /ideasoftcdn/i,
-    /ideasoftstatic/i,
-    /cdn\.ideasoft/i,
+    // CDN ve asset imzaları (en güvenilir!)
+    /ideacdn/i, 
+    /ideasoftcdn/i, 
+    /ideasoftstatic/i, 
+    /ideacdn\.net/i,
+    /ideacdn\.com/i,
     /cdn\.ideasofthosting/i,
-    /ideasoftstore/i,
-    /content=["']?IdeaSoft/i,
-    /ak[ıi]ll[ıi]\s*e[-\s]?ticaret[^<]{0,160}haz[ıi]rlanm[ıi][şs]t[ıi]r/i,
-    /powered\s*by\s*ideasoft/i
+    /\/\/ideacdn\./i,
+    /\/\/cdn\.ideasoft/i,
+    // Domain imzaları
+    /ideasoft\.com\.tr/i,
+    // Güçlü meta/content imzaları
+    /content=["']?IdeaSoft/i, 
+    /ak[ıi]ll[ıi]\s*e[-\s]?ticaret[^<]{0,160}haz[ıi]rlanm[ıi][şs]t[ıi]r/i, 
+    /powered\s*by\s*ideasoft/i,
+    /ideasoft\s*(akıllı|akilli)?\s*e[-\s]?ticaret/i, 
+    /ideasoft\s*altyap[ıi]/i,
+    /ideasoft\s*sistemi/i,
+    /ideasoft\s*e[-\s]?ticaret\s*sistemi/i,
+    // JavaScript API imzaları (spesifik!)
+    /IdeaSoft\.Cart/i,
+    /IdeaSoft\.Product/i,
+    /IdeaSoft\.Customer/i,
+    /IdeaSoft\.Core/i,
+    /var\s+IdeaSoft\s*=/i,
+    /window\.IdeaSoft/i,
+    // Theme ve module imzaları
+    /ideasoft-theme/i,
+    /ideasoft\.module/i,
+    /ideasoft\.init/i,
+    // Form ve input imzaları (spesifik!)
+    /ideaForm/i,
+    /ideaInput/i,
+    /idea-cart/i,
+    /idea-product/i
   ] });
-  // Ticimax (SPESİFİK pattern'ler)
-  sig.push({ name: 'Ticimax', html: [
-    /ticimaxcdn/i,
-    /ticimaxstatic/i,
-    /cdn\d*\.ticimax/i,
-    /static\.ticimax/i,
-    /img[-\.].*ticimax/i,
-    /images\.ticimax/i,
-    /ticimax\.com/i,
-    /ticimax\.com\.tr/i,
-    /ticimax\.net/i,
-    /ticimaxstatic\.com/i,
-    /powered\s*by\s*ticimax/i,
-    /ticimax_/i,
-    /ticimax\.js/i,
-    /ticimax\.css/i,
-    /src=["'][^"']*ticimax/i,
-    /href=["'][^"']*ticimax/i
-  ], headers: [/x-powered-by\s*:\s*ticimax/i, /tcmx/i] });
-  sig.push({ name: 'T-Soft', html: [/T-Soft\s+E-?Ticaret\s+Sistemleri/i, /TEKROM\s+Teknoloji/i] });
-  sig.push({ name: 'İkas', html: [/ikascdn/i, /cdn\.ikas/i] });
-  sig.push({ name: 'PlatinMarket', html: [/platinmarket/i] });
-  sig.push({ name: 'Projesoft', html: [/projesoft/i] });
-  sig.push({ name: 'Faprika', html: [/faprika/i] });
-  sig.push({ name: 'Neticaret', html: [/neticaret/i] });
-  sig.push({ name: 'E-Ticaret Soft', html: [/eticaretsoft|e[- ]ticaret soft/i] });
-  sig.push({ name: 'Smart E-Ticaret', html: [/smarteticaret|smart e[- ]ticaret/i] });
-  sig.push({ name: 'ShopPHP', html: [/shopphp/i] });
-  sig.push({ name: 'JettyCart', html: [/jettycart/i] });
+  sig.push({ name: 'T-Soft', html: [/T-Soft\s+E-?Ticaret\s+Sistemleri/i, /TEKROM\s+Teknoloji/i, /tsoftcdn/i, /tsoft\.com\.tr/i, /powered\s*by\s*t-?soft/i] });
+  sig.push({ name: 'Ticimax', html: [/ticimaxcdn/i, /ticimaxstatic/i, /ticimaxassets/i, /ticimax\.com/i, /ticimax\.net/i, /ticimax\.io/i, /cdn\.ticimax/i, /powered\s*by\s*ticimax/i, /ticimax\s*e[-\s]?ticaret/i, /ticimax\s*altyap[ıi]/i, /ticimax-theme/i, /ticimax\.js/i, /window\.ticimax/i, /\/\/.*ticimax/i] });
+  sig.push({ name: 'İkas', html: [/ikascdn/i, /ikasstatic/i, /ikasassets/i, /ikas\.com/i, /cdn\.ikas\.com/i, /powered\s*by\s*ikas/i, /ikas\s*e[-\s]?ticaret/i, /ikas\s*altyap[ıi]/i, /ikas\.io/i, /ikas-theme/i, /ikas\.js/i, /window\.ikas/i] });
+  sig.push({ name: 'PlatinMarket', html: [/platinmarket/i, /platin\s*market/i, /powered\s*by\s*platinmarket/i] });
+  sig.push({ name: 'Eticaret.com', html: [/eticaret\.com/i, /eticaretcdn/i, /powered\s*by\s*eticaret\.com/i, /eticaret\.com\s*altyap[ıi]/i, /eticaret\.com\s*sistemi/i, /cdn\.eticaret\.com/i] });
+  sig.push({ name: 'Projesoft', html: [/projesoft/i, /projesoft\.com\.tr/i] });
+  sig.push({ name: 'Faprika', html: [/faprika/i, /faprika\.com/i] });
+  sig.push({ name: 'Neticaret', html: [/neticaret/i, /neticaret\.com/i] });
+  sig.push({ name: 'E-Ticaret Soft', html: [/eticaretsoft|e[- ]ticaret soft/i, /eticaretsoft\.com/i] });
+  sig.push({ name: 'Smart E-Ticaret', html: [/smarteticaret|smart e[- ]ticaret/i, /smarteticaret\.com/i] });
+  sig.push({ name: 'ShopPHP', html: [/shopphp/i, /shopphp\.net/i] });
+  sig.push({ name: 'JettyCart', html: [/jettycart/i, /jettycart\.com/i] });
   return sig;
   
   function addDomainSig(arr, name, domains){
@@ -1032,63 +1119,81 @@ function detectKnownCMS(signals) {
   const lowHtml = String(html || '').toLowerCase();
   const headerPairs = Object.entries(headers || {});
 
-  // 0) Header kontrolü - EN ÖNCE (en güvenilir)
-  const headersJoined = Object.entries(headers||{}).map(([k,v]) => `${k}: ${v}`).join('\n').toLowerCase();
-  
-  // IdeaSoft header kontrolü - ÖNCELİKLİ
-  if (/powered-by\s*:\s*ideasoft|x-powered-by\s*:\s*ideasoft|x-idea-cluster/i.test(headersJoined)) {
-    console.log('IdeaSoft detected from headers:', { url: finalUrl, headers: headersJoined.match(/powered-by|x-powered-by|x-idea-cluster[^\n]*/gi) });
-    return 'IdeaSoft';
-  }
-  
-  // Ticimax header kontrolü
-  if (/x-powered-by\s*:\s*ticimax|tcmx/i.test(headersJoined)) {
-    return 'Ticimax';
-  }
-  
-  // WordPress header kontrolü
-  if (/x-powered-by\s*:\s*wordpress/i.test(headersJoined)) {
-    return 'WordPress';
-  }
-
-  // 1) Meta generator
+  // 0) Meta generator (genişletilmiş)
   const genMatch = /<meta[^>]+name=["']generator["'][^>]+content=["']([^"']+)["']/i.exec(html || '') || /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']generator["']/i.exec(html || '');
       if (genMatch && genMatch[1]) {
       const g = genMatch[1].toLowerCase();
+      // E-ticaret platformları
       if (/wordpress|woocommerce/.test(g)) return /woocommerce/.test(g) ? 'WooCommerce' : 'WordPress';
       if (/shopify/.test(g)) return 'Shopify';
+      if (/wix/.test(g)) return 'Wix';
       if (/squarespace/.test(g)) return 'Squarespace';
       if (/prestashop/.test(g)) return 'PrestaShop';
       if (/opencart/.test(g)) return 'OpenCart';
       if (/magento/.test(g)) return 'Magento';
       if (/shopware/.test(g)) return 'Shopware';
+      if (/bigcommerce/.test(g)) return 'BigCommerce';
+      if (/ecwid/.test(g)) return 'Ecwid';
+      if (/webflow/.test(g)) return 'Webflow';
+      // TR platformları
       if (/t-?soft/.test(g)) return 'T-Soft';
       if (/ticimax/.test(g)) return 'Ticimax';
-      if (/godaddy/.test(g)) return 'GoDaddy';
-      if (/ideasoft|akilli\s*e[-\s]?ticaret/.test(g)) return 'IdeaSoft';
+      if (/ikas/.test(g)) return 'İkas';
+      if (/ideasoft|ak[ıi]ll[ıi]\s*e[-\s]?ticaret|ideasoft\s*e[-\s]?ticaret|ideasoft\s*sistemi/.test(g)) return 'IdeaSoft';
+      if (/platinmarket/.test(g)) return 'PlatinMarket';
+      if (/eticaret\.com/.test(g)) return 'Eticaret.com';
+      if (/projesoft/.test(g)) return 'Projesoft';
     }
 
-  // 1) Varlık URL parmak izleri (cdn, asset ve final domain)
-  for (const s of CMS_SIGNATURES) {
-    if (s.assets) {
-      for (const re of s.assets) {
-        if (re.test(finalUrl) || re.test(lowHtml)) return s.name;
+  // 1) ÖNCE: Ana domain kontrolü (en güvenilir!)
+  try {
+    const u = new URL(finalUrl);
+    const host = u.hostname.toLowerCase();
+    
+    // Ana domain eşleşmesi - kesin tespit
+    for (const s of CMS_SIGNATURES) {
+      if (s.assets) {
+        for (const re of s.assets) {
+          if (re.test(host)) {
+            console.log(`🎯 Ana domain tespit: ${s.name} (host: ${host})`);
+            return s.name;
+          }
+        }
       }
     }
-    // domain eşleşmesi (ör: ikas.com, tsoft.com.tr vs.)
-    try {
-      const u = new URL(finalUrl);
-      const host = u.hostname.toLowerCase();
-      if (s.assets && s.assets.some(re => re.test(host))) return s.name;
-    } catch(_) {}
-  }
-  // 2) HTML gövde parmak izleri
-  for (const s of CMS_SIGNATURES) {
-    if (s.html) {
-      for (const re of s.html) { if (re.test(html)) return s.name; }
+  } catch(_) {}
+  
+  // 2) CDN URL'leri HTML içinde (örn: src="https://ideacdn.net/...")
+  // Öncelik sırası: Ticimax > T-Soft > İkas > IdeaSoft (çakışma önleme)
+  const cdnPriority = [
+    { name: 'Ticimax', patterns: [/ticimaxcdn/i, /ticimaxstatic/i, /ticimaxassets/i, /cdn\.ticimax/i] },
+    { name: 'T-Soft', patterns: [/tsoftcdn/i, /tsoftstatic/i, /cdn\.tsoft/i] },
+    { name: 'İkas', patterns: [/ikascdn/i, /ikasstatic/i, /ikasassets/i, /cdn\.ikas/i] },
+    { name: 'IdeaSoft', patterns: [/ideacdn\.net/i, /ideacdn\.com/i, /ideasoftcdn/i, /cdn\.ideasofthosting/i, /\/\/ideacdn\./i, /\/\/cdn\.ideasoft/i] }
+  ];
+  
+  for (const platform of cdnPriority) {
+    for (const pattern of platform.patterns) {
+      if (pattern.test(lowHtml)) {
+        console.log(`🎯 CDN tespit: ${platform.name} (pattern: ${pattern})`);
+        return platform.name;
+      }
     }
   }
-  // 3) Header parmak izleri ve cookie adları (ikincil kontrol - zaten yukarıda IdeaSoft/Ticimax/WordPress kontrol edildi)
+  
+  // 3) HTML gövde parmak izleri (dikkatli!)
+  for (const s of CMS_SIGNATURES) {
+    if (s.html) {
+      for (const re of s.html) { 
+        if (re.test(html)) {
+          console.log(`📝 HTML pattern tespit: ${s.name} (pattern: ${re})`);
+          return s.name; 
+        }
+      }
+    }
+  }
+  // 3) Header parmak izleri ve cookie adları
+  const headersJoined = Object.entries(headers||{}).map(([k,v]) => `${k}: ${v}`).join('\n');
   for (const s of CMS_SIGNATURES) {
     if (s.headers) {
       for (const re of s.headers) {
@@ -1104,48 +1209,93 @@ function detectKnownCMS(signals) {
 function classifyCustomQuality(signals) {
   const { html, headers, finalUrl } = signals;
   let score = 0;
+  
+  // ⚡ Hız optimizasyonu: lowerHtml'i sadece gerektiğinde hesapla
+  let lowerHtml = null;
+  const getLowerHtml = () => {
+    if (lowerHtml === null) lowerHtml = html.toLowerCase();
+    return lowerHtml;
+  };
 
-  // Güvenlik & temel hijyen
-  if (/^https:/i.test(finalUrl)) score += 2; else score -= 2;
-  if (/content-security-policy/i.test(headers['content-security-policy'] || '')) score += 1;
-  if (/strict-transport-security/i.test(headers['strict-transport-security'] || '')) score += 1;
+  // ⚡ ERKEN ÇIKIŞ: Çok kötü siteleri hemen tespit et
+  if (html.length < 500) return 'Düşük Kalite'; // Çok az içerik
+  
+  const isHttps = /^https:/i.test(finalUrl);
+  if (!isHttps && html.length < 2000) {
+    // HTTP + az içerik = düşük kalite
+    return 'Düşük Kalite';
+  }
 
-  // SEO / semantik
+  // 🔒 Güvenlik & temel hijyen (ağırlıklı)
+  if (isHttps) score += 3; else score -= 3; // HTTPS çok önemli
+  if (/content-security-policy/i.test(headers['content-security-policy'] || '')) score += 2;
+  if (/strict-transport-security/i.test(headers['strict-transport-security'] || '')) score += 2;
+  if (/x-frame-options/i.test(headers['x-frame-options'] || '')) score += 1;
+
+  // 🎨 SEO / semantik (iyileştirilmiş)
   const titleMatch = /<title>([^<]+)<\/title>/i.exec(html);
-  if (titleMatch && titleMatch[1].length > 15) score += 2; // Uzun title = iyi
-  else if (titleMatch) score += 1;
-  
-  if (/<meta[^>]+name=["']description["'][^>]+content=["'][^"']{30,}/i.test(html)) score += 2; // 30+ karakter
-  else if (/<meta[^>]+name=["']description["']/i.test(html)) score += 1;
-  
+  if (titleMatch && titleMatch[1].length > 10) score += 2; else if (titleMatch) score += 1;
+  if (/<meta[^>]+name=["']description["'][^>]+content=["'][^"']{20,}/i.test(html)) score += 2;
   if (/<link[^>]+rel=["']canonical["']/i.test(html)) score += 1;
   if (/<meta[^>]+property=["']og:title["']/i.test(html)) score += 1; // OpenGraph
   if (/<meta[^>]+property=["']og:image["']/i.test(html)) score += 1;
 
-  // Mobil uyum
+  // 📱 Mobil uyum & responsive
   if (/<meta[^>]+name=["']viewport["'][^>]+width=device-width/i.test(html)) score += 2;
-  else if (/<meta[^>]+name=["']viewport["']/i.test(html)) score += 1;
+  if (/@media[^{]*\([^)]*max-width|min-width/i.test(html)) score += 1; // CSS media queries
 
-  // Yapılandırılmış veri / modern JS
+  // 🚀 Modern teknolojiler (güçlendirilmiş)
   if (/<script[^>]+type=["']application\/ld\+json["']/i.test(html)) score += 2; // Structured data
-  if (/\bwebpackJsonp\b|\b__NEXT_DATA__\b|data-reactroot|ng-version|vue/i.test(html)) score += 2; // Modern framework
+  if (/\bwebpackJsonp\b|\b__NEXT_DATA__\b/i.test(html)) score += 2; // Modern bundler
+  if (/data-reactroot|data-react-/i.test(html)) score += 2; // React
+  if (/ng-version|ng-app/i.test(html)) score += 2; // Angular
+  if (/\bVue\b|v-bind|v-model/i.test(html)) score += 2; // Vue.js
+  if (/cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com/i.test(html)) score += 1; // Modern CDN
 
-  // E-ticaret bonus puanları (büyük markalar için)
-  if (/sepet|cart|basket/i.test(html)) score += 1;
-  if (/ödeme|payment|checkout/i.test(html)) score += 1;
-  if (/<script[^>]*gtag|google-analytics/i.test(html)) score += 1; // Analytics kullanımı
+  // 💰 E-ticaret özellikleri (bonus)
+  if (/sepet|cart|basket|add to cart|sepete ekle/i.test(html)) score += 1;
+  if (/ödeme|payment|checkout|sipariş|order/i.test(html)) score += 1;
+  if (/<script[^>]*>[^<]*gtag|google-analytics|analytics\.js/i.test(html)) score += 1; // Analytics
+
+  // 🎯 Performans göstergeleri
+  if (/<link[^>]+rel=["']preload["']/i.test(html)) score += 1; // Resource preload
+  if (/<link[^>]+rel=["']dns-prefetch["']/i.test(html)) score += 1;
+  if (/loading=["']lazy["']/i.test(html)) score += 1; // Lazy loading
+
+  // ⚠️ Kod kokuları – negatifler (ağırlıklı - optimize edilmiş)
+  if (/<font\b|<marquee\b|<blink\b/i.test(html)) score -= 4; // Eski HTML
+  if (/<center\b/i.test(html)) score -= 2; // Deprecated tag
   
-  // İçerik zenginliği
-  if (html.length > 50000) score += 1; // Zengin içerik
-  else if (html.length < 1000) score -= 2; // Çok zayıf içerik
+  // ⚡ Hız: Sadece table varsa role kontrolü yap
+  if (/<table/i.test(html)) {
+    if (/<table[^>]*border=[^>]*>/i.test(html) && !/role="table"|aria/i.test(html)) score -= 2;
+  }
+  
+  // ⚡ Hız: Sadece img varsa alt kontrolü yap
+  if (/<img/i.test(html)) {
+    if (!/<img[^>]+alt=/i.test(html)) score -= 2;
+  }
+  
+  if (/document\.write|eval\(/i.test(html)) score -= 3; // Bad practice
+  
+  // ⚡ Hız: Yorum sayısını sadece gerektiğinde hesapla
+  const commentCount = (html.match(/<!--/g) || []).length;
+  if (commentCount > 20) score -= 1;
+  
+  // 📏 İçerik kalitesi
+  if (html.length < 1000) score -= 3; // Çok az içerik
+  else if (html.length < 5000) score -= 1; // Az içerik
+  else if (html.length > 50000) score += 1; // Zengin içerik
 
-  // Kod kokuları – negatifler (yumuşatıldı)
-  if (/<font\b|<marquee\b/i.test(html)) score -= 3; // Eski HTML
-  if (/<table[^>]*border=/i.test(html) && !/role="table"/i.test(html)) score -= 1; // Layout table (sadece border varsa)
+  // 🚫 Kötü göstergeler
+  if (/error|404|not found|page not found/i.test(html) && html.length < 3000) score -= 5;
+  if (/<iframe[^>]+src=["'][^"']*ad/i.test(html)) score -= 1; // Çok fazla reklam
+  if (/powered by wordpress/i.test(getLowerHtml()) && !/woocommerce/i.test(getLowerHtml())) score -= 1; // Eski WP
 
-  // Dengeli eşik (iyileştirilmiş)
-  if (score >= 4) return 'Yüksek Kalite';
-  if (score >= 1) return 'Normal Kalite';
+  // 📊 Kalite kategorileri (daha dengeli)
+  if (score >= 8) return 'Yüksek Kalite';
+  if (score >= 3) return 'Normal Kalite';
+  if (score >= 0) return 'Orta Kalite';
   return 'Düşük Kalite';
 }
 
@@ -1153,7 +1303,7 @@ function classifyCustomQuality(signals) {
 
 const REF_LIST = {
   turkiye_hazir_eticaret: [
-    'ideasoft.com.tr','ikas.com','ticimax.com','tsoft.com.tr','softtr.com','platinmarket.com','projesoft.com.tr','faprika.com','demresa.com','bilgikurumsal.com','shopphp.net','qukasoft.com','imagaza.net','akinsoft.com.tr','hipotenus.com.tr','ticifly.com','alkissoft.com','kobimaster.com','vatansoft.com','inplato.com','neticaret.com','eticaretsoft.com','smarteticaret.com','eticaretim.com','paratika.com','berqnet.com'
+    'ideasoft.com.tr','ikas.com','ticimax.com','tsoft.com.tr','eticaret.com','softtr.com','platinmarket.com','projesoft.com.tr','faprika.com','demresa.com','bilgikurumsal.com','shopphp.net','qukasoft.com','imagaza.net','akinsoft.com.tr','hipotenus.com.tr','ticifly.com','alkissoft.com','kobimaster.com','vatansoft.com','inplato.com','neticaret.com','eticaretsoft.com','smarteticaret.com','eticaretim.com','paratika.com','berqnet.com'
   ],
   dunya_acik_kaynak: [
     'woocommerce.com','magento.com','prestashop.com','opencart.com','bagisto.com','saleor.io','sylius.com','shopware.com','spreecommerce.org','nopcommerce.com','virtuemart.net','oscommerce.com','zencart.com'
@@ -1162,21 +1312,58 @@ const REF_LIST = {
     'shopify.com','wix.com','bigcommerce.com','squarespace.com','ecwid.com','weebly.com','volusion.com','shift4shop.com','bigcartel.com','selz.com','godaddy.com','webflow.com'
   ],
   pazar_yerleri_sosyal_magazalar: [
-    'trendyol.com','hepsiburada.com','n11.com','ciceksepeti.com','pttavm.com','gittigidiyor.com','amazon.com.tr','morhipo.com','instagram.com','facebook.com','tiktokglobalshop.com','shopier.com','tiktok.com','twitter.com','x.com','linkedin.com','youtube.com','pinterest.com'
+    'trendyol.com','hepsiburada.com','n11.com','ciceksepeti.com','pttavm.com','gittigidiyor.com','amazon.com.tr','morhipo.com','instagram.com','facebook.com','tiktokglobalshop.com','shopier.com','tiktok.com','twitter.com','x.com','linkedin.com','youtube.com'
   ]
 };
 
 // ----------------- Basit testler -----------------
 
+/**
+ * 🧪 Hızlı Test - Sistemin çalışıp çalışmadığını kontrol et
+ */
+function testCMSDetectorQuick() {
+  try {
+    console.log('🧪 CMS Detector hızlı test başlatılıyor...');
+    
+    // Test 1: Instagram (Sitesi Yok dönmeli)
+    const test1 = extractDomain('https://www.instagram.com/test');
+    const isInstagram = isMarketplaceOrSocial(test1);
+    console.log('Test 1 - Instagram:', { domain: test1, isSocial: isInstagram });
+    
+    // Test 2: Kalite analizi
+    const testSignals = {
+      html: '<html><head><title>Test Site</title><meta name="viewport" content="width=device-width"></head><body>Test</body></html>',
+      headers: {},
+      finalUrl: 'https://test.com'
+    };
+    const quality = classifyCustomQuality(testSignals);
+    console.log('Test 2 - Kalite:', quality);
+    
+    // Test 3: CMS imza kontrolü
+    const cmsCount = CMS_SIGNATURES.length;
+    console.log('Test 3 - CMS imza sayısı:', cmsCount);
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Test Başarılı!', 
+      `Instagram: ${isInstagram ? 'Tespit edildi ✅' : 'Hata ❌'}\nKalite: ${quality}\nCMS sayısı: ${cmsCount}`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    return { success: true, instagram: isInstagram, quality, cmsCount };
+  } catch (error) {
+    console.error('❌ Test hatası:', error);
+    SpreadsheetApp.getUi().alert('Test Hatası', error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: false, error: error.message };
+  }
+}
+
 function runCmsDetectorTests() {
   console.log('🧪 CMS Detector tests');
   const samples = [
+    'https://www.instagram.com',
     'https://www.shopify.com',
     'https://woocommerce.com',
-    'https://www.wix.com',
     'https://www.trendyol.com',
-    'https://opencart.com',
-    'https://magento.com',
     'https://www.google.com'
   ];
   const results = detectCMSBatch(samples);
