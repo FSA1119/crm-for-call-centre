@@ -2634,6 +2634,9 @@ function createManagerMenu() {
     const logAnalysisSubmenu = ui.createMenu('📊 Log Özeti');
     logAnalysisSubmenu.addItem('🌐 Genel Log Analizi - Tüm Temsilciler', 'showGeneralLogAnalysis');
     logAnalysisSubmenu.addSeparator();
+    logAnalysisSubmenu.addItem('📊 Funnel Raporu', 'showFunnelReportDialog');
+    logAnalysisSubmenu.addItem('💾 Funnel Raporu Excel Export', 'exportFunnelReportToExcel');
+    logAnalysisSubmenu.addSeparator();
     for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
       // Boşlukları alt çizgi ile değiştir ve doğru fonksiyon ismini oluştur
       const functionName = `logAnalysis_${employeeCode.replace(/\s+/g, '_')}`;
@@ -14209,6 +14212,970 @@ function highlightDuplicateMeetingsByCompany(){
     console.error('Function failed:', error);
     SpreadsheetApp.getUi().alert('Hata', String(error && error.message || error), SpreadsheetApp.getUi().ButtonSet.OK);
     throw error;
+  }
+}
+
+// ========================================
+// 📊 FUNNEL REPORT SYSTEM - YENİ FUNNEL RAPORU
+// ========================================
+
+/**
+ * 📊 Funnel Raporu Dialog'unu Göster
+ * Modern HTML dialog ile zaman filtresi ve temsilci seçimi
+ */
+function showFunnelReportDialog() {
+  console.log('📊 Funnel Raporu başlatıldı');
+  try {
+    const ui = SpreadsheetApp.getUi();
+    if (!ui) {
+      throw new Error('UI erişilemiyor');
+    }
+    
+    // HTML Dialog içeriği (Material Design)
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 Funnel Raporu</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }
+    .header h2 {
+      font-size: 24px;
+      font-weight: 500;
+      margin: 0;
+    }
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-top: 8px;
+    }
+    .content {
+      padding: 24px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    select, input[type="date"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+      background: white;
+    }
+    select:focus, input[type="date"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .radio-group {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .radio-item {
+      flex: 1;
+      min-width: 120px;
+    }
+    .radio-item input[type="radio"] {
+      display: none;
+    }
+    .radio-item label {
+      display: block;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 500;
+    }
+    .radio-item input[type="radio"]:checked + label {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: #667eea;
+    }
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    button {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #666;
+    }
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .info-box {
+      background: #e3f2fd;
+      border-left: 4px solid #2196F3;
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #1976D2;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>📊 Funnel Raporu</h2>
+      <p>Pozitif ve Negatif Funnel Analizi</p>
+    </div>
+    <div class="content">
+      <div class="form-group">
+        <label>⏰ Zaman Filtresi:</label>
+        <div class="radio-group">
+          <div class="radio-item">
+            <input type="radio" id="daily" name="timeFilter" value="daily" checked>
+            <label for="daily">📅 Günlük</label>
+          </div>
+          <div class="radio-item">
+            <input type="radio" id="weekly" name="timeFilter" value="weekly">
+            <label for="weekly">📆 Haftalık</label>
+          </div>
+          <div class="radio-item">
+            <input type="radio" id="monthly" name="timeFilter" value="monthly">
+            <label for="monthly">📊 Aylık</label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="employeeSelect">👥 Temsilci Seçimi:</label>
+        <select id="employeeSelect">
+          <option value="ALL">Tüm Temsilciler</option>
+        </select>
+      </div>
+      
+      <div class="info-box">
+        <strong>ℹ️ Bilgi:</strong> Rapor, Gizli Log Arşivi'nden veri çeker. Log eksikse yedek kaynaklar (Randevularım, Fırsatlarım, Toplantılarım) kullanılır.
+      </div>
+      
+      <div class="button-group">
+        <button class="btn-secondary" onclick="cancel()">İptal</button>
+        <button class="btn-primary" onclick="submit()" id="submitBtn">Rapor Oluştur</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Temsilci listesini yükle
+    (function() {
+      google.script.run
+        .withSuccessHandler(function(employees) {
+          const select = document.getElementById('employeeSelect');
+          employees.forEach(function(emp) {
+            const option = document.createElement('option');
+            option.value = emp.code;
+            option.textContent = emp.code + ' - ' + emp.name;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Temsilci listesi yüklenemedi:', error);
+        })
+        .getEmployeeListForFunnel();
+    })();
+
+    function submit() {
+      const timeFilter = document.querySelector('input[name="timeFilter"]:checked').value;
+      const employeeCode = document.getElementById('employeeSelect').value;
+      
+      // Butonu devre dışı bırak
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'İşleniyor...';
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          google.script.host.close();
+        })
+        .withFailureHandler(function(error) {
+          alert('Hata: ' + (error.message || error));
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Rapor Oluştur';
+        })
+        .generateFunnelReport(timeFilter, employeeCode);
+    }
+
+    function cancel() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>`;
+    
+    const html = HtmlService.createHtmlOutput(htmlContent)
+      .setWidth(650)
+      .setHeight(500);
+    
+    console.log('📋 Funnel Report dialog HTML oluşturuldu, gösteriliyor...');
+    ui.showModalDialog(html, '📊 Funnel Raporu');
+    console.log('✅ Dialog gösterildi');
+  } catch (error) {
+    console.error('❌ Funnel Report dialog hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Funnel Raporu dialog hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * Temsilci listesini döndür (Funnel Report dialog için)
+ */
+function getEmployeeListForFunnel() {
+  try {
+    const employees = [];
+    for (const [code, name] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
+      employees.push({ code: code, name: name });
+    }
+    return employees;
+  } catch (error) {
+    console.error('❌ getEmployeeListForFunnel hatası:', error);
+    return [];
+  }
+}
+
+/**
+ * 📊 Funnel Raporu Oluştur
+ * @param {string} timeFilter - 'daily', 'weekly', 'monthly'
+ * @param {string} employeeCode - Temsilci kodu veya 'ALL'
+ */
+function generateFunnelReport(timeFilter, employeeCode) {
+  console.log('📊 Funnel Raporu oluşturuluyor:', { timeFilter, employeeCode });
+  const startTime = Date.now();
+  
+  try {
+    // 1. Tarih aralığını hesapla
+    const dateRange = calculateDateRange(timeFilter);
+    const startDate = dateRange.start;
+    const endDate = dateRange.end;
+    
+    console.log(`📅 Tarih aralığı: ${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}`);
+    
+    // 2. Veri topla (Batch Operations)
+    const funnelData = collectFunnelData(employeeCode, startDate, endDate);
+    
+    // 3. Funnel işleme
+    const processedFunnel = processFunnelData(funnelData);
+    
+    // 4. Rapor sayfası oluştur
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = createFunnelReportSheet(managerFile, processedFunnel, timeFilter, startDate, endDate, employeeCode);
+    
+    // 5. Excel export (opsiyonel - otomatik)
+    // Excel export'u kullanıcı butonuna tıklayınca yapılacak
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Funnel Raporu oluşturuldu (${duration}ms)`);
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Funnel Raporu Tamamlandı',
+      `📊 Rapor oluşturuldu!\n\n📅 Tarih: ${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}\n⏱️ Süre: ${(duration / 1000).toFixed(1)}s\n\n"FUNNEL RAPORU" sayfasına bakın.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    return { success: true, sheetName: sheet.getName(), duration: duration };
+    
+  } catch (error) {
+    console.error('❌ generateFunnelReport hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Funnel Raporu hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * Tarih aralığını hesapla (Günlük/Haftalık/Aylık)
+ */
+function calculateDateRange(timeFilter) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  let startDate, endDate;
+  
+  if (timeFilter === 'daily') {
+    // Bugün
+    startDate = new Date(today);
+    endDate = new Date(today);
+  } else if (timeFilter === 'weekly') {
+    // Bu haftanın Pazartesi - Pazar
+    const dayOfWeek = today.getDay(); // 0 = Pazar, 1 = Pazartesi, ...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Pazartesi'ye git
+    startDate = new Date(today);
+    startDate.setDate(today.getDate() + mondayOffset);
+    endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6); // Pazar
+  } else if (timeFilter === 'monthly') {
+    // Bu ayın 1. günü - Son günü
+    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Ayın son günü
+  } else {
+    throw new Error('Geçersiz zaman filtresi: ' + timeFilter);
+  }
+  
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(23, 59, 59, 999);
+  
+  return { start: startDate, end: endDate };
+}
+
+/**
+ * Funnel verilerini topla (Batch Operations)
+ * Log Arşivi öncelikli, yoksa yedek kaynaklar
+ */
+function collectFunnelData(employeeCode, startDate, endDate) {
+  console.log('📊 Funnel verileri toplanıyor...');
+  const allActivities = [];
+  
+  // Temsilci kodları
+  const employeeCodes = employeeCode === 'ALL' 
+    ? Object.keys(CRM_CONFIG.EMPLOYEE_CODES)
+    : [employeeCode];
+  
+  // Her temsilci için veri topla
+  for (const empCode of employeeCodes) {
+    try {
+      const employeeFile = getEmployeeFile(empCode);
+      if (!employeeFile) {
+        console.log(`⚠️ ${empCode} dosyası bulunamadı`);
+        continue;
+      }
+      
+      // 1. Log Arşivi'nden veri çek (ÖNCELİKLİ)
+      let logArchiveSheet = employeeFile.getSheetByName('📋 Log Arşivi');
+      if (!logArchiveSheet) {
+        logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+      }
+      
+      if (logArchiveSheet && logArchiveSheet.getLastRow() > 1) {
+        console.log(`📊 ${empCode}: Log Arşivi'nden veri okunuyor...`);
+        const allData = logArchiveSheet.getDataRange().getValues(); // ✅ BATCH READ
+        
+        if (allData.length >= 2) {
+          const headers = allData[0];
+          const aktiviteTarihiIndex = headers.indexOf('Tarih') !== -1 
+            ? headers.indexOf('Tarih') 
+            : headers.indexOf('Aktivite Tarihi');
+          const aktiviteIndex = headers.indexOf('Aktivite');
+          const logIndex = headers.indexOf('Log Detayı') !== -1 
+            ? headers.indexOf('Log Detayı') 
+            : headers.indexOf('Log');
+          
+          if (aktiviteTarihiIndex !== -1 && aktiviteIndex !== -1) {
+            for (let row = 1; row < allData.length; row++) {
+              const aktiviteTarihi = allData[row][aktiviteTarihiIndex];
+              const aktivite = String(allData[row][aktiviteIndex] || '').trim();
+              const log = logIndex !== -1 ? String(allData[row][logIndex] || '') : '';
+              
+              if (!aktiviteTarihi || !aktivite) continue;
+              
+              // Tarih parse etme
+              let logDate = null;
+              if (aktiviteTarihi instanceof Date) {
+                logDate = new Date(aktiviteTarihi);
+              } else {
+                logDate = parseDdMmYyyy(aktiviteTarihi);
+                if (!logDate) {
+                  try {
+                    logDate = new Date(String(aktiviteTarihi));
+                    if (isNaN(logDate.getTime())) continue;
+                  } catch (e) {
+                    continue;
+                  }
+                }
+              }
+              
+              if (!logDate || isNaN(logDate.getTime())) continue;
+              
+              // Tarih karşılaştırması
+              const logDateOnly = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+              const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+              const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+              
+              if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+                allActivities.push({
+                  employeeCode: empCode,
+                  date: logDate,
+                  aktivite: aktivite,
+                  log: log,
+                  source: 'Log Arşivi'
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      // 2. Log Arşivi'nde veri yoksa yedek kaynaklardan çek
+      if (allActivities.filter(a => a.employeeCode === empCode).length === 0) {
+        console.log(`📊 ${empCode}: Log Arşivi'nde veri yok, yedek kaynaklardan çekiliyor...`);
+        // Yedek kaynaklar: Randevularım, Fırsatlarım, Toplantılarım
+        const backupActivities = collectFunnelDataFromBackup(employeeFile, startDate, endDate);
+        backupActivities.forEach(activity => {
+          activity.employeeCode = empCode;
+          activity.source = 'Yedek Kaynak';
+          allActivities.push(activity);
+        });
+      }
+      
+    } catch (error) {
+      console.error(`❌ ${empCode} işleme hatası:`, error);
+    }
+  }
+  
+  console.log(`📊 Toplam ${allActivities.length} aktivite toplandı`);
+  return allActivities;
+}
+
+/**
+ * Yedek kaynaklardan veri topla (Randevularım, Fırsatlarım, Toplantılarım)
+ */
+function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
+  const activities = [];
+  
+  // Randevularım
+  const randevularimSheet = employeeFile.getSheetByName('Randevularım');
+  if (randevularimSheet && randevularimSheet.getLastRow() > 1) {
+    const data = randevularimSheet.getDataRange().getValues();
+    const headers = data[0];
+    const aktiviteIndex = headers.indexOf('Aktivite');
+    const tarihIndex = headers.findIndex(h => String(h || '').includes('Tarih'));
+    
+    if (aktiviteIndex !== -1 && tarihIndex !== -1) {
+      for (let row = 1; row < data.length; row++) {
+        const aktivite = String(data[row][aktiviteIndex] || '').trim();
+        const tarih = data[row][tarihIndex];
+        if (aktivite && tarih) {
+          let logDate = parseDdMmYyyy(tarih) || (tarih instanceof Date ? new Date(tarih) : null);
+          if (logDate && !isNaN(logDate.getTime())) {
+            const logDateOnly = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+            const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+              activities.push({
+                date: logDate,
+                aktivite: aktivite,
+                log: aktivite,
+                source: 'Randevularım'
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Fırsatlarım
+  const firsatlarimSheet = employeeFile.getSheetByName('Fırsatlarım');
+  if (firsatlarimSheet && firsatlarimSheet.getLastRow() > 1) {
+    const data = firsatlarimSheet.getDataRange().getValues();
+    const headers = data[0];
+    const aktiviteIndex = headers.indexOf('Aktivite');
+    const tarihIndex = headers.findIndex(h => String(h || '').includes('Tarih'));
+    
+    if (aktiviteIndex !== -1 && tarihIndex !== -1) {
+      for (let row = 1; row < data.length; row++) {
+        const aktivite = String(data[row][aktiviteIndex] || '').trim();
+        const tarih = data[row][tarihIndex];
+        if (aktivite && tarih) {
+          let logDate = parseDdMmYyyy(tarih) || (tarih instanceof Date ? new Date(tarih) : null);
+          if (logDate && !isNaN(logDate.getTime())) {
+            const logDateOnly = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+            const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+              activities.push({
+                date: logDate,
+                aktivite: aktivite,
+                log: aktivite,
+                source: 'Fırsatlarım'
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Toplantılarım
+  const toplantilarimSheet = employeeFile.getSheetByName('Toplantılarım');
+  if (toplantilarimSheet && toplantilarimSheet.getLastRow() > 1) {
+    const data = toplantilarimSheet.getDataRange().getValues();
+    const headers = data[0];
+    const aktiviteIndex = headers.indexOf('Aktivite');
+    const tarihIndex = headers.findIndex(h => String(h || '').includes('Tarih'));
+    
+    if (aktiviteIndex !== -1 && tarihIndex !== -1) {
+      for (let row = 1; row < data.length; row++) {
+        const aktivite = String(data[row][aktiviteIndex] || '').trim();
+        const tarih = data[row][tarihIndex];
+        if (aktivite && tarih) {
+          let logDate = parseDdMmYyyy(tarih) || (tarih instanceof Date ? new Date(tarih) : null);
+          if (logDate && !isNaN(logDate.getTime())) {
+            const logDateOnly = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+            const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+              activities.push({
+                date: logDate,
+                aktivite: aktivite,
+                log: aktivite,
+                source: 'Toplantılarım'
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return activities;
+}
+
+/**
+ * Aktivite ismini normalize et (büyük/küçük harf tutarsızlığı için)
+ */
+function normalizeActivityName(aktivite) {
+  const normalized = String(aktivite || '').trim();
+  // İlk harfi büyük yap, geri kalanı küçük (basit normalizasyon)
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
+}
+
+/**
+ * Funnel verilerini işle (Pozitif ve Negatif kol)
+ */
+function processFunnelData(activities) {
+  console.log('📊 Funnel verileri işleniyor...');
+  
+  // Aktivite tiplerini normalize et ve kategorize et
+  const positiveFunnel = {
+    'Arama': 0,           // Başlangıç (tüm aktiviteler)
+    'Fırsat': 0,          // Fırsat İletildi
+    'Randevu': 0,         // Randevu Alındı, İleri Tarih Randevu
+    'Toplantı': 0,        // Toplantı Tamamlandı
+    'Satış': 0            // Satış Yapıldı
+  };
+  
+  const negativeFunnel = {
+    'Geçersiz Numara': 0,
+    'Ulaşılamadı': 0,
+    'İlgilenmiyor': 0,
+    'Kurumsal': 0,
+    'Randevu İptal/Ertelendi': 0,
+    'Fırsat Kaybedilen': 0
+  };
+  
+  // Aktivite mapping (case-insensitive)
+  const activityMap = {
+    // Pozitif
+    'Fırsat İletildi': 'Fırsat',
+    'Fırsat iletildi': 'Fırsat',
+    'Randevu Alındı': 'Randevu',
+    'Randevu alındı': 'Randevu',
+    'İleri Tarih Randevu': 'Randevu',
+    'İleri tarih randevu': 'Randevu',
+    'Toplantı Tamamlandı': 'Toplantı',
+    'Toplantı tamamlandı': 'Toplantı',
+    'Toplantı Gerçekleşti': 'Toplantı',
+    'Toplantı gerçekleşti': 'Toplantı',
+    'Satış Yapıldı': 'Satış',
+    'Satış yapıldı': 'Satış',
+    // Negatif
+    'Geçersiz Numara': 'Geçersiz Numara',
+    'Geçersiz numara': 'Geçersiz Numara',
+    'Ulaşılamadı': 'Ulaşılamadı',
+    'ulaşılamadı': 'Ulaşılamadı',
+    'İlgilenmiyor': 'İlgilenmiyor',
+    'ilgilenmiyor': 'İlgilenmiyor',
+    'Kurumsal': 'Kurumsal',
+    'kurumsal': 'Kurumsal',
+    'Randevu İptal oldu': 'Randevu İptal/Ertelendi',
+    'Randevu iptal oldu': 'Randevu İptal/Ertelendi',
+    'Randevu Ertelendi': 'Randevu İptal/Ertelendi',
+    'Randevu ertelendi': 'Randevu İptal/Ertelendi',
+    'Fırsat kaybedilen': 'Fırsat Kaybedilen',
+    'Fırsat Kaybedilen': 'Fırsat Kaybedilen'
+  };
+  
+  // Tüm aktiviteleri say
+  let totalActivities = 0;
+  
+  for (const activity of activities) {
+    const aktivite = String(activity.aktivite || '').trim();
+    if (!aktivite) continue;
+    
+    totalActivities++;
+    
+    // Aktivite mapping'den bul
+    const mappedActivity = activityMap[aktivite] || null;
+    
+    if (mappedActivity) {
+      // Pozitif funnel
+      if (positiveFunnel.hasOwnProperty(mappedActivity)) {
+        positiveFunnel[mappedActivity]++;
+      }
+      // Negatif funnel
+      if (negativeFunnel.hasOwnProperty(mappedActivity)) {
+        negativeFunnel[mappedActivity]++;
+      }
+    }
+  }
+  
+  // Arama = Tüm aktiviteler
+  positiveFunnel['Arama'] = totalActivities;
+  
+  // Yüzdeleri hesapla
+  const positivePercentages = {};
+  const negativePercentages = {};
+  
+  Object.keys(positiveFunnel).forEach(key => {
+    if (key === 'Arama') {
+      positivePercentages[key] = 100;
+    } else {
+      const prevKey = key === 'Fırsat' ? 'Arama' : 
+                     key === 'Randevu' ? 'Fırsat' :
+                     key === 'Toplantı' ? 'Randevu' : 'Toplantı';
+      const prevCount = positiveFunnel[prevKey] || 0;
+      positivePercentages[key] = prevCount > 0 
+        ? ((positiveFunnel[key] / prevCount) * 100).toFixed(1)
+        : '0.0';
+    }
+  });
+  
+  Object.keys(negativeFunnel).forEach(key => {
+    negativePercentages[key] = totalActivities > 0
+      ? ((negativeFunnel[key] / totalActivities) * 100).toFixed(1)
+      : '0.0';
+  });
+  
+  return {
+    positive: {
+      counts: positiveFunnel,
+      percentages: positivePercentages
+    },
+    negative: {
+      counts: negativeFunnel,
+      percentages: negativePercentages
+    },
+    total: totalActivities
+  };
+}
+
+/**
+ * Funnel Raporu sayfası oluştur
+ */
+function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate, endDate, employeeCode) {
+  try {
+    const sheetName = 'FUNNEL RAPORU';
+    
+    // Eski sayfayı sil veya temizle
+    let sheet = managerFile.getSheetByName(sheetName);
+    if (sheet) {
+      managerFile.deleteSheet(sheet);
+    }
+    sheet = managerFile.insertSheet(sheetName);
+    
+    let currentRow = 1;
+    
+    // ========================================
+    // BAŞLIK BÖLÜMÜ
+    // ========================================
+    sheet.getRange(currentRow, 1).setValue('📊 FUNNEL RAPORU');
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(18).setBackground('#667eea').setFontColor('#FFFFFF');
+    currentRow++;
+    
+    const timeFilterText = timeFilter === 'daily' ? 'Günlük' : timeFilter === 'weekly' ? 'Haftalık' : 'Aylık';
+    const employeeText = employeeCode === 'ALL' ? 'Tüm Temsilciler' : `${employeeCode} - ${CRM_CONFIG.EMPLOYEE_CODES[employeeCode] || employeeCode}`;
+    const dateRangeText = `${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}`;
+    
+    sheet.getRange(currentRow, 1).setValue(`📅 Tarih Aralığı: ${dateRangeText}`);
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setBackground('#E3F2FD');
+    currentRow++;
+    
+    sheet.getRange(currentRow, 1).setValue(`⏰ Filtre: ${timeFilterText} | 👥 Temsilci: ${employeeText}`);
+    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setBackground('#BBDEFB');
+    currentRow += 2;
+    
+    // ========================================
+    // POZİTİF FUNNEL
+    // ========================================
+    sheet.getRange(currentRow, 1).setValue('✅ POZİTİF FUNNEL (Sales Funnel)');
+    sheet.getRange(currentRow, 1, 1, 5).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#4CAF50').setFontColor('#FFFFFF');
+    currentRow++;
+    
+    // Başlıklar
+    sheet.getRange(currentRow, 1).setValue('Adım');
+    sheet.getRange(currentRow, 2).setValue('Aktivite');
+    sheet.getRange(currentRow, 3).setValue('Sayı');
+    sheet.getRange(currentRow, 4).setValue('Yüzde');
+    sheet.getRange(currentRow, 5).setValue('Görsel');
+    sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#C8E6C9');
+    currentRow++;
+    
+    // Pozitif funnel verileri
+    const positiveSteps = [
+      { key: 'Arama', label: '1. Arama' },
+      { key: 'Fırsat', label: '2. Fırsat' },
+      { key: 'Randevu', label: '3. Randevu' },
+      { key: 'Toplantı', label: '4. Toplantı' },
+      { key: 'Satış', label: '5. Satış' }
+    ];
+    
+    for (const step of positiveSteps) {
+      const count = funnelData.positive.counts[step.key] || 0;
+      const percentage = funnelData.positive.percentages[step.key] || '0.0';
+      
+      sheet.getRange(currentRow, 1).setValue(step.label);
+      sheet.getRange(currentRow, 2).setValue(step.key);
+      sheet.getRange(currentRow, 3).setValue(count);
+      sheet.getRange(currentRow, 4).setValue(percentage + '%');
+      
+      // Görsel bar (basit)
+      const barLength = Math.min(20, Math.round(count / Math.max(funnelData.positive.counts['Arama'] || 1, 1) * 20));
+      sheet.getRange(currentRow, 5).setValue('█'.repeat(barLength));
+      sheet.getRange(currentRow, 5).setFontColor('#4CAF50');
+      
+      currentRow++;
+    }
+    
+    currentRow += 2;
+    
+    // ========================================
+    // NEGATİF FUNNEL
+    // ========================================
+    sheet.getRange(currentRow, 1).setValue('❌ NEGATİF FUNNEL (Loss Funnel)');
+    sheet.getRange(currentRow, 1, 1, 5).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#F44336').setFontColor('#FFFFFF');
+    currentRow++;
+    
+    // Başlıklar
+    sheet.getRange(currentRow, 1).setValue('Kategori');
+    sheet.getRange(currentRow, 2).setValue('Aktivite');
+    sheet.getRange(currentRow, 3).setValue('Sayı');
+    sheet.getRange(currentRow, 4).setValue('Yüzde');
+    sheet.getRange(currentRow, 5).setValue('Görsel');
+    sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#FFCDD2');
+    currentRow++;
+    
+    // Negatif funnel verileri
+    const negativeCategories = Object.keys(funnelData.negative.counts);
+    for (const category of negativeCategories) {
+      const count = funnelData.negative.counts[category] || 0;
+      const percentage = funnelData.negative.percentages[category] || '0.0';
+      
+      sheet.getRange(currentRow, 1).setValue(category);
+      sheet.getRange(currentRow, 2).setValue(category);
+      sheet.getRange(currentRow, 3).setValue(count);
+      sheet.getRange(currentRow, 4).setValue(percentage + '%');
+      
+      // Görsel bar
+      const maxNegative = Math.max(...Object.values(funnelData.negative.counts));
+      const barLength = maxNegative > 0 ? Math.min(20, Math.round(count / maxNegative * 20)) : 0;
+      sheet.getRange(currentRow, 5).setValue('█'.repeat(barLength));
+      sheet.getRange(currentRow, 5).setFontColor('#F44336');
+      
+      currentRow++;
+    }
+    
+    currentRow += 2;
+    
+    // ========================================
+    // ÖZET
+    // ========================================
+    sheet.getRange(currentRow, 1).setValue('📊 ÖZET');
+    sheet.getRange(currentRow, 1, 1, 5).merge();
+    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FF9800').setFontColor('#FFFFFF');
+    currentRow++;
+    
+    sheet.getRange(currentRow, 1).setValue('Toplam Aktivite:');
+    sheet.getRange(currentRow, 2).setValue(funnelData.total);
+    sheet.getRange(currentRow, 1).setFontWeight('bold');
+    currentRow++;
+    
+    const positiveTotal = Object.values(funnelData.positive.counts).reduce((a, b) => a + b, 0) - funnelData.positive.counts['Arama'];
+    const negativeTotal = Object.values(funnelData.negative.counts).reduce((a, b) => a + b, 0);
+    
+    sheet.getRange(currentRow, 1).setValue('Pozitif Toplam:');
+    sheet.getRange(currentRow, 2).setValue(positiveTotal);
+    sheet.getRange(currentRow, 1).setFontWeight('bold');
+    currentRow++;
+    
+    sheet.getRange(currentRow, 1).setValue('Negatif Toplam:');
+    sheet.getRange(currentRow, 2).setValue(negativeTotal);
+    sheet.getRange(currentRow, 1).setFontWeight('bold');
+    currentRow++;
+    
+    // Sütun genişliklerini ayarla
+    sheet.setColumnWidth(1, 200);
+    sheet.setColumnWidth(2, 200);
+    sheet.setColumnWidth(3, 100);
+    sheet.setColumnWidth(4, 100);
+    sheet.setColumnWidth(5, 300);
+    
+    // Excel export butonu ekle (opsiyonel - kullanıcı manuel olarak çağırabilir)
+    currentRow += 2;
+    sheet.getRange(currentRow, 1).setValue('💾 Excel Export için: Menüden "Funnel Raporu Excel Export" seçin');
+    sheet.getRange(currentRow, 1, 1, 5).merge();
+    sheet.getRange(currentRow, 1).setFontStyle('italic').setFontColor('#666');
+    
+    console.log('✅ Funnel Raporu sayfası oluşturuldu');
+    return sheet;
+    
+  } catch (error) {
+    console.error('❌ createFunnelReportSheet hatası:', error);
+    throw error;
+  }
+}
+
+/**
+ * 📊 Funnel Raporu Excel Export
+ * CSV formatında export eder
+ */
+function exportFunnelReportToExcel() {
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = managerFile.getSheetByName('FUNNEL RAPORU');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Funnel Raporu sayfası bulunamadı. Önce raporu oluşturun.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    // Veriyi al
+    const data = sheet.getDataRange().getValues();
+    
+    // CSV formatına çevir
+    const csv = data.map(row => 
+      row.map(cell => {
+        const value = String(cell || '');
+        // CSV için özel karakterleri escape et
+        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      }).join(',')
+    ).join('\n');
+    
+    // BOM ekle (UTF-8 için Excel uyumluluğu)
+    const csvWithBOM = '\uFEFF' + csv;
+    
+    // Blob oluştur
+    const blob = Utilities.newBlob(csvWithBOM, 'text/csv;charset=utf-8', 'Funnel_Raporu.csv');
+    
+    // Drive'a kaydet
+    const folder = DriveApp.getRootFolder(); // Veya belirli bir klasör
+    const file = folder.createFile(blob);
+    
+    // Download URL oluştur
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${file.getId()}`;
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Excel Export Tamamlandı',
+      `📊 Funnel Raporu Excel formatında export edildi!\n\n📁 Dosya: ${file.getName()}\n🔗 Link: ${file.getUrl()}\n\nDosyayı Drive'dan indirebilirsiniz.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    console.log('✅ Funnel Raporu Excel export edildi:', file.getUrl());
+    return { success: true, url: file.getUrl(), filename: file.getName() };
+    
+  } catch (error) {
+    console.error('❌ exportFunnelReportToExcel hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Excel export hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * Temsilci dosyasını al
+ */
+function getEmployeeFile(employeeCode) {
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    const managerFileName = managerFile.getName();
+    
+    // Temsilci dosya adını oluştur (örnek: "NT 002 - Neslihan Türk")
+    const employeeName = CRM_CONFIG.EMPLOYEE_CODES[employeeCode];
+    if (!employeeName) {
+      console.log(`⚠️ ${employeeCode} için isim bulunamadı`);
+      return null;
+    }
+    
+    const employeeFileName = `${employeeCode} - ${employeeName}`;
+    
+    // Drive'dan dosyayı bul
+    const files = DriveApp.getFilesByName(employeeFileName);
+    if (!files.hasNext()) {
+      console.log(`⚠️ ${employeeFileName} dosyası bulunamadı`);
+      return null;
+    }
+    
+    const file = files.next();
+    return SpreadsheetApp.openById(file.getId());
+    
+  } catch (error) {
+    console.error(`❌ getEmployeeFile hatası (${employeeCode}):`, error);
+    return null;
   }
 }
 
