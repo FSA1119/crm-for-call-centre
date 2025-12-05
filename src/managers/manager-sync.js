@@ -14406,6 +14406,17 @@ function showFunnelReportDialog() {
         </select>
       </div>
       
+      <div class="form-group" id="sortGroup" style="display: none;">
+        <label for="sortSelect">📊 Sıralama Metriği:</label>
+        <select id="sortSelect">
+          <option value="Satış">Satış</option>
+          <option value="Toplantı">Toplantı</option>
+          <option value="Randevu">Randevu</option>
+          <option value="Fırsat">Fırsat</option>
+          <option value="Arama">Arama</option>
+        </select>
+      </div>
+      
       <div class="info-box">
         <strong>ℹ️ Bilgi:</strong> Rapor, Gizli Log Arşivi'nden veri çeker. Log eksikse yedek kaynaklar (Randevularım, Fırsatlarım, Toplantılarım) kullanılır.
       </div>
@@ -14429,6 +14440,21 @@ function showFunnelReportDialog() {
             option.textContent = emp.code + ' - ' + emp.name;
             select.appendChild(option);
           });
+          
+          // Temsilci seçimi değiştiğinde sıralama dropdown'unu göster/gizle
+          select.addEventListener('change', function() {
+            const sortGroup = document.getElementById('sortGroup');
+            if (this.value === 'ALL') {
+              sortGroup.style.display = 'block';
+            } else {
+              sortGroup.style.display = 'none';
+            }
+          });
+          
+          // İlk yüklemede kontrol et
+          if (select.value === 'ALL') {
+            document.getElementById('sortGroup').style.display = 'block';
+          }
         })
         .withFailureHandler(function(error) {
           console.error('Temsilci listesi yüklenemedi:', error);
@@ -14439,6 +14465,9 @@ function showFunnelReportDialog() {
     function submit() {
       const timeFilter = document.querySelector('input[name="timeFilter"]:checked').value;
       const employeeCode = document.getElementById('employeeSelect').value;
+      const sortBy = employeeCode === 'ALL' 
+        ? document.getElementById('sortSelect').value 
+        : 'Satış'; // Tek temsilci için varsayılan
       
       // Butonu devre dışı bırak
       const submitBtn = document.getElementById('submitBtn');
@@ -14447,14 +14476,17 @@ function showFunnelReportDialog() {
       
       google.script.run
         .withSuccessHandler(function(result) {
-          google.script.host.close();
+          // Dialog'u kapat (Çalışıyor mesajı sorununu önlemek için)
+          setTimeout(function() {
+            google.script.host.close();
+          }, 100);
         })
         .withFailureHandler(function(error) {
           alert('Hata: ' + (error.message || error));
           submitBtn.disabled = false;
           submitBtn.textContent = 'Rapor Oluştur';
         })
-        .generateFunnelReport(timeFilter, employeeCode);
+        .generateFunnelReport(timeFilter, employeeCode, sortBy);
     }
 
     function cancel() {
@@ -14497,10 +14529,16 @@ function getEmployeeListForFunnel() {
  * 📊 Funnel Raporu Oluştur
  * @param {string} timeFilter - 'daily', 'weekly', 'monthly'
  * @param {string} employeeCode - Temsilci kodu veya 'ALL'
+ * @param {string} sortBy - Sıralama metriği: 'Satış', 'Toplantı', 'Randevu', 'Fırsat', 'Arama'
  */
-function generateFunnelReport(timeFilter, employeeCode) {
-  console.log('📊 Funnel Raporu oluşturuluyor:', { timeFilter, employeeCode });
+function generateFunnelReport(timeFilter, employeeCode, sortBy) {
+  console.log('📊 Funnel Raporu oluşturuluyor:', { timeFilter, employeeCode, sortBy });
   const startTime = Date.now();
+  
+  // Varsayılan sıralama
+  if (!sortBy) {
+    sortBy = 'Satış';
+  }
   
   try {
     // 1. Tarih aralığını hesapla
@@ -14513,12 +14551,14 @@ function generateFunnelReport(timeFilter, employeeCode) {
     // 2. Veri topla (Batch Operations)
     const funnelData = collectFunnelData(employeeCode, startDate, endDate);
     
-    // 3. Funnel işleme
-    const processedFunnel = processFunnelData(funnelData);
+    // 3. Funnel işleme (Temsilci bazında veya toplam)
+    const processedFunnel = employeeCode === 'ALL' 
+      ? processFunnelDataByEmployee(funnelData, sortBy)
+      : processFunnelData(funnelData);
     
     // 4. Rapor sayfası oluştur
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = createFunnelReportSheet(managerFile, processedFunnel, timeFilter, startDate, endDate, employeeCode);
+    const sheet = createFunnelReportSheet(managerFile, processedFunnel, timeFilter, startDate, endDate, employeeCode, sortBy);
     
     // 5. Excel export (opsiyonel - otomatik)
     // Excel export'u kullanıcı butonuna tıklayınca yapılacak
@@ -14799,7 +14839,7 @@ function normalizeActivityName(aktivite) {
 }
 
 /**
- * Funnel verilerini işle (Pozitif ve Negatif kol)
+ * Funnel verilerini işle (Pozitif ve Negatif kol) - Tek temsilci için
  */
 function processFunnelData(activities) {
   console.log('📊 Funnel verileri işleniyor...');
@@ -14823,36 +14863,7 @@ function processFunnelData(activities) {
   };
   
   // Aktivite mapping (case-insensitive)
-  const activityMap = {
-    // Pozitif
-    'Fırsat İletildi': 'Fırsat',
-    'Fırsat iletildi': 'Fırsat',
-    'Randevu Alındı': 'Randevu',
-    'Randevu alındı': 'Randevu',
-    'İleri Tarih Randevu': 'Randevu',
-    'İleri tarih randevu': 'Randevu',
-    'Toplantı Tamamlandı': 'Toplantı',
-    'Toplantı tamamlandı': 'Toplantı',
-    'Toplantı Gerçekleşti': 'Toplantı',
-    'Toplantı gerçekleşti': 'Toplantı',
-    'Satış Yapıldı': 'Satış',
-    'Satış yapıldı': 'Satış',
-    // Negatif
-    'Geçersiz Numara': 'Geçersiz Numara',
-    'Geçersiz numara': 'Geçersiz Numara',
-    'Ulaşılamadı': 'Ulaşılamadı',
-    'ulaşılamadı': 'Ulaşılamadı',
-    'İlgilenmiyor': 'İlgilenmiyor',
-    'ilgilenmiyor': 'İlgilenmiyor',
-    'Kurumsal': 'Kurumsal',
-    'kurumsal': 'Kurumsal',
-    'Randevu İptal oldu': 'Randevu İptal/Ertelendi',
-    'Randevu iptal oldu': 'Randevu İptal/Ertelendi',
-    'Randevu Ertelendi': 'Randevu İptal/Ertelendi',
-    'Randevu ertelendi': 'Randevu İptal/Ertelendi',
-    'Fırsat kaybedilen': 'Fırsat Kaybedilen',
-    'Fırsat Kaybedilen': 'Fırsat Kaybedilen'
-  };
+  const activityMap = getActivityMapping();
   
   // Tüm aktiviteleri say
   let totalActivities = 0;
@@ -14919,9 +14930,185 @@ function processFunnelData(activities) {
 }
 
 /**
+ * Funnel verilerini temsilci bazında işle (Tüm Temsilciler için)
+ * Her temsilci için ayrı veri döndürür, seçilen metriğe göre sıralar
+ * @param {Array} activities - Aktivite listesi
+ * @param {string} sortBy - Sıralama metriği: 'Satış', 'Toplantı', 'Randevu', 'Fırsat', 'Arama'
+ */
+function processFunnelDataByEmployee(activities, sortBy) {
+  console.log('📊 Funnel verileri temsilci bazında işleniyor...', { sortBy });
+  
+  // Varsayılan sıralama
+  if (!sortBy) {
+    sortBy = 'Satış';
+  }
+  
+  // Temsilci bazında grupla
+  const employeeData = new Map();
+  
+  for (const activity of activities) {
+    const empCode = activity.employeeCode || 'Bilinmeyen';
+    
+    if (!employeeData.has(empCode)) {
+      employeeData.set(empCode, []);
+    }
+    employeeData.get(empCode).push(activity);
+  }
+  
+  // Her temsilci için funnel hesapla
+  const employeeFunnels = [];
+  
+  for (const [empCode, empActivities] of employeeData) {
+    const employeeName = CRM_CONFIG.EMPLOYEE_CODES[empCode] || empCode;
+    const funnel = processFunnelData(empActivities);
+    
+    // Performans skoru hesapla (Satış + Toplantı + Randevu - Negatifler)
+    const positiveScore = (funnel.positive.counts['Satış'] || 0) * 10 +
+                         (funnel.positive.counts['Toplantı'] || 0) * 5 +
+                         (funnel.positive.counts['Randevu'] || 0) * 3 +
+                         (funnel.positive.counts['Fırsat'] || 0) * 1;
+    const negativeScore = Object.values(funnel.negative.counts).reduce((a, b) => a + b, 0) * 2;
+    const performanceScore = positiveScore - negativeScore;
+    
+    employeeFunnels.push({
+      employeeCode: empCode,
+      employeeName: employeeName,
+      funnel: funnel,
+      performanceScore: performanceScore,
+      totalActivities: funnel.total
+    });
+  }
+  
+  // Seçilen metriğe göre sırala (yüksekten düşüğe - en iyi en üstte)
+  employeeFunnels.sort((a, b) => {
+    // Seçilen metriğe göre değer al
+    const valueA = a.funnel.positive.counts[sortBy] || 0;
+    const valueB = b.funnel.positive.counts[sortBy] || 0;
+    
+    // Önce seçilen metriğe göre (yüksekten düşüğe)
+    if (valueB !== valueA) {
+      return valueB - valueA;
+    }
+    
+    // Eşitse ikincil sıralama: Satış sayısına göre
+    const salesA = a.funnel.positive.counts['Satış'] || 0;
+    const salesB = b.funnel.positive.counts['Satış'] || 0;
+    if (salesB !== salesA) {
+      return salesB - salesA;
+    }
+    
+    // Eşitse toplam aktiviteye göre
+    return b.totalActivities - a.totalActivities;
+  });
+  
+  // Toplam hesapla
+  const totalFunnel = {
+    positive: {
+      counts: {
+        'Arama': 0,
+        'Fırsat': 0,
+        'Randevu': 0,
+        'Toplantı': 0,
+        'Satış': 0
+      },
+      percentages: {}
+    },
+    negative: {
+      counts: {
+        'Geçersiz Numara': 0,
+        'Ulaşılamadı': 0,
+        'İlgilenmiyor': 0,
+        'Kurumsal': 0,
+        'Randevu İptal/Ertelendi': 0,
+        'Fırsat Kaybedilen': 0
+      },
+      percentages: {}
+    },
+    total: 0
+  };
+  
+  for (const empFunnel of employeeFunnels) {
+    const f = empFunnel.funnel;
+    totalFunnel.total += f.total;
+    
+    // Pozitif toplam
+    Object.keys(totalFunnel.positive.counts).forEach(key => {
+      totalFunnel.positive.counts[key] += f.positive.counts[key] || 0;
+    });
+    
+    // Negatif toplam
+    Object.keys(totalFunnel.negative.counts).forEach(key => {
+      totalFunnel.negative.counts[key] += f.negative.counts[key] || 0;
+    });
+  }
+  
+  // Toplam yüzdeleri hesapla
+  Object.keys(totalFunnel.positive.counts).forEach(key => {
+    if (key === 'Arama') {
+      totalFunnel.positive.percentages[key] = 100;
+    } else {
+      const prevKey = key === 'Fırsat' ? 'Arama' : 
+                     key === 'Randevu' ? 'Fırsat' :
+                     key === 'Toplantı' ? 'Randevu' : 'Toplantı';
+      const prevCount = totalFunnel.positive.counts[prevKey] || 0;
+      totalFunnel.positive.percentages[key] = prevCount > 0 
+        ? ((totalFunnel.positive.counts[key] / prevCount) * 100).toFixed(1)
+        : '0.0';
+    }
+  });
+  
+  Object.keys(totalFunnel.negative.counts).forEach(key => {
+    totalFunnel.negative.percentages[key] = totalFunnel.total > 0
+      ? ((totalFunnel.negative.counts[key] / totalFunnel.total) * 100).toFixed(1)
+      : '0.0';
+  });
+  
+  return {
+    employees: employeeFunnels,
+    total: totalFunnel
+  };
+}
+
+/**
+ * Aktivite mapping'i döndür (DRY prensibi)
+ */
+function getActivityMapping() {
+  return {
+    // Pozitif
+    'Fırsat İletildi': 'Fırsat',
+    'Fırsat iletildi': 'Fırsat',
+    'Randevu Alındı': 'Randevu',
+    'Randevu alındı': 'Randevu',
+    'İleri Tarih Randevu': 'Randevu',
+    'İleri tarih randevu': 'Randevu',
+    'Toplantı Tamamlandı': 'Toplantı',
+    'Toplantı tamamlandı': 'Toplantı',
+    'Toplantı Gerçekleşti': 'Toplantı',
+    'Toplantı gerçekleşti': 'Toplantı',
+    'Satış Yapıldı': 'Satış',
+    'Satış yapıldı': 'Satış',
+    // Negatif
+    'Geçersiz Numara': 'Geçersiz Numara',
+    'Geçersiz numara': 'Geçersiz Numara',
+    'Ulaşılamadı': 'Ulaşılamadı',
+    'ulaşılamadı': 'Ulaşılamadı',
+    'İlgilenmiyor': 'İlgilenmiyor',
+    'ilgilenmiyor': 'İlgilenmiyor',
+    'Kurumsal': 'Kurumsal',
+    'kurumsal': 'Kurumsal',
+    'Randevu İptal oldu': 'Randevu İptal/Ertelendi',
+    'Randevu iptal oldu': 'Randevu İptal/Ertelendi',
+    'Randevu Ertelendi': 'Randevu İptal/Ertelendi',
+    'Randevu ertelendi': 'Randevu İptal/Ertelendi',
+    'Fırsat kaybedilen': 'Fırsat Kaybedilen',
+    'Fırsat Kaybedilen': 'Fırsat Kaybedilen'
+  };
+}
+
+/**
  * Funnel Raporu sayfası oluştur
  */
-function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate, endDate, employeeCode) {
+function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate, endDate, employeeCode, sortBy) {
   try {
     const sheetName = 'FUNNEL RAPORU';
     
@@ -14938,145 +15125,244 @@ function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate,
     // BAŞLIK BÖLÜMÜ
     // ========================================
     sheet.getRange(currentRow, 1).setValue('📊 FUNNEL RAPORU');
-    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1, 1, 15).merge();
     sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(18).setBackground('#667eea').setFontColor('#FFFFFF');
     currentRow++;
     
     const timeFilterText = timeFilter === 'daily' ? 'Günlük' : timeFilter === 'weekly' ? 'Haftalık' : 'Aylık';
     const employeeText = employeeCode === 'ALL' ? 'Tüm Temsilciler' : `${employeeCode} - ${CRM_CONFIG.EMPLOYEE_CODES[employeeCode] || employeeCode}`;
     const dateRangeText = `${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}`;
+    const sortByText = employeeCode === 'ALL' && sortBy ? ` | 📊 Sıralama: ${sortBy}` : '';
     
     sheet.getRange(currentRow, 1).setValue(`📅 Tarih Aralığı: ${dateRangeText}`);
-    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1, 1, 15).merge();
     sheet.getRange(currentRow, 1).setFontWeight('bold').setBackground('#E3F2FD');
     currentRow++;
     
-    sheet.getRange(currentRow, 1).setValue(`⏰ Filtre: ${timeFilterText} | 👥 Temsilci: ${employeeText}`);
-    sheet.getRange(currentRow, 1, 1, 10).merge();
+    sheet.getRange(currentRow, 1).setValue(`⏰ Filtre: ${timeFilterText} | 👥 Temsilci: ${employeeText}${sortByText}`);
+    sheet.getRange(currentRow, 1, 1, 15).merge();
     sheet.getRange(currentRow, 1).setFontWeight('bold').setBackground('#BBDEFB');
     currentRow += 2;
     
     // ========================================
-    // POZİTİF FUNNEL
+    // TÜM TEMSİLCİLER İÇİN TABLO FORMATI
     // ========================================
-    sheet.getRange(currentRow, 1).setValue('✅ POZİTİF FUNNEL (Sales Funnel)');
-    sheet.getRange(currentRow, 1, 1, 5).merge();
-    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#4CAF50').setFontColor('#FFFFFF');
-    currentRow++;
-    
-    // Başlıklar
-    sheet.getRange(currentRow, 1).setValue('Adım');
-    sheet.getRange(currentRow, 2).setValue('Aktivite');
-    sheet.getRange(currentRow, 3).setValue('Sayı');
-    sheet.getRange(currentRow, 4).setValue('Yüzde');
-    sheet.getRange(currentRow, 5).setValue('Görsel');
-    sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#C8E6C9');
-    currentRow++;
-    
-    // Pozitif funnel verileri
-    const positiveSteps = [
-      { key: 'Arama', label: '1. Arama' },
-      { key: 'Fırsat', label: '2. Fırsat' },
-      { key: 'Randevu', label: '3. Randevu' },
-      { key: 'Toplantı', label: '4. Toplantı' },
-      { key: 'Satış', label: '5. Satış' }
-    ];
-    
-    for (const step of positiveSteps) {
-      const count = funnelData.positive.counts[step.key] || 0;
-      const percentage = funnelData.positive.percentages[step.key] || '0.0';
-      
-      sheet.getRange(currentRow, 1).setValue(step.label);
-      sheet.getRange(currentRow, 2).setValue(step.key);
-      sheet.getRange(currentRow, 3).setValue(count);
-      sheet.getRange(currentRow, 4).setValue(percentage + '%');
-      
-      // Görsel bar (basit)
-      const barLength = Math.min(20, Math.round(count / Math.max(funnelData.positive.counts['Arama'] || 1, 1) * 20));
-      sheet.getRange(currentRow, 5).setValue('█'.repeat(barLength));
-      sheet.getRange(currentRow, 5).setFontColor('#4CAF50');
-      
+    if (employeeCode === 'ALL' && funnelData.employees) {
+      // Başlık
+      sheet.getRange(currentRow, 1).setValue('👥 TEMSİLCİ BAZINDA FUNNEL RAPORU');
+      sheet.getRange(currentRow, 1, 1, 15).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#9C27B0').setFontColor('#FFFFFF');
       currentRow++;
+      
+      // Tablo başlıkları
+      const headers = [
+        'Temsilci',
+        'Toplam Aktivite',
+        'Arama',
+        'Fırsat',
+        'Randevu',
+        'Toplantı',
+        'Satış',
+        'Geçersiz Numara',
+        'Ulaşılamadı',
+        'İlgilenmiyor',
+        'Kurumsal',
+        'Randevu İptal/Ertelendi',
+        'Fırsat Kaybedilen',
+        'Performans Skoru',
+        'Sıra'
+      ];
+      
+      for (let col = 1; col <= headers.length; col++) {
+        sheet.getRange(currentRow, col).setValue(headers[col - 1]);
+        sheet.getRange(currentRow, col).setFontWeight('bold').setBackground('#E1BEE7');
+      }
+      currentRow++;
+      
+      // Her temsilci için satır (performansa göre sıralı - en iyi en üstte)
+      for (let i = 0; i < funnelData.employees.length; i++) {
+        const emp = funnelData.employees[i];
+        const f = emp.funnel;
+        
+        let col = 1;
+        sheet.getRange(currentRow, col++).setValue(`${emp.employeeCode} - ${emp.employeeName}`);
+        sheet.getRange(currentRow, col++).setValue(f.total);
+        sheet.getRange(currentRow, col++).setValue(f.positive.counts['Arama'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.positive.counts['Fırsat'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.positive.counts['Randevu'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.positive.counts['Toplantı'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.positive.counts['Satış'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.negative.counts['Geçersiz Numara'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.negative.counts['Ulaşılamadı'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.negative.counts['İlgilenmiyor'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.negative.counts['Kurumsal'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.negative.counts['Randevu İptal/Ertelendi'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.negative.counts['Fırsat Kaybedilen'] || 0);
+        sheet.getRange(currentRow, col++).setValue(emp.performanceScore);
+        sheet.getRange(currentRow, col++).setValue(i + 1);
+        
+        // Zebra striping
+        if (i % 2 === 0) {
+          sheet.getRange(currentRow, 1, 1, headers.length).setBackground('#F3E5F5');
+        }
+        
+        currentRow++;
+      }
+      
+      // TOPLAM SATIRI (en sonda)
+      currentRow++;
+      let col = 1;
+      sheet.getRange(currentRow, col++).setValue('📊 TOPLAM');
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.total);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Arama'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Fırsat'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Randevu'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Toplantı'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Satış'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Geçersiz Numara'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Ulaşılamadı'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['İlgilenmiyor'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Kurumsal'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Randevu İptal/Ertelendi'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Fırsat Kaybedilen'] || 0);
+      sheet.getRange(currentRow, col++).setValue('-'); // Performans skoru toplamı yok
+      sheet.getRange(currentRow, col++).setValue('-'); // Sıra toplamı yok
+      
+      // Toplam satırını vurgula
+      sheet.getRange(currentRow, 1, 1, headers.length)
+        .setFontWeight('bold')
+        .setBackground('#FF9800')
+        .setFontColor('#FFFFFF');
+      
+      currentRow += 2;
+      
+      // Sütun genişliklerini ayarla
+      sheet.setColumnWidth(1, 250); // Temsilci
+      for (let c = 2; c <= headers.length; c++) {
+        sheet.setColumnWidth(c, 120);
+      }
+      
+    } else {
+      // ========================================
+      // TEK TEMSİLCİ İÇİN DETAYLI FORMAT
+      // ========================================
+      
+      // POZİTİF FUNNEL
+      sheet.getRange(currentRow, 1).setValue('✅ POZİTİF FUNNEL (Sales Funnel)');
+      sheet.getRange(currentRow, 1, 1, 5).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#4CAF50').setFontColor('#FFFFFF');
+      currentRow++;
+      
+      // Başlıklar
+      sheet.getRange(currentRow, 1).setValue('Adım');
+      sheet.getRange(currentRow, 2).setValue('Aktivite');
+      sheet.getRange(currentRow, 3).setValue('Sayı');
+      sheet.getRange(currentRow, 4).setValue('Yüzde');
+      sheet.getRange(currentRow, 5).setValue('Görsel');
+      sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#C8E6C9');
+      currentRow++;
+      
+      // Pozitif funnel verileri
+      const positiveSteps = [
+        { key: 'Arama', label: '1. Arama' },
+        { key: 'Fırsat', label: '2. Fırsat' },
+        { key: 'Randevu', label: '3. Randevu' },
+        { key: 'Toplantı', label: '4. Toplantı' },
+        { key: 'Satış', label: '5. Satış' }
+      ];
+      
+      for (const step of positiveSteps) {
+        const count = funnelData.positive.counts[step.key] || 0;
+        const percentage = funnelData.positive.percentages[step.key] || '0.0';
+        
+        sheet.getRange(currentRow, 1).setValue(step.label);
+        sheet.getRange(currentRow, 2).setValue(step.key);
+        sheet.getRange(currentRow, 3).setValue(count);
+        sheet.getRange(currentRow, 4).setValue(percentage + '%');
+        
+        // Görsel bar (basit)
+        const barLength = Math.min(20, Math.round(count / Math.max(funnelData.positive.counts['Arama'] || 1, 1) * 20));
+        sheet.getRange(currentRow, 5).setValue('█'.repeat(barLength));
+        sheet.getRange(currentRow, 5).setFontColor('#4CAF50');
+        
+        currentRow++;
+      }
+      
+      currentRow += 2;
+      
+      // NEGATİF FUNNEL
+      sheet.getRange(currentRow, 1).setValue('❌ NEGATİF FUNNEL (Loss Funnel)');
+      sheet.getRange(currentRow, 1, 1, 5).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#F44336').setFontColor('#FFFFFF');
+      currentRow++;
+      
+      // Başlıklar
+      sheet.getRange(currentRow, 1).setValue('Kategori');
+      sheet.getRange(currentRow, 2).setValue('Aktivite');
+      sheet.getRange(currentRow, 3).setValue('Sayı');
+      sheet.getRange(currentRow, 4).setValue('Yüzde');
+      sheet.getRange(currentRow, 5).setValue('Görsel');
+      sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#FFCDD2');
+      currentRow++;
+      
+      // Negatif funnel verileri
+      const negativeCategories = Object.keys(funnelData.negative.counts);
+      for (const category of negativeCategories) {
+        const count = funnelData.negative.counts[category] || 0;
+        const percentage = funnelData.negative.percentages[category] || '0.0';
+        
+        sheet.getRange(currentRow, 1).setValue(category);
+        sheet.getRange(currentRow, 2).setValue(category);
+        sheet.getRange(currentRow, 3).setValue(count);
+        sheet.getRange(currentRow, 4).setValue(percentage + '%');
+        
+        // Görsel bar
+        const maxNegative = Math.max(...Object.values(funnelData.negative.counts));
+        const barLength = maxNegative > 0 ? Math.min(20, Math.round(count / maxNegative * 20)) : 0;
+        sheet.getRange(currentRow, 5).setValue('█'.repeat(barLength));
+        sheet.getRange(currentRow, 5).setFontColor('#F44336');
+        
+        currentRow++;
+      }
+      
+      currentRow += 2;
+      
+      // ÖZET
+      sheet.getRange(currentRow, 1).setValue('📊 ÖZET');
+      sheet.getRange(currentRow, 1, 1, 5).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FF9800').setFontColor('#FFFFFF');
+      currentRow++;
+      
+      sheet.getRange(currentRow, 1).setValue('Toplam Aktivite:');
+      sheet.getRange(currentRow, 2).setValue(funnelData.total);
+      sheet.getRange(currentRow, 1).setFontWeight('bold');
+      currentRow++;
+      
+      const positiveTotal = Object.values(funnelData.positive.counts).reduce((a, b) => a + b, 0) - funnelData.positive.counts['Arama'];
+      const negativeTotal = Object.values(funnelData.negative.counts).reduce((a, b) => a + b, 0);
+      
+      sheet.getRange(currentRow, 1).setValue('Pozitif Toplam:');
+      sheet.getRange(currentRow, 2).setValue(positiveTotal);
+      sheet.getRange(currentRow, 1).setFontWeight('bold');
+      currentRow++;
+      
+      sheet.getRange(currentRow, 1).setValue('Negatif Toplam:');
+      sheet.getRange(currentRow, 2).setValue(negativeTotal);
+      sheet.getRange(currentRow, 1).setFontWeight('bold');
+      currentRow++;
+      
+      // Sütun genişliklerini ayarla
+      sheet.setColumnWidth(1, 200);
+      sheet.setColumnWidth(2, 200);
+      sheet.setColumnWidth(3, 100);
+      sheet.setColumnWidth(4, 100);
+      sheet.setColumnWidth(5, 300);
     }
     
-    currentRow += 2;
-    
-    // ========================================
-    // NEGATİF FUNNEL
-    // ========================================
-    sheet.getRange(currentRow, 1).setValue('❌ NEGATİF FUNNEL (Loss Funnel)');
-    sheet.getRange(currentRow, 1, 1, 5).merge();
-    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#F44336').setFontColor('#FFFFFF');
-    currentRow++;
-    
-    // Başlıklar
-    sheet.getRange(currentRow, 1).setValue('Kategori');
-    sheet.getRange(currentRow, 2).setValue('Aktivite');
-    sheet.getRange(currentRow, 3).setValue('Sayı');
-    sheet.getRange(currentRow, 4).setValue('Yüzde');
-    sheet.getRange(currentRow, 5).setValue('Görsel');
-    sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#FFCDD2');
-    currentRow++;
-    
-    // Negatif funnel verileri
-    const negativeCategories = Object.keys(funnelData.negative.counts);
-    for (const category of negativeCategories) {
-      const count = funnelData.negative.counts[category] || 0;
-      const percentage = funnelData.negative.percentages[category] || '0.0';
-      
-      sheet.getRange(currentRow, 1).setValue(category);
-      sheet.getRange(currentRow, 2).setValue(category);
-      sheet.getRange(currentRow, 3).setValue(count);
-      sheet.getRange(currentRow, 4).setValue(percentage + '%');
-      
-      // Görsel bar
-      const maxNegative = Math.max(...Object.values(funnelData.negative.counts));
-      const barLength = maxNegative > 0 ? Math.min(20, Math.round(count / maxNegative * 20)) : 0;
-      sheet.getRange(currentRow, 5).setValue('█'.repeat(barLength));
-      sheet.getRange(currentRow, 5).setFontColor('#F44336');
-      
-      currentRow++;
-    }
-    
-    currentRow += 2;
-    
-    // ========================================
-    // ÖZET
-    // ========================================
-    sheet.getRange(currentRow, 1).setValue('📊 ÖZET');
-    sheet.getRange(currentRow, 1, 1, 5).merge();
-    sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FF9800').setFontColor('#FFFFFF');
-    currentRow++;
-    
-    sheet.getRange(currentRow, 1).setValue('Toplam Aktivite:');
-    sheet.getRange(currentRow, 2).setValue(funnelData.total);
-    sheet.getRange(currentRow, 1).setFontWeight('bold');
-    currentRow++;
-    
-    const positiveTotal = Object.values(funnelData.positive.counts).reduce((a, b) => a + b, 0) - funnelData.positive.counts['Arama'];
-    const negativeTotal = Object.values(funnelData.negative.counts).reduce((a, b) => a + b, 0);
-    
-    sheet.getRange(currentRow, 1).setValue('Pozitif Toplam:');
-    sheet.getRange(currentRow, 2).setValue(positiveTotal);
-    sheet.getRange(currentRow, 1).setFontWeight('bold');
-    currentRow++;
-    
-    sheet.getRange(currentRow, 1).setValue('Negatif Toplam:');
-    sheet.getRange(currentRow, 2).setValue(negativeTotal);
-    sheet.getRange(currentRow, 1).setFontWeight('bold');
-    currentRow++;
-    
-    // Sütun genişliklerini ayarla
-    sheet.setColumnWidth(1, 200);
-    sheet.setColumnWidth(2, 200);
-    sheet.setColumnWidth(3, 100);
-    sheet.setColumnWidth(4, 100);
-    sheet.setColumnWidth(5, 300);
-    
-    // Excel export butonu ekle (opsiyonel - kullanıcı manuel olarak çağırabilir)
+    // Excel export butonu ekle
     currentRow += 2;
     sheet.getRange(currentRow, 1).setValue('💾 Excel Export için: Menüden "Funnel Raporu Excel Export" seçin');
-    sheet.getRange(currentRow, 1, 1, 5).merge();
+    sheet.getRange(currentRow, 1, 1, 15).merge();
     sheet.getRange(currentRow, 1).setFontStyle('italic').setFontColor('#666');
     
     console.log('✅ Funnel Raporu sayfası oluşturuldu');
