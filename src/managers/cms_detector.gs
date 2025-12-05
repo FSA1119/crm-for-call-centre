@@ -495,14 +495,92 @@ function runCMSDetectionForSelectionAccurate() {
     const rows = Array.from(new Set(rangeList.getRanges().flatMap(r => Array.from({length:r.getNumRows()}, (_,i)=>r.getRow()+i)).filter(r=>r>=2))).sort((a,b)=>a-b);
     if (rows.length === 0) { ui.alert('Bilgi', 'Başlık satırı dışında seçim yapın (2+).', ui.ButtonSet.OK); return { total: 0, updated: 0 }; }
 
+    // ✅ BATCH OPERATIONS: Tüm URL'leri tek seferde oku (Google best practice)
+    console.log(`📊 [BATCH] ${rows.length} satır için batch operations başlatılıyor...`);
+    
+    // Tüm satır numaralarını sırala (batch read için)
+    const sortedRows = [...rows].sort((a, b) => a - b);
+    
+    // ✅ BATCH READ: Tüm website değerlerini tek seferde oku
+    const minRow = Math.min(...sortedRows);
+    const maxRow = Math.max(...sortedRows);
+    const totalRows = maxRow - minRow + 1;
+    const websiteRange = sheet.getRange(minRow, iWebsite + 1, totalRows, 1);
+    const allWebsiteValues = websiteRange.getDisplayValues(); // 1 API call!
+    
+    // Row numarası -> array index mapping
+    const rowToIndex = {};
+    for (const row of sortedRows) {
+      rowToIndex[row] = row - minRow;
+    }
+    
+    // Memory'de analiz yap ve sonuçları hazırla
+    const results = [];
     let updated = 0;
-    for (const row of rows) {
-      const url = String(sheet.getRange(row, iWebsite+1).getDisplayValue() || '').trim();
-      if (!url) continue;
-      const cmsName = detectCMSForUrl(url) || '';
-      if (iCms !== -1) sheet.getRange(row, iCms+1).setValue(cmsName);
-      if (iGroup !== -1) sheet.getRange(row, iGroup+1).setValue(mapCmsGroup(cmsName));
-      updated++;
+    
+    for (const row of sortedRows) {
+      const arrayIndex = rowToIndex[row];
+      const url = String(allWebsiteValues[arrayIndex][0] || '').trim();
+      
+      if (!url) {
+        // Boş URL - boş değer ekle
+        results.push({ row, cmsName: '', cmsGroup: '' });
+        continue;
+      }
+      
+      try {
+        const cmsName = detectCMSForUrl(url) || '';
+        const cmsGroup = mapCmsGroup(cmsName);
+        
+        results.push({ row, cmsName, cmsGroup });
+        updated++;
+      } catch (error) {
+        console.error(`❌ Satır ${row} analiz hatası:`, error);
+        results.push({ row, cmsName: 'Erişilemedi', cmsGroup: 'Erişilemedi' });
+      }
+    }
+    
+    // ✅ BATCH WRITE: Tüm sonuçları tek seferde yaz (Google best practice)
+    if (results.length > 0) {
+      // Ardışık satırlar kontrolü
+      const isConsecutive = sortedRows.every((row, idx) => idx === 0 || row === sortedRows[idx - 1] + 1);
+      
+      if (isConsecutive && sortedRows.length > 0) {
+        // ✅ Ardışık satırlar - Tek batch write (en hızlı)
+        const firstRow = sortedRows[0];
+        const cmsNameValues = results.map(r => [r.cmsName]);
+        const cmsGroupValues = results.map(r => [r.cmsGroup]);
+        
+        if (iCms !== -1) {
+          const cmsNameRange = sheet.getRange(firstRow, iCms + 1, sortedRows.length, 1);
+          cmsNameRange.setValues(cmsNameValues); // 1 API call!
+        }
+        
+        if (iGroup !== -1) {
+          const cmsGroupRange = sheet.getRange(firstRow, iGroup + 1, sortedRows.length, 1);
+          cmsGroupRange.setValues(cmsGroupValues); // 1 API call!
+        }
+        
+        console.log(`✅ [BATCH] ${updated} satır işlendi (3 API call: 1 read + 2 write)`);
+      } else {
+        // ⚠️ Ardışık olmayan satırlar - Her satır için ayrı yaz (ama yine de daha az API call)
+        // Çünkü batch read zaten yapıldı, sadece write'lar tek tek
+        let writeApiCalls = 0;
+        
+        for (const result of results) {
+          if (iCms !== -1) {
+            sheet.getRange(result.row, iCms + 1).setValue(result.cmsName);
+            writeApiCalls++;
+          }
+          if (iGroup !== -1) {
+            sheet.getRange(result.row, iGroup + 1).setValue(result.cmsGroup);
+            writeApiCalls++;
+          }
+        }
+        
+        console.log(`✅ [BATCH] ${updated} satır işlendi (${1 + writeApiCalls} API call: 1 read + ${writeApiCalls} write)`);
+        console.log(`⚠️ Not: Ardışık olmayan satırlar için batch write kullanılamadı, ama batch read kullanıldı`);
+      }
     }
 
     ui.alert('CMS Analizi (Doğruluk)', `${sheetName} → ${updated}/${rows.length} satır işlendi`, ui.ButtonSet.OK);
