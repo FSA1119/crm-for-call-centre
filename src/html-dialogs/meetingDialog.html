@@ -340,6 +340,8 @@
           var defaultMeetingNotes = <?= defaultMeetingNotes ? JSON.stringify(defaultMeetingNotes) : '""' ?>;
           var defaultYoneticiNot = <?= defaultYoneticiNot ? JSON.stringify(defaultYoneticiNot) : '""' ?>;
           var defaultYeniTakipTarihi = <?= defaultYeniTakipTarihi ? JSON.stringify(defaultYeniTakipTarihi) : '""' ?>;
+          var defaultToplantiYapan = <?= (typeof defaultToplantiYapan !== 'undefined' && defaultToplantiYapan) ? JSON.stringify(defaultToplantiYapan) : '""' ?>;
+          var defaultMeetingResult = <?= (typeof defaultMeetingResult !== 'undefined' && defaultMeetingResult) ? JSON.stringify(defaultMeetingResult) : '""' ?>;
           var rowNumber = <?= (rowNumber && typeof rowNumber === 'number') ? rowNumber : (rowNumber ? parseInt(rowNumber, 10) || 0 : 0) ?>;
           var sourceSheetName = <?= JSON.stringify(sourceSheetName || '') ?>;
         </script>
@@ -347,7 +349,7 @@
       
       <div class="form-group">
         <label for="meetingNotes">📝 Yorum</label>
-        <textarea id="meetingNotes" name="meetingNotes" placeholder="Toplantı ile ilgili yorumlarınızı buraya yazın..." rows="4"></textarea>
+        <textarea id="meetingNotes" name="meetingNotes" placeholder="Toplantı ile ilgili yorumlarınızı buraya yazabilirsiniz..." rows="4"></textarea>
       </div>
       
       <div class="form-group">
@@ -360,6 +362,26 @@
         <select id="meetingResult" name="meetingResult">
           <option value="">Sonuç seçin</option>
         </select>
+      </div>
+      
+      <!-- SATIŞ TÜRÜ (sadece "Satış Yapıldı" seçildiğinde) -->
+      <div class="form-group" id="satisTuruGroup" style="display: none;">
+        <label for="satisTuru">🎯 Satış Türü <span class="required">*</span></label>
+        <select id="satisTuru" name="satisTuru" required>
+          <option value="">Seçiniz...</option>
+          <option value="Yerinde Satış">Yerinde Satış</option>
+          <option value="Teklif Sonrası">Teklif Sonrası</option>
+        </select>
+        <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">Yerinde Satış: Toplantı sırasında direkt satış | Teklif Sonrası: Teklif gönderildi, incelendi, sonradan satış</small>
+      </div>
+      
+      <!-- TEKLİF DETAYI (sadece "Satış Yapıldı" seçildiğinde - her iki satış türünde de) -->
+      <div class="form-group" id="teklifDetayiSaleGroup" style="display: none;">
+        <label for="teklifDetayiSale">📦 Paket (Teklif Detayı) <span class="required">*</span></label>
+        <select id="teklifDetayiSale" name="teklifDetayiSale" required>
+          <option value="">Seçiniz...</option>
+        </select>
+        <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">Satış yapılan paketi seçin</small>
       </div>
       
       <!-- CİRO ALANI (sadece "Satış Yapıldı" seçildiğinde) -->
@@ -394,7 +416,7 @@
       
       <div class="buttons">
         <button type="button" class="btn btn-secondary" onclick="closeDialog()">❌ İptal</button>
-        <button type="submit" class="btn btn-primary">💾 Kaydet ve Toplantıya Geç</button>
+        <button type="submit" class="btn btn-primary" id="submitButton">💾 Kaydet ve Toplantıya Geç</button>
       </div>
     </form>
   </div>
@@ -457,33 +479,137 @@
       fillTimeDropdowns();
       fillDropdowns();
       
-      // Toplantı Sonucu değiştiğinde ciro input'unu göster/gizle
+      // Default değerleri set et (dropdown'lar doldurulduktan sonra)
+      fillDefaultValues();
+      
+      // Toplantı Sonucu değiştiğinde satış alanlarını göster/gizle
       const meetingResultSelect = document.getElementById('meetingResult');
       if (meetingResultSelect) {
         meetingResultSelect.addEventListener('change', function() {
+          const selectedValue = this.value.toLowerCase();
+          const isSatisYapildi = selectedValue.includes('satış') || selectedValue === 'satış yapıldı';
+          const isTeklifIletildi = selectedValue.includes('teklif');
+          const isBeklemede = selectedValue.includes('beklemede');
+          
+          // Satış alanları (Satış Yapıldı seçildiğinde)
+          const satisTuruGroup = document.getElementById('satisTuruGroup');
+          const satisTuruSelect = document.getElementById('satisTuru');
+          const teklifDetayiSaleGroup = document.getElementById('teklifDetayiSaleGroup');
+          const teklifDetayiSaleSelect = document.getElementById('teklifDetayiSale');
           const ciroGroup = document.getElementById('ciroGroup');
           const ciroInput = document.getElementById('ciro');
-          const selectedValue = this.value.toLowerCase();
           
-          if (selectedValue.includes('satış') || selectedValue === 'satış yapıldı') {
-            // "Satış Yapıldı" seçildiğinde ciro input'unu göster
+          // Teklif Detayı (İsteğe Bağlı) - Toplantı Gerçekleşti durumunda
+          const extraFieldsGroup = document.getElementById('extraFieldsGroup');
+          const teklifDetayiSelect = document.getElementById('teklifDetayi');
+          
+          // Satış Potansiyeli (Teklif iletildi veya Beklemede seçildiğinde göster, Satış Yapıldı seçildiğinde gizle)
+          const extraFieldsGroup2 = document.getElementById('extraFieldsGroup2');
+          const satisPotansiyeliSelect = document.getElementById('satisPotansiyeli');
+          
+          if (isSatisYapildi) {
+            // Satış Türü göster
+            if (satisTuruGroup) satisTuruGroup.style.display = 'block';
+            if (satisTuruSelect) satisTuruSelect.setAttribute('required', 'required');
+            
+            // Paket (Teklif Detayı) göster - Satış yapılan paket
+            if (teklifDetayiSaleGroup) teklifDetayiSaleGroup.style.display = 'block';
+            if (teklifDetayiSaleSelect) teklifDetayiSaleSelect.setAttribute('required', 'required');
+            
+            // Ciro göster
             if (ciroGroup) ciroGroup.style.display = 'block';
             if (ciroInput) ciroInput.setAttribute('required', 'required');
-          } else {
-            // Diğer durumlarda gizle
+            
+            // "Teklif Detayı (İsteğe Bağlı)" gizle - Artık gerek yok, çünkü "Paket (Teklif Detayı)" var
+            if (extraFieldsGroup) extraFieldsGroup.style.display = 'none';
+            if (teklifDetayiSelect) {
+              teklifDetayiSelect.removeAttribute('required');
+              teklifDetayiSelect.value = '';
+            }
+            
+            // Satış Potansiyeli gizle - Artık satış yapıldı, takip edilmeyecek
+            if (extraFieldsGroup2) extraFieldsGroup2.style.display = 'none';
+            if (satisPotansiyeliSelect) satisPotansiyeliSelect.value = '';
+          } else if (isTeklifIletildi || isBeklemede) {
+            // Satış alanlarını gizle
+            if (satisTuruGroup) satisTuruGroup.style.display = 'none';
+            if (satisTuruSelect) {
+              satisTuruSelect.removeAttribute('required');
+              satisTuruSelect.value = '';
+            }
+            if (teklifDetayiSaleGroup) teklifDetayiSaleGroup.style.display = 'none';
+            if (teklifDetayiSaleSelect) {
+              teklifDetayiSaleSelect.removeAttribute('required');
+              teklifDetayiSaleSelect.value = '';
+            }
             if (ciroGroup) ciroGroup.style.display = 'none';
             if (ciroInput) {
               ciroInput.removeAttribute('required');
               ciroInput.value = '';
             }
+            
+            // "Teklif Detayı (İsteğe Bağlı)" göster - Teklif gönderilecek paketler
+            if (extraFieldsGroup) extraFieldsGroup.style.display = 'flex';
+            
+            // Satış Potansiyeli göster - Müşterinin sıcaklık durumu
+            if (extraFieldsGroup2) extraFieldsGroup2.style.display = 'flex';
+          } else {
+            // Diğer durumlar (Beklemede, İptal vb.) - Her şeyi gizle
+            if (satisTuruGroup) satisTuruGroup.style.display = 'none';
+            if (satisTuruSelect) {
+              satisTuruSelect.removeAttribute('required');
+              satisTuruSelect.value = '';
+            }
+            if (teklifDetayiSaleGroup) teklifDetayiSaleGroup.style.display = 'none';
+            if (teklifDetayiSaleSelect) {
+              teklifDetayiSaleSelect.removeAttribute('required');
+              teklifDetayiSaleSelect.value = '';
+            }
+            if (ciroGroup) ciroGroup.style.display = 'none';
+            if (ciroInput) {
+              ciroInput.removeAttribute('required');
+              ciroInput.value = '';
+            }
+            if (extraFieldsGroup) extraFieldsGroup.style.display = 'none';
+            if (teklifDetayiSelect) {
+              teklifDetayiSelect.removeAttribute('required');
+              teklifDetayiSelect.value = '';
+            }
+            if (extraFieldsGroup2) extraFieldsGroup2.style.display = 'none';
+            if (satisPotansiyeliSelect) satisPotansiyeliSelect.value = '';
           }
         });
       }
       
       // Varsayılan değerleri dropdown'lar doldurulduktan sonra set et - HIZ için minimum gecikme
       setTimeout(function() {
-        fillDefaultValues();
+        // fillDefaultValues() zaten yukarıda çağrıldı, tekrar çağırmaya gerek yok
+        // fillDefaultValues(); // Kaldırıldı - zaten yukarıda çağrılıyor
         toggleConditionalFields();
+        
+        // Toplantı Sonucu default değerini set et (eğer varsa)
+        if (typeof defaultMeetingResult !== 'undefined' && defaultMeetingResult && defaultMeetingResult !== '' && defaultMeetingResult !== 'null' && defaultMeetingResult !== null) {
+          const meetingResultSelect = document.getElementById('meetingResult');
+          if (meetingResultSelect && meetingResultSelect.options.length > 1) {
+            let resultValue = String(defaultMeetingResult)
+              .replace(/^"/, '').replace(/"$/, '')
+              .replace(/\\"/g, '"')
+              .trim();
+            
+            // Dropdown'da bu değeri bul ve seç
+            for (let i = 0; i < meetingResultSelect.options.length; i++) {
+              if (meetingResultSelect.options[i].value === resultValue || 
+                  meetingResultSelect.options[i].text === resultValue) {
+                meetingResultSelect.value = meetingResultSelect.options[i].value;
+                console.log('✅ Toplantı Sonucu set edildi:', resultValue);
+                // Trigger change event to ensure all sale fields are shown
+                meetingResultSelect.dispatchEvent(new Event('change'));
+                break;
+              }
+            }
+          }
+        }
+        
       }, 100); // Hızlı kayıt için minimum gecikme
     };
     
@@ -567,12 +693,23 @@
     // Dropdown'ları JavaScript değişkenlerinden doldur
     function fillDropdowns() {
       // Meeting Formats
-      if (typeof meetingFormatsHTML !== 'undefined' && meetingFormatsHTML) {
+      if (typeof meetingFormatsHTML !== 'undefined' && meetingFormatsHTML && meetingFormatsHTML !== '') {
         const meetingFormatSelect = document.getElementById('meetingFormat');
         if (meetingFormatSelect) {
           // HTML string'i direkt ekle (zaten escape edilmiş)
-          meetingFormatSelect.innerHTML = meetingFormatSelect.innerHTML + meetingFormatsHTML;
+          // Önce mevcut placeholder'ı koru, sonra option'ları ekle
+          const currentHTML = meetingFormatSelect.innerHTML;
+          if (currentHTML.includes('Format seçin')) {
+            // Placeholder var, onu koru ve option'ları ekle
+            meetingFormatSelect.innerHTML = currentHTML + meetingFormatsHTML;
+          } else {
+            // Placeholder yok, direkt ekle
+            meetingFormatSelect.innerHTML = meetingFormatSelect.innerHTML + meetingFormatsHTML;
+          }
+          console.log('✅ Meeting Formats dropdown dolduruldu:', meetingFormatsHTML.length, 'karakter');
         }
+      } else {
+        console.warn('⚠️ meetingFormatsHTML boş veya undefined:', typeof meetingFormatsHTML, meetingFormatsHTML);
       }
       
       // Toplantıyı Yapan (sadece "Toplantı Gerçekleşti" durumunda)
@@ -584,11 +721,22 @@
       }
       
       // Toplantı Sonucu
-      if (typeof toplantiSonucuHTML !== 'undefined' && toplantiSonucuHTML) {
+      if (typeof toplantiSonucuHTML !== 'undefined' && toplantiSonucuHTML && toplantiSonucuHTML !== '') {
         const meetingResultSelect = document.getElementById('meetingResult');
         if (meetingResultSelect) {
-          meetingResultSelect.innerHTML += toplantiSonucuHTML;
+          // Önce mevcut placeholder'ı koru, sonra option'ları ekle
+          const currentHTML = meetingResultSelect.innerHTML;
+          if (currentHTML.includes('Sonuç seçin')) {
+            // Placeholder var, onu koru ve option'ları ekle
+            meetingResultSelect.innerHTML = currentHTML + toplantiSonucuHTML;
+          } else {
+            // Placeholder yok, direkt ekle
+            meetingResultSelect.innerHTML = meetingResultSelect.innerHTML + toplantiSonucuHTML;
+          }
+          console.log('✅ Toplantı Sonucu dropdown dolduruldu:', toplantiSonucuHTML.length, 'karakter');
         }
+      } else {
+        console.warn('⚠️ toplantiSonucuHTML boş veya undefined:', typeof toplantiSonucuHTML, toplantiSonucuHTML);
       }
       
       // Teklif Detayı (sadece "Toplantı Gerçekleşti" durumunda) - normal select
@@ -596,6 +744,12 @@
         const teklifDetayiSelect = document.getElementById('teklifDetayi');
         if (teklifDetayiSelect) {
           teklifDetayiSelect.innerHTML += teklifDetayiHTML;
+        }
+        
+        // Satış için Teklif Detayı (Paket) dropdown'unu da doldur (Satış Yapıldı seçildiğinde kullanılacak)
+        const teklifDetayiSaleSelect = document.getElementById('teklifDetayiSale');
+        if (teklifDetayiSaleSelect) {
+          teklifDetayiSaleSelect.innerHTML += teklifDetayiHTML;
         }
       }
       
@@ -791,8 +945,11 @@
       }
       
       // Toplantı Notları: Randevu'daki Yorum
-      if (typeof defaultMeetingNotes !== 'undefined' && defaultMeetingNotes) {
-        document.getElementById('meetingNotes').value = defaultMeetingNotes;
+      if (typeof defaultMeetingNotes !== 'undefined' && defaultMeetingNotes && defaultMeetingNotes !== 'null' && defaultMeetingNotes !== '' && defaultMeetingNotes !== null) {
+        const meetingNotesValue = String(defaultMeetingNotes).replace(/^"/, '').replace(/"$/, '').replace(/\\"/g, '"').replace(/^""""$/, ''); // Tırnak işaretlerini temizle
+        if (meetingNotesValue && meetingNotesValue !== 'null' && meetingNotesValue !== '""""') {
+          document.getElementById('meetingNotes').value = meetingNotesValue;
+        }
       }
       
       // Yönetici Not: Randevu'daki Yönetici Not
@@ -813,6 +970,72 @@
             .trim();
           yeniTakipTarihiInput.value = yeniTakipTarihiDegeri;
           console.log('✅ Yeni Takip Tarihi set edildi (fillDefaultValues):', yeniTakipTarihiDegeri);
+        }
+      }
+      
+      // Paket (Teklif Detayı) - Satış dialog'u için (Toplantılarım'dan geliyor)
+      if (typeof defaultTeklifDetayiSale !== 'undefined' && defaultTeklifDetayiSale && defaultTeklifDetayiSale !== '' && defaultTeklifDetayiSale !== 'null' && defaultTeklifDetayiSale !== null) {
+        const teklifDetayiSaleSelect = document.getElementById('teklifDetayiSale');
+        if (teklifDetayiSaleSelect && teklifDetayiSaleSelect.options.length > 1) {
+          let teklifDetayiSaleValue = String(defaultTeklifDetayiSale)
+            .replace(/^"/, '').replace(/"$/, '')
+            .replace(/\\"/g, '"')
+            .trim();
+          
+          // Dropdown'da bu değeri bul ve seç
+          for (let i = 0; i < teklifDetayiSaleSelect.options.length; i++) {
+            if (teklifDetayiSaleSelect.options[i].value === teklifDetayiSaleValue || 
+                teklifDetayiSaleSelect.options[i].text === teklifDetayiSaleValue) {
+              teklifDetayiSaleSelect.value = teklifDetayiSaleSelect.options[i].value;
+              console.log('✅ Paket (Teklif Detayı) set edildi:', teklifDetayiSaleValue);
+              break;
+            }
+          }
+        }
+      }
+      
+      // Toplantıyı Yapan - Satış dialog'u için (Toplantılarım'dan geliyor)
+      if (typeof defaultToplantiYapan !== 'undefined' && defaultToplantiYapan && defaultToplantiYapan !== '' && defaultToplantiYapan !== 'null' && defaultToplantiYapan !== null) {
+        const toplantiYapanSelect = document.getElementById('toplantiYapan');
+        if (toplantiYapanSelect && toplantiYapanSelect.options.length > 1) {
+          let toplantiYapanValue = String(defaultToplantiYapan)
+            .replace(/^"/, '').replace(/"$/, '')
+            .replace(/\\"/g, '"')
+            .trim();
+          
+          // Dropdown'da bu değeri bul ve seç
+          for (let i = 0; i < toplantiYapanSelect.options.length; i++) {
+            if (toplantiYapanSelect.options[i].value === toplantiYapanValue || 
+                toplantiYapanSelect.options[i].text === toplantiYapanValue ||
+                toplantiYapanSelect.options[i].text.includes(toplantiYapanValue)) {
+              toplantiYapanSelect.value = toplantiYapanSelect.options[i].value;
+              console.log('✅ Toplantıyı Yapan set edildi:', toplantiYapanValue);
+              break;
+            }
+          }
+        }
+      }
+      
+      // Toplantı Sonucu - Default değeri set et (eğer varsa)
+      if (typeof defaultMeetingResult !== 'undefined' && defaultMeetingResult && defaultMeetingResult !== '' && defaultMeetingResult !== 'null' && defaultMeetingResult !== null) {
+        const meetingResultSelect = document.getElementById('meetingResult');
+        if (meetingResultSelect && meetingResultSelect.options.length > 1) {
+          let resultValue = String(defaultMeetingResult)
+            .replace(/^"/, '').replace(/"$/, '')
+            .replace(/\\"/g, '"')
+            .trim();
+          
+          // Dropdown'da bu değeri bul ve seç
+          for (let i = 0; i < meetingResultSelect.options.length; i++) {
+            if (meetingResultSelect.options[i].value === resultValue || 
+                meetingResultSelect.options[i].text === resultValue) {
+              meetingResultSelect.value = meetingResultSelect.options[i].value;
+              console.log('✅ Toplantı Sonucu set edildi (fillDefaultValues):', resultValue);
+              // Trigger change event to ensure all sale fields are shown if "Satış Yapıldı"
+              meetingResultSelect.dispatchEvent(new Event('change'));
+              break;
+            }
+          }
         }
       }
     }
@@ -851,7 +1074,7 @@
       
       // Submit flag'ini set et
       isSubmitting = true;
-      const submitButton = document.querySelector('button[type="submit"]');
+      const submitButton = document.getElementById('submitButton') || document.querySelector('button[type="submit"]');
       if (submitButton) {
         submitButton.disabled = true;
         submitButton.textContent = '⏳ Kaydediliyor...';
@@ -871,15 +1094,17 @@
         yoneticiNot: document.getElementById('yoneticiNot').value,
         toplantiSonucu: document.getElementById('meetingResult').value,
         meetingResult: document.getElementById('meetingResult').value, // Backward compatibility
-        ciro: document.getElementById('ciro').value || 0, // Ciro (Satış Yapıldı için)
-        satisCiro: document.getElementById('ciro').value || 0 // Backward compatibility
+        ciro: document.getElementById('ciro') ? (document.getElementById('ciro').value || 0) : 0, // Ciro (Satış Yapıldı için)
+        satisCiro: document.getElementById('ciro') ? (document.getElementById('ciro').value || 0) : 0, // Backward compatibility
+        satisTuru: document.getElementById('satisTuru') ? document.getElementById('satisTuru').value : '', // Satış Türü (Yerinde Satış / Teklif Sonrası)
+        teklifDetayiSale: document.getElementById('teklifDetayiSale') ? document.getElementById('teklifDetayiSale').value : '' // Satış için Teklif Detayı
       };
       
       // "Toplantı Gerçekleşti" durumunda ekstra alanlar
       if (typeof isToplantiGerceklesti !== 'undefined' && isToplantiGerceklesti) {
         formData.toplantiYapan = document.getElementById('toplantiYapan').value;
         
-        // Teklif Detayı - normal select
+        // Teklif Detayı - normal select (sadece Toplantı Gerçekleşti durumunda)
         formData.teklifDetayi = document.getElementById('teklifDetayi').value;
         
         formData.satisPotansiyeli = document.getElementById('satisPotansiyeli').value;
@@ -916,7 +1141,7 @@
               submitButton.disabled = false;
               submitButton.textContent = '💾 Kaydet ve Toplantıya Geç';
             }
-            alert('❌ Hata: ' + error.message);
+            alert('❌ Hata: ' + (error.message || 'Bilinmeyen hata'));
           })
           .processMeetingForm(formData, rowNumber, sourceSheetName);
       } else {
