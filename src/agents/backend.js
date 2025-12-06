@@ -504,17 +504,74 @@ function getCurrentEmployeeCode(rowData = null) {
 }
 
 /**
- * Logs activity with timestamp
+ * Logs activity with timestamp and writes to Log Arşivi
  * @param {string} action - Action performed
  * @param {Object} data - Related data (can include rowData for employee code extraction)
  */
 function logActivity(action, data = {}) {
   const timestamp = new Date().toISOString();
   // rowData'dan employee code'u çıkar (varsa)
-  const rowData = data.rowData || data.rowId ? (data.rowId ? { Kod: data.rowId } : null) : null;
+  const rowData = data.rowData || (data.rowId ? { Kod: data.rowId } : null);
   const employeeCode = getCurrentEmployeeCode(rowData);
   const logEntry = { timestamp, employee: employeeCode, action, data };
   console.log('Activity logged:', logEntry);
+  
+  // Log Arşivi'ne yaz (gizli sayfa)
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = spreadsheet.getSheetByName('Log Arşivi');
+    
+    // Sayfa yoksa oluştur
+    if (!logSheet) {
+      logSheet = createLogArchiveSheet(spreadsheet);
+    }
+    
+    // Tarih ve saat
+    const now = new Date();
+    const tarih = Utilities.formatDate(now, 'Europe/Istanbul', 'dd.MM.yyyy');
+    const saat = Utilities.formatDate(now, 'Europe/Istanbul', 'HH:mm');
+    
+    // Log Detayı oluştur
+    let logDetay = action;
+    if (data.appointmentData) {
+      logDetay = `${action} - ${data.appointmentData.isimSoyisim || ''} - ${data.appointmentData.randevuTarihi || ''}`;
+    } else if (data.meetingData) {
+      logDetay = `${action} - ${data.meetingData.isimSoyisim || ''} - ${data.meetingData.toplantiTarihi || ''}`;
+    } else if (data.opportunityData) {
+      logDetay = `${action} - ${data.opportunityData.isimSoyisim || ''}`;
+    }
+    
+    // Kaynak Sayfa
+    const kaynakSayfa = data.sheetName || data.source || 'Format Tablo';
+    
+    // Kod
+    const kod = data.rowId || (rowData && rowData.Kod) || '';
+    
+    // Company name
+    const companyName = (rowData && rowData['Company name']) || '';
+    
+    // Yeni satır ekle
+    const nextRow = logSheet.getLastRow() + 1;
+    logSheet.getRange(nextRow, 1, 1, 7).setValues([[
+      tarih,        // Tarih
+      saat,         // Saat
+      action,       // Aktivite
+      logDetay,     // Log Detayı
+      kaynakSayfa,  // Kaynak Sayfa
+      kod,          // Kod
+      companyName   // Company name
+    ]]);
+    
+    // Format ayarları (sadece yeni satır için)
+    logSheet.getRange(nextRow, 1).setNumberFormat('dd.MM.yyyy'); // Tarih
+    logSheet.getRange(nextRow, 2).setNumberFormat('HH:mm');      // Saat
+    logSheet.getRange(nextRow, 6).setNumberFormat('@');           // Kod (text)
+    
+  } catch (error) {
+    console.error('Log Arşivi yazma hatası (kritik değil):', error);
+    // Hata olsa bile devam et (log yazma kritik değil)
+  }
+  
   return logEntry;
 }
 
@@ -1032,7 +1089,9 @@ function processAppointmentForm(formData, selectedRowData = null, rowNumber = nu
     
     logActivity('takeAppointment', { 
       rowId: rowData.Kod,
-      appointmentData: formData 
+      rowData: rowData, // Company name için gerekli
+      appointmentData: formData,
+      sheetName: activeSheet.getName()
     });
     
     // Return success to close dialog
@@ -1206,13 +1265,12 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
     }
   }
   
-  // Sıralama işlemini atla - performans için (2 saniye hedefi)
-  // Kullanıcı manuel olarak sıralayabilir veya arka planda çalıştırabiliriz
-  // try {
-  //   sortRandevularimByDate(randevularimSheet);
-  // } catch (sortError) {
-  //   console.error('❌ Sıralama hatası:', sortError);
-  // }
+  // Randevularım'ı tarihe göre sırala (en yeni önce - performans optimize edilmiş)
+  try {
+    sortRandevularimByDate(randevularimSheet);
+  } catch (sortError) {
+    console.error('❌ Sıralama hatası:', sortError);
+  }
   
   // Activate sheet'i kaldırdık - performans için (kullanıcı zaten sayfayı görebilir)
   
@@ -3080,6 +3138,106 @@ function createSatislarimSheet(spreadsheet) {
   console.log('✅ Satışlarım sayfası oluşturuldu');
   
   return sheet;
+}
+
+/**
+ * Log Arşivi sayfası oluştur (Gizli sayfa - Temsilciler görmesin)
+ * @param {Spreadsheet} spreadsheet - Active spreadsheet
+ * @returns {Sheet} - Created or existing sheet
+ */
+function createLogArchiveSheet(spreadsheet) {
+  const SHEET_NAME = 'Log Arşivi';
+  
+  // Sayfa varsa döndür (gizli olsa bile)
+  let sheet = spreadsheet.getSheetByName(SHEET_NAME);
+  if (sheet) {
+    // Gizli değilse gizli yap
+    if (!sheet.isSheetHidden()) {
+      sheet.hideSheet();
+      console.log('✅ Log Arşivi sayfası gizli yapıldı');
+    }
+    return sheet;
+  }
+  
+  // Sayfa yoksa oluştur
+  sheet = spreadsheet.insertSheet(SHEET_NAME);
+  
+  // Kolonlar (KM 005'teki yapıya göre)
+  const columns = [
+    'Tarih',
+    'Saat',
+    'Aktivite',
+    'Log Detayı',
+    'Kaynak Sayfa',
+    'Kod',
+    'Company name'
+  ];
+  
+  // Başlıkları yaz
+  sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
+  
+  // Stil uygula
+  const headerRange = sheet.getRange(1, 1, 1, columns.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#666666');
+  headerRange.setFontColor('#FFFFFF');
+  headerRange.setHorizontalAlignment('center');
+  
+  // Kolon genişlikleri (sadece header için - hızlı)
+  sheet.setColumnWidth(1, 120); // Tarih
+  sheet.setColumnWidth(2, 80);  // Saat
+  sheet.setColumnWidth(3, 150); // Aktivite
+  sheet.setColumnWidth(4, 400); // Log Detayı
+  sheet.setColumnWidth(5, 150); // Kaynak Sayfa
+  sheet.setColumnWidth(6, 100); // Kod
+  sheet.setColumnWidth(7, 200); // Company name
+  
+  // Format ayarları (sadece header satırı - 10000 satır format ayarlama gereksiz ve yavaş)
+  // Format ayarları veri eklendiğinde otomatik uygulanacak
+  
+  // Gizli yap (Temsilciler görmesin)
+  sheet.hideSheet();
+  
+  console.log('✅ Log Arşivi sayfası oluşturuldu ve gizli yapıldı');
+  
+  return sheet;
+}
+
+/**
+ * Log Arşivi sayfasını göster (gizliyse göster, yoksa oluştur)
+ */
+function showLogArchiveSheet() {
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = spreadsheet.getSheetByName('Log Arşivi');
+    
+    // Sayfa yoksa oluştur
+    if (!logSheet) {
+      logSheet = createLogArchiveSheet(spreadsheet);
+    }
+    
+    // Gizliyse göster
+    if (logSheet.isSheetHidden()) {
+      logSheet.showSheet();
+    }
+    
+    // Sayfayı aktif et
+    logSheet.activate();
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Log Arşivi Açıldı',
+      'Log Arşivi sayfası görünür hale getirildi.\n\n' +
+      'Not: Sayfayı tekrar gizli yapmak için:\n' +
+      'Sağ tık → Sayfayı gizle\n\n' +
+      'Sayfayı silmek için:\n' +
+      'Sağ tık → Sil',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+  } catch (error) {
+    console.error('Log Arşivi gösterme hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Log Arşivi açılamadı: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 /**
@@ -5302,6 +5460,20 @@ function onOpen() {
   } else {
     console.log('Temsilci file detected - creating CRM and ADMIN menus');
     
+    // Log Arşivi sayfasını kontrol et ve oluştur (yoksa) - Hızlı kontrol
+    try {
+      const logSheet = spreadsheet.getSheetByName('Log Arşivi');
+      if (!logSheet) {
+        // Sadece yoksa oluştur (onOpen'da hızlı olmalı)
+        createLogArchiveSheet(spreadsheet);
+      } else if (!logSheet.isSheetHidden()) {
+        // Varsa ama gizli değilse gizli yap
+        logSheet.hideSheet();
+      }
+    } catch (error) {
+      console.error('Error checking Log Arşivi sheet:', error);
+    }
+    
     // Data validation kaldırıldı - artık otomatik uygulanmıyor
     
     // Create admin menu for all sheets
@@ -5332,6 +5504,7 @@ function onOpen() {
       .addItem('Toplantıya Geç', 'showMoveToMeetingDialog')
       .addSeparator()
       .addItem('💰 Satışlarım', 'showSatislarimSheet')
+      .addItem('📋 Log Arşivi', 'showLogArchiveSheet')
       .addSeparator()
       .addItem('📦 Dataset Raporu', 'showDatasetReportDialog')
       .addSeparator()

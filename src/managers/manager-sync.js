@@ -3674,29 +3674,22 @@ function collectSingleEmployeeData(employeeCode) {
  * @returns {Spreadsheet|null} - Employee file or null
  */
 function findEmployeeFile(employeeCode) { 
-  console.log(`🔍 Finding employee file for ${employeeCode}`); 
-  
   try {
     // Check if employee code exists in the EMPLOYEE_FILES mapping
     if (EMPLOYEE_FILES[employeeCode]) {
       const fileId = EMPLOYEE_FILES[employeeCode];
-      console.log(`📄 Found employee file ID for ${employeeCode}: ${fileId}`);
       
       try {
         const employeeFile = SpreadsheetApp.openById(fileId);
-        console.log(`✅ Successfully opened employee file for ${employeeCode}`);
         return employeeFile;
       } catch (openError) {
-        console.error(`❌ Error opening employee file for ${employeeCode}:`, openError);
         return null;
       }
     } else {
-      console.log(`⚠️ No file ID found for employee code: ${employeeCode}`);
       return null;
     }
     
   } catch (error) {
-    console.error(`❌ Error finding employee file for ${employeeCode}:`, error);
     return null;
   }
 }
@@ -10053,10 +10046,18 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
         let logsFromArchive = [];
         let logsFromFormatTables = [];
         
-        // 1. Log Arşivi'nden veri çek
-        let logArchiveSheet = employeeFile.getSheetByName('📋 Log Arşivi');
+        // 1. Log Arşivi'nden veri çek (Gizli sayfalar dahil)
+        let logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+        
+        // Gizli sayfaları da kontrol et
         if (!logArchiveSheet) {
-          logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+          const allSheets = employeeFile.getSheets();
+          for (const sheet of allSheets) {
+            if (sheet.getName() === 'Log Arşivi') {
+              logArchiveSheet = sheet;
+              break;
+            }
+          }
         }
         
         if (logArchiveSheet && logArchiveSheet.getLastRow() > 1) {
@@ -13409,10 +13410,18 @@ function collectWeeklyReportData(employeeCodes, weekStart, weekEnd) {
       let logsFromArchive = [];
       let logsFromFormatTables = [];
       
-      // 1. Log Arşivi'nden veri çek
-      let logArchiveSheet = employeeFile.getSheetByName('📋 Log Arşivi');
+      // 1. Log Arşivi'nden veri çek (ÖNCELİKLİ) - Gizli sayfalar dahil
+      let logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+      
+      // Gizli sayfaları da kontrol et (getSheetByName gizli sayfaları bulamayabilir)
       if (!logArchiveSheet) {
-        logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+        const allSheets = employeeFile.getSheets();
+        for (const sheet of allSheets) {
+          if (sheet.getName() === 'Log Arşivi') {
+            logArchiveSheet = sheet;
+            break;
+          }
+        }
       }
       
       if (logArchiveSheet && logArchiveSheet.getLastRow() > 1) {
@@ -14512,17 +14521,18 @@ function showFunnelReportDialog() {
 /**
  * Temsilci listesini döndür (Funnel Report dialog için)
  */
+/**
+ * Temsilci listesini döndür (HTML dialog için - optimize edilmiş)
+ * @returns {Array<Object>} [{code: string, name: string}]
+ */
 function getEmployeeListForFunnel() {
-  try {
-    const employees = [];
-    for (const [code, name] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
-      employees.push({ code: code, name: name });
-    }
-    return employees;
-  } catch (error) {
-    console.error('❌ getEmployeeListForFunnel hatası:', error);
-    return [];
+  // Direkt CRM_CONFIG'den al (cache yok, zaten constant)
+  const employees = [];
+  const codes = CRM_CONFIG.EMPLOYEE_CODES;
+  for (const code in codes) {
+    employees.push({ code: code, name: codes[code] });
   }
+  return employees;
 }
 
 /**
@@ -14621,7 +14631,6 @@ function calculateDateRange(timeFilter) {
  * Log Arşivi öncelikli, yoksa yedek kaynaklar
  */
 function collectFunnelData(employeeCode, startDate, endDate) {
-  console.log('📊 Funnel verileri toplanıyor...');
   const allActivities = [];
   
   // Temsilci kodları
@@ -14629,27 +14638,45 @@ function collectFunnelData(employeeCode, startDate, endDate) {
     ? Object.keys(CRM_CONFIG.EMPLOYEE_CODES)
     : [employeeCode];
   
-  // Her temsilci için veri topla
+  console.log(`🔍 Funnel veri toplama başladı: ${employeeCodes.length} temsilci, Tarih: ${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}`);
+  
+  // Her temsilci için veri topla (Batch - findEmployeeFile kullan, DriveApp.getFilesByName yerine)
   for (const empCode of employeeCodes) {
     try {
-      const employeeFile = getEmployeeFile(empCode);
+      const employeeFile = findEmployeeFile(empCode);
       if (!employeeFile) {
-        console.log(`⚠️ ${empCode} dosyası bulunamadı`);
+        console.log(`⚠️ ${empCode}: Dosya bulunamadı (EMPLOYEE_FILES mapping'inde yok olabilir)`);
         continue;
       }
       
-      // 1. Log Arşivi'nden veri çek (ÖNCELİKLİ)
-      let logArchiveSheet = employeeFile.getSheetByName('📋 Log Arşivi');
+      console.log(`✅ ${empCode}: Dosya bulundu`);
+      
+      // 1. Log Arşivi'nden veri çek (ÖNCELİKLİ) - Gizli sayfalar dahil
+      let logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+      
+      // Gizli sayfaları da kontrol et (getSheetByName gizli sayfaları bulamayabilir)
       if (!logArchiveSheet) {
-        logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
+        const allSheets = employeeFile.getSheets();
+        for (const sheet of allSheets) {
+          if (sheet.getName() === 'Log Arşivi') {
+            logArchiveSheet = sheet;
+            break;
+          }
+        }
       }
       
-      if (logArchiveSheet && logArchiveSheet.getLastRow() > 1) {
-        console.log(`📊 ${empCode}: Log Arşivi'nden veri okunuyor...`);
+      if (!logArchiveSheet) {
+        console.log(`⚠️ ${empCode}: Log Arşivi sayfası bulunamadı`);
+      } else if (logArchiveSheet.getLastRow() <= 1) {
+        console.log(`⚠️ ${empCode}: Log Arşivi boş (${logArchiveSheet.getLastRow()} satır)`);
+      } else {
+        console.log(`📊 ${empCode}: Log Arşivi bulundu (${logArchiveSheet.getLastRow()} satır)`);
         const allData = logArchiveSheet.getDataRange().getValues(); // ✅ BATCH READ
         
         if (allData.length >= 2) {
           const headers = allData[0];
+          console.log(`📋 ${empCode}: Kolonlar:`, headers);
+          
           const aktiviteTarihiIndex = headers.indexOf('Tarih') !== -1 
             ? headers.indexOf('Tarih') 
             : headers.indexOf('Aktivite Tarihi');
@@ -14658,7 +14685,14 @@ function collectFunnelData(employeeCode, startDate, endDate) {
             ? headers.indexOf('Log Detayı') 
             : headers.indexOf('Log');
           
-          if (aktiviteTarihiIndex !== -1 && aktiviteIndex !== -1) {
+          console.log(`🔍 ${empCode}: Kolon indeksleri - Tarih: ${aktiviteTarihiIndex}, Aktivite: ${aktiviteIndex}, Log: ${logIndex}`);
+          
+          if (aktiviteTarihiIndex === -1 || aktiviteIndex === -1) {
+            console.log(`❌ ${empCode}: Gerekli kolonlar bulunamadı! Tarih kolonu: ${aktiviteTarihiIndex === -1 ? 'YOK' : 'VAR'}, Aktivite kolonu: ${aktiviteIndex === -1 ? 'YOK' : 'VAR'}`);
+          } else {
+            let processedCount = 0;
+            let matchedCount = 0;
+            
             for (let row = 1; row < allData.length; row++) {
               const aktiviteTarihi = allData[row][aktiviteTarihiIndex];
               const aktivite = String(allData[row][aktiviteIndex] || '').trim();
@@ -14666,17 +14700,24 @@ function collectFunnelData(employeeCode, startDate, endDate) {
               
               if (!aktiviteTarihi || !aktivite) continue;
               
+              processedCount++;
+              
               // Tarih parse etme
               let logDate = null;
               if (aktiviteTarihi instanceof Date) {
                 logDate = new Date(aktiviteTarihi);
               } else {
-                logDate = parseDdMmYyyy(aktiviteTarihi);
-                if (!logDate) {
+                const dateStr = String(aktiviteTarihi);
+                logDate = parseDdMmYyyy(dateStr);
+                if (!logDate || isNaN(logDate.getTime())) {
                   try {
-                    logDate = new Date(String(aktiviteTarihi));
-                    if (isNaN(logDate.getTime())) continue;
+                    logDate = new Date(dateStr);
+                    if (isNaN(logDate.getTime())) {
+                      console.log(`⚠️ ${empCode} Satır ${row + 1}: Tarih parse edilemedi: "${dateStr}"`);
+                      continue;
+                    }
                   } catch (e) {
+                    console.log(`⚠️ ${empCode} Satır ${row + 1}: Tarih parse hatası: "${dateStr}"`);
                     continue;
                   }
                 }
@@ -14690,6 +14731,7 @@ function collectFunnelData(employeeCode, startDate, endDate) {
               const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
               
               if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+                matchedCount++;
                 allActivities.push({
                   employeeCode: empCode,
                   date: logDate,
@@ -14699,15 +14741,19 @@ function collectFunnelData(employeeCode, startDate, endDate) {
                 });
               }
             }
+            
+            console.log(`📊 ${empCode}: ${processedCount} satır işlendi, ${matchedCount} satır tarih aralığına uydu, ${allActivities.filter(a => a.employeeCode === empCode).length} aktivite eklendi`);
           }
         }
       }
       
       // 2. Log Arşivi'nde veri yoksa yedek kaynaklardan çek
-      if (allActivities.filter(a => a.employeeCode === empCode).length === 0) {
+      const empActivities = allActivities.filter(a => a.employeeCode === empCode);
+      if (empActivities.length === 0) {
         console.log(`📊 ${empCode}: Log Arşivi'nde veri yok, yedek kaynaklardan çekiliyor...`);
         // Yedek kaynaklar: Randevularım, Fırsatlarım, Toplantılarım
         const backupActivities = collectFunnelDataFromBackup(employeeFile, startDate, endDate);
+        console.log(`📊 ${empCode}: Yedek kaynaklardan ${backupActivities.length} aktivite bulundu`);
         backupActivities.forEach(activity => {
           activity.employeeCode = empCode;
           activity.source = 'Yedek Kaynak';
@@ -14720,7 +14766,7 @@ function collectFunnelData(employeeCode, startDate, endDate) {
     }
   }
   
-  console.log(`📊 Toplam ${allActivities.length} aktivite toplandı`);
+  console.log(`✅ Funnel veri toplama tamamlandı: Toplam ${allActivities.length} aktivite`);
   return allActivities;
 }
 
@@ -15435,34 +15481,13 @@ function exportFunnelReportToExcel() {
 /**
  * Temsilci dosyasını al
  */
+/**
+ * @deprecated Bu fonksiyon yavaş (DriveApp.getFilesByName kullanıyor)
+ * Bunun yerine findEmployeeFile() kullan (EMPLOYEE_FILES mapping ile hızlı)
+ */
 function getEmployeeFile(employeeCode) {
-  try {
-    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    const managerFileName = managerFile.getName();
-    
-    // Temsilci dosya adını oluştur (örnek: "NT 002 - Neslihan Türk")
-    const employeeName = CRM_CONFIG.EMPLOYEE_CODES[employeeCode];
-    if (!employeeName) {
-      console.log(`⚠️ ${employeeCode} için isim bulunamadı`);
-      return null;
-    }
-    
-    const employeeFileName = `${employeeCode} - ${employeeName}`;
-    
-    // Drive'dan dosyayı bul
-    const files = DriveApp.getFilesByName(employeeFileName);
-    if (!files.hasNext()) {
-      console.log(`⚠️ ${employeeFileName} dosyası bulunamadı`);
-      return null;
-    }
-    
-    const file = files.next();
-    return SpreadsheetApp.openById(file.getId());
-    
-  } catch (error) {
-    console.error(`❌ getEmployeeFile hatası (${employeeCode}):`, error);
-    return null;
-  }
+  // findEmployeeFile kullan (100x daha hızlı - direkt file ID ile)
+  return findEmployeeFile(employeeCode);
 }
 
 console.log("🔧 DEBUG: Ana dosyaya eklendi");
