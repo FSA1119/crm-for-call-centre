@@ -37,6 +37,7 @@ Google-Sheets-CRM/
 ## 📊 Raporlar
 - `Raporlarım` tek menü; alt-fonksiyonlar: Günlük, Haftalık, Aylık (tasarım)  
 - Mantık (kaynak sayfalar, tarihler, toplam formülleri): `docs/sistem_semasi.md`
+- **Funnel Raporu:** Aktivite mapping için `docs/sayfa_kolonlari.md` → "📊 Aktivite Mapping (Funnel Raporu)" bölümüne bakın
 
 ## 🎨 Renkler
 - Merkez: `docs/RENK_KODLARI.md`

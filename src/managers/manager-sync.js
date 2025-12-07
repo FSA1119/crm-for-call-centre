@@ -10049,11 +10049,14 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
         // 1. Log Arşivi'nden veri çek (Gizli sayfalar dahil)
         let logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
         
-        // Gizli sayfaları da kontrol et
+        // Gizli sayfaları da kontrol et (esnek arama)
         if (!logArchiveSheet) {
           const allSheets = employeeFile.getSheets();
           for (const sheet of allSheets) {
-            if (sheet.getName() === 'Log Arşivi') {
+            const sheetName = sheet.getName().trim();
+            if (sheetName === 'Log Arşivi' || 
+                sheetName.toLowerCase() === 'log arşivi' ||
+                (sheetName.toLowerCase().includes('log') && sheetName.toLowerCase().includes('arşiv'))) {
               logArchiveSheet = sheet;
               break;
             }
@@ -13413,11 +13416,14 @@ function collectWeeklyReportData(employeeCodes, weekStart, weekEnd) {
       // 1. Log Arşivi'nden veri çek (ÖNCELİKLİ) - Gizli sayfalar dahil
       let logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
       
-      // Gizli sayfaları da kontrol et (getSheetByName gizli sayfaları bulamayabilir)
+      // Gizli sayfaları da kontrol et (esnek arama)
       if (!logArchiveSheet) {
         const allSheets = employeeFile.getSheets();
         for (const sheet of allSheets) {
-          if (sheet.getName() === 'Log Arşivi') {
+          const sheetName = sheet.getName().trim();
+          if (sheetName === 'Log Arşivi' || 
+              sheetName.toLowerCase() === 'log arşivi' ||
+              (sheetName.toLowerCase().includes('log') && sheetName.toLowerCase().includes('arşiv'))) {
             logArchiveSheet = sheet;
             break;
           }
@@ -14485,10 +14491,15 @@ function showFunnelReportDialog() {
       
       google.script.run
         .withSuccessHandler(function(result) {
-          // Dialog'u kapat (Çalışıyor mesajı sorununu önlemek için)
+          // Dialog'u kapat (Çalışıyor mesajı sorununu önlemek için daha uzun setTimeout)
+          // Google Sheets'in loading indicator'ının kaybolması için yeterli süre ver
           setTimeout(function() {
-            google.script.host.close();
-          }, 100);
+            try {
+              google.script.host.close();
+            } catch (e) {
+              // Dialog zaten kapalıysa hata verme
+            }
+          }, 1000);
         })
         .withFailureHandler(function(error) {
           alert('Hata: ' + (error.message || error));
@@ -14654,19 +14665,30 @@ function collectFunnelData(employeeCode, startDate, endDate) {
       // 1. Log Arşivi'nden veri çek (ÖNCELİKLİ) - Gizli sayfalar dahil
       let logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
       
-      // Gizli sayfaları da kontrol et (getSheetByName gizli sayfaları bulamayabilir)
+      // Gizli sayfaları da kontrol et (esnek arama)
       if (!logArchiveSheet) {
         const allSheets = employeeFile.getSheets();
+        const allSheetNames = allSheets.map(s => s.getName());
+        console.log(`🔍 ${empCode}: Tüm sayfalar:`, allSheetNames);
+        
+        // Case-insensitive ve boşluk toleranslı arama
         for (const sheet of allSheets) {
-          if (sheet.getName() === 'Log Arşivi') {
+          const sheetName = sheet.getName().trim();
+          if (sheetName === 'Log Arşivi' || 
+              sheetName.toLowerCase() === 'log arşivi' ||
+              (sheetName.toLowerCase().includes('log') && sheetName.toLowerCase().includes('arşiv'))) {
             logArchiveSheet = sheet;
+            console.log(`✅ ${empCode}: Log Arşivi bulundu (esnek arama): "${sheetName}"`);
             break;
           }
         }
       }
       
       if (!logArchiveSheet) {
-        console.log(`⚠️ ${empCode}: Log Arşivi sayfası bulunamadı`);
+        // Tüm sayfa isimlerini listele (debug için)
+        const allSheets = employeeFile.getSheets();
+        const sheetNames = allSheets.map(s => s.getName());
+        console.log(`⚠️ ${empCode}: Log Arşivi sayfası bulunamadı. Mevcut sayfalar:`, sheetNames);
       } else if (logArchiveSheet.getLastRow() <= 1) {
         console.log(`⚠️ ${empCode}: Log Arşivi boş (${logArchiveSheet.getLastRow()} satır)`);
       } else {
@@ -14781,10 +14803,21 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
   if (randevularimSheet && randevularimSheet.getLastRow() > 1) {
     const data = randevularimSheet.getDataRange().getValues();
     const headers = data[0];
-    const aktiviteIndex = headers.indexOf('Aktivite');
-    const tarihIndex = headers.findIndex(h => String(h || '').includes('Tarih'));
+    // Randevularım'da "Randevu durumu" kolonu var, "Aktivite" yok
+    let aktiviteIndex = headers.indexOf('Randevu durumu');
+    if (aktiviteIndex === -1) {
+      // Fallback: "Aktivite" kolonunu dene
+      aktiviteIndex = headers.indexOf('Aktivite');
+    }
+    const tarihIndex = headers.findIndex(h => {
+      const hStr = String(h || '').toLowerCase();
+      return hStr.includes('randevu tarihi') || hStr.includes('tarih');
+    });
+    
+    console.log(`🔍 Randevularım: Aktivite kolonu index=${aktiviteIndex}, Tarih kolonu index=${tarihIndex}`);
     
     if (aktiviteIndex !== -1 && tarihIndex !== -1) {
+      let randevuCount = 0;
       for (let row = 1; row < data.length; row++) {
         const aktivite = String(data[row][aktiviteIndex] || '').trim();
         const tarih = data[row][tarihIndex];
@@ -14795,16 +14828,34 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
             const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
             const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
             if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+              // Randevu durumu değerlerini aktivite ismine çevir
+              let mappedActivity = aktivite;
+              
+              // Randevu durumu değerlerini normalize et
+              if (aktivite === 'Randevu Alındı' || aktivite === 'Randevu alındı' || aktivite === 'İleri Tarih Randevu' || aktivite === 'Randevu Teyitlendi') {
+                mappedActivity = 'Randevu Alındı';
+              } else if (aktivite === 'Randevu Ertelendi' || aktivite === 'Randevu İptal oldu' || aktivite === 'Randevu iptal oldu') {
+                mappedActivity = aktivite; // Negatif olarak sayılacak
+              } else if (aktivite === 'Toplantı Gerçekleşti' || aktivite === 'Toplantı gerçekleşti') {
+                mappedActivity = 'Toplantı Tamamlandı'; // Toplantıya geçti
+              }
+              
+              console.log(`📊 Randevularım Satır ${row + 1}: "${aktivite}" → "${mappedActivity}" (${Utilities.formatDate(logDate, 'Europe/Istanbul', 'dd.MM.yyyy')})`);
+              
               activities.push({
                 date: logDate,
-                aktivite: aktivite,
+                aktivite: mappedActivity,
                 log: aktivite,
                 source: 'Randevularım'
               });
+              randevuCount++;
             }
           }
         }
       }
+      console.log(`📊 Randevularım: ${randevuCount} randevu aktivitesi eklendi`);
+    } else {
+      console.log(`⚠️ Randevularım: Aktivite veya Tarih kolonu bulunamadı`);
     }
   }
   
@@ -14813,10 +14864,21 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
   if (firsatlarimSheet && firsatlarimSheet.getLastRow() > 1) {
     const data = firsatlarimSheet.getDataRange().getValues();
     const headers = data[0];
-    const aktiviteIndex = headers.indexOf('Aktivite');
-    const tarihIndex = headers.findIndex(h => String(h || '').includes('Tarih'));
+    // Fırsatlarım'da "Fırsat Durumu" kolonu var, "Aktivite" yok
+    let aktiviteIndex = headers.indexOf('Fırsat Durumu');
+    if (aktiviteIndex === -1) {
+      // Fallback: "Aktivite" kolonunu dene
+      aktiviteIndex = headers.indexOf('Aktivite');
+    }
+    const tarihIndex = headers.findIndex(h => {
+      const hStr = String(h || '').toLowerCase();
+      return hStr.includes('fırsat tarihi') || hStr.includes('tarih');
+    });
+    
+    console.log(`🔍 Fırsatlarım: Aktivite kolonu index=${aktiviteIndex}, Tarih kolonu index=${tarihIndex}`);
     
     if (aktiviteIndex !== -1 && tarihIndex !== -1) {
+      let firsatCount = 0;
       for (let row = 1; row < data.length; row++) {
         const aktivite = String(data[row][aktiviteIndex] || '').trim();
         const tarih = data[row][tarihIndex];
@@ -14827,16 +14889,34 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
             const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
             const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
             if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+              // Fırsat Durumu değerlerini aktivite ismine çevir
+              let mappedActivity = aktivite;
+              
+              // Fırsat Durumu değerlerini normalize et
+              if (aktivite === 'Fırsat İletildi' || aktivite === 'Fırsat iletildi') {
+                mappedActivity = 'Fırsat İletildi';
+              } else if (aktivite === 'Fırsat Kaybedildi' || aktivite === 'Fırsat kaybedildi' || aktivite === 'Fırsat Kaybedilen') {
+                mappedActivity = 'Fırsat Kaybedilen'; // Negatif olarak sayılacak
+              } else if (aktivite === 'Yeniden Aranacak' || aktivite === 'Bilgi Verildi') {
+                mappedActivity = aktivite; // Bu değerler mapping'de yok, olduğu gibi bırak
+              }
+              
+              console.log(`📊 Fırsatlarım Satır ${row + 1}: "${aktivite}" → "${mappedActivity}" (${Utilities.formatDate(logDate, 'Europe/Istanbul', 'dd.MM.yyyy')})`);
+              
               activities.push({
                 date: logDate,
-                aktivite: aktivite,
+                aktivite: mappedActivity,
                 log: aktivite,
                 source: 'Fırsatlarım'
               });
+              firsatCount++;
             }
           }
         }
       }
+      console.log(`📊 Fırsatlarım: ${firsatCount} fırsat aktivitesi eklendi`);
+    } else {
+      console.log(`⚠️ Fırsatlarım: Aktivite veya Tarih kolonu bulunamadı`);
     }
   }
   
@@ -14845,10 +14925,21 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
   if (toplantilarimSheet && toplantilarimSheet.getLastRow() > 1) {
     const data = toplantilarimSheet.getDataRange().getValues();
     const headers = data[0];
-    const aktiviteIndex = headers.indexOf('Aktivite');
-    const tarihIndex = headers.findIndex(h => String(h || '').includes('Tarih'));
+    // Toplantılarım'da "Toplantı Sonucu" kolonu var, "Aktivite" yok
+    let aktiviteIndex = headers.indexOf('Toplantı Sonucu');
+    if (aktiviteIndex === -1) {
+      // Fallback: "Aktivite" kolonunu dene
+      aktiviteIndex = headers.indexOf('Aktivite');
+    }
+    const tarihIndex = headers.findIndex(h => {
+      const hStr = String(h || '').toLowerCase();
+      return hStr.includes('toplantı tarihi') || hStr.includes('tarih');
+    });
+    
+    console.log(`🔍 Toplantılarım: Aktivite kolonu index=${aktiviteIndex}, Tarih kolonu index=${tarihIndex}`);
     
     if (aktiviteIndex !== -1 && tarihIndex !== -1) {
+      let toplantiCount = 0;
       for (let row = 1; row < data.length; row++) {
         const aktivite = String(data[row][aktiviteIndex] || '').trim();
         const tarih = data[row][tarihIndex];
@@ -14859,16 +14950,38 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
             const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
             const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
             if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+              // Toplantı Sonucu değerlerini aktivite ismine çevir
+              // Toplantı Sonucu dropdown değerleri: "Satış Yapıldı", "Teklif iletildi", "Beklemede", "Satış İptal"
+              let mappedActivity = aktivite;
+              
+              // Toplantı Sonucu değerlerini normalize et
+              if (aktivite === 'Satış Yapıldı' || aktivite === 'Satış yapıldı') {
+                mappedActivity = 'Satış Yapıldı';
+              } else if (aktivite === 'Teklif iletildi' || aktivite === 'Teklif İletildi') {
+                mappedActivity = 'Toplantı Tamamlandı'; // Teklif = Toplantı tamamlandı sayılır
+              } else if (aktivite === 'Toplantı Tamamlandı' || aktivite === 'Toplantı tamamlandı' || aktivite === 'Toplantı Gerçekleşti' || aktivite === 'Toplantı gerçekleşti') {
+                mappedActivity = 'Toplantı Tamamlandı';
+              } else if (aktivite === 'Beklemede' || aktivite === 'Satış İptal') {
+                // Bu değerler negatif değil, ama pozitif de değil - atla veya özel işle
+                mappedActivity = 'Toplantı Tamamlandı'; // Beklemede de toplantı yapıldı sayılır
+              }
+              
+              console.log(`📊 Toplantılarım Satır ${row + 1}: "${aktivite}" → "${mappedActivity}" (${Utilities.formatDate(logDate, 'Europe/Istanbul', 'dd.MM.yyyy')})`);
+              
               activities.push({
                 date: logDate,
-                aktivite: aktivite,
+                aktivite: mappedActivity,
                 log: aktivite,
                 source: 'Toplantılarım'
               });
+              toplantiCount++;
             }
           }
         }
       }
+      console.log(`📊 Toplantılarım: ${toplantiCount} toplantı aktivitesi eklendi`);
+    } else {
+      console.log(`⚠️ Toplantılarım: Aktivite veya Tarih kolonu bulunamadı`);
     }
   }
   
@@ -14944,14 +15057,31 @@ function processFunnelData(activities) {
   
   Object.keys(positiveFunnel).forEach(key => {
     if (key === 'Arama') {
+      // Arama = Başlangıç noktası (100%)
       positivePercentages[key] = 100;
-    } else {
-      const prevKey = key === 'Fırsat' ? 'Arama' : 
-                     key === 'Randevu' ? 'Fırsat' :
-                     key === 'Toplantı' ? 'Randevu' : 'Toplantı';
-      const prevCount = positiveFunnel[prevKey] || 0;
-      positivePercentages[key] = prevCount > 0 
-        ? ((positiveFunnel[key] / prevCount) * 100).toFixed(1)
+    } else if (key === 'Fırsat') {
+      // Fırsat = Arama'ya göre % (direkt aramadan fırsat oluşturulabilir)
+      const aramaCount = positiveFunnel['Arama'] || 0;
+      positivePercentages[key] = aramaCount > 0 
+        ? ((positiveFunnel[key] / aramaCount) * 100).toFixed(1)
+        : '0.0';
+    } else if (key === 'Randevu') {
+      // Randevu = Arama'ya göre % (direkt aramadan randevu alınabilir, fırsattan da gelebilir)
+      const aramaCount = positiveFunnel['Arama'] || 0;
+      positivePercentages[key] = aramaCount > 0 
+        ? ((positiveFunnel[key] / aramaCount) * 100).toFixed(1)
+        : '0.0';
+    } else if (key === 'Toplantı') {
+      // Toplantı = Randevu'ya göre % (randevudan toplantı)
+      const randevuCount = positiveFunnel['Randevu'] || 0;
+      positivePercentages[key] = randevuCount > 0 
+        ? ((positiveFunnel[key] / randevuCount) * 100).toFixed(1)
+        : '0.0';
+    } else if (key === 'Satış') {
+      // Satış = Toplantı'ya göre % (toplantıdan satış)
+      const toplantiCount = positiveFunnel['Toplantı'] || 0;
+      positivePercentages[key] = toplantiCount > 0 
+        ? ((positiveFunnel[key] / toplantiCount) * 100).toFixed(1)
         : '0.0';
     }
   });
@@ -15008,19 +15138,10 @@ function processFunnelDataByEmployee(activities, sortBy) {
     const employeeName = CRM_CONFIG.EMPLOYEE_CODES[empCode] || empCode;
     const funnel = processFunnelData(empActivities);
     
-    // Performans skoru hesapla (Satış + Toplantı + Randevu - Negatifler)
-    const positiveScore = (funnel.positive.counts['Satış'] || 0) * 10 +
-                         (funnel.positive.counts['Toplantı'] || 0) * 5 +
-                         (funnel.positive.counts['Randevu'] || 0) * 3 +
-                         (funnel.positive.counts['Fırsat'] || 0) * 1;
-    const negativeScore = Object.values(funnel.negative.counts).reduce((a, b) => a + b, 0) * 2;
-    const performanceScore = positiveScore - negativeScore;
-    
     employeeFunnels.push({
       employeeCode: empCode,
       employeeName: employeeName,
       funnel: funnel,
-      performanceScore: performanceScore,
       totalActivities: funnel.total
     });
   }
@@ -15091,14 +15212,31 @@ function processFunnelDataByEmployee(activities, sortBy) {
   // Toplam yüzdeleri hesapla
   Object.keys(totalFunnel.positive.counts).forEach(key => {
     if (key === 'Arama') {
+      // Arama = Başlangıç noktası (100%)
       totalFunnel.positive.percentages[key] = 100;
-    } else {
-      const prevKey = key === 'Fırsat' ? 'Arama' : 
-                     key === 'Randevu' ? 'Fırsat' :
-                     key === 'Toplantı' ? 'Randevu' : 'Toplantı';
-      const prevCount = totalFunnel.positive.counts[prevKey] || 0;
-      totalFunnel.positive.percentages[key] = prevCount > 0 
-        ? ((totalFunnel.positive.counts[key] / prevCount) * 100).toFixed(1)
+    } else if (key === 'Fırsat') {
+      // Fırsat = Arama'ya göre % (direkt aramadan fırsat oluşturulabilir)
+      const aramaCount = totalFunnel.positive.counts['Arama'] || 0;
+      totalFunnel.positive.percentages[key] = aramaCount > 0 
+        ? ((totalFunnel.positive.counts[key] / aramaCount) * 100).toFixed(1)
+        : '0.0';
+    } else if (key === 'Randevu') {
+      // Randevu = Arama'ya göre % (direkt aramadan randevu alınabilir, fırsattan da gelebilir)
+      const aramaCount = totalFunnel.positive.counts['Arama'] || 0;
+      totalFunnel.positive.percentages[key] = aramaCount > 0 
+        ? ((totalFunnel.positive.counts[key] / aramaCount) * 100).toFixed(1)
+        : '0.0';
+    } else if (key === 'Toplantı') {
+      // Toplantı = Randevu'ya göre % (randevudan toplantı)
+      const randevuCount = totalFunnel.positive.counts['Randevu'] || 0;
+      totalFunnel.positive.percentages[key] = randevuCount > 0 
+        ? ((totalFunnel.positive.counts[key] / randevuCount) * 100).toFixed(1)
+        : '0.0';
+    } else if (key === 'Satış') {
+      // Satış = Toplantı'ya göre % (toplantıdan satış)
+      const toplantiCount = totalFunnel.positive.counts['Toplantı'] || 0;
+      totalFunnel.positive.percentages[key] = toplantiCount > 0 
+        ? ((totalFunnel.positive.counts[key] / toplantiCount) * 100).toFixed(1)
         : '0.0';
     }
   });
@@ -15117,23 +15255,43 @@ function processFunnelDataByEmployee(activities, sortBy) {
 
 /**
  * Aktivite mapping'i döndür (DRY prensibi)
+ * 
+ * ⚠️ ÖNEMLİ: Bu fonksiyon güncellendiğinde dokümantasyonu da güncelle:
+ * - docs/sayfa_kolonlari.md → "📊 Aktivite Mapping (Funnel Raporu)" bölümü
+ * - README.md → Raporlar bölümü (eğer mapping referansı varsa)
+ * 
+ * @returns {Object} Aktivite isimlerinden funnel kategorilerine mapping
  */
 function getActivityMapping() {
   return {
-    // Pozitif
+    // Pozitif (Türkçe)
     'Fırsat İletildi': 'Fırsat',
     'Fırsat iletildi': 'Fırsat',
+    'Yeniden Aranacak': 'Fırsat', // Fırsat Durumu: Yeniden Aranacak = Fırsat
+    'Yeniden aranacak': 'Fırsat',
+    'Bilgi Verildi': 'Fırsat', // Fırsat Durumu: Bilgi Verildi = Fırsat
+    'Bilgi verildi': 'Fırsat',
     'Randevu Alındı': 'Randevu',
     'Randevu alındı': 'Randevu',
     'İleri Tarih Randevu': 'Randevu',
     'İleri tarih randevu': 'Randevu',
+    'Randevu Teyitlendi': 'Randevu', // Randevu durumu: Randevu Teyitlendi = Randevu
+    'Randevu teyitlendi': 'Randevu',
     'Toplantı Tamamlandı': 'Toplantı',
     'Toplantı tamamlandı': 'Toplantı',
     'Toplantı Gerçekleşti': 'Toplantı',
     'Toplantı gerçekleşti': 'Toplantı',
+    'Teklif iletildi': 'Toplantı', // Toplantı Sonucu: Teklif iletildi = Toplantı
+    'Teklif İletildi': 'Toplantı',
+    'Beklemede': 'Toplantı', // Toplantı Sonucu: Beklemede = Toplantı (toplantı yapıldı sayılır)
     'Satış Yapıldı': 'Satış',
     'Satış yapıldı': 'Satış',
-    // Negatif
+    // Pozitif (İngilizce - eski log'lar için)
+    'takeAppointment': 'Randevu',
+    'createOpportunity': 'Fırsat',
+    'moveToMeeting': 'Toplantı',
+    'createSale': 'Satış',
+    // Negatif (Türkçe)
     'Geçersiz Numara': 'Geçersiz Numara',
     'Geçersiz numara': 'Geçersiz Numara',
     'Ulaşılamadı': 'Ulaşılamadı',
@@ -15147,7 +15305,17 @@ function getActivityMapping() {
     'Randevu Ertelendi': 'Randevu İptal/Ertelendi',
     'Randevu ertelendi': 'Randevu İptal/Ertelendi',
     'Fırsat kaybedilen': 'Fırsat Kaybedilen',
-    'Fırsat Kaybedilen': 'Fırsat Kaybedilen'
+    'Fırsat Kaybedilen': 'Fırsat Kaybedilen',
+    'Fırsat Kaybedildi': 'Fırsat Kaybedilen', // Fırsat Durumu: Fırsat Kaybedildi
+    'Fırsat kaybedildi': 'Fırsat Kaybedilen',
+    // Negatif (İngilizce - eski log'lar için)
+    'invalidNumber': 'Geçersiz Numara',
+    'unreachable': 'Ulaşılamadı',
+    'notInterested': 'İlgilenmiyor',
+    'corporate': 'Kurumsal',
+    'appointmentCancelled': 'Randevu İptal/Ertelendi',
+    'appointmentPostponed': 'Randevu İptal/Ertelendi',
+    'opportunityLost': 'Fırsat Kaybedilen'
   };
 }
 
@@ -15200,91 +15368,136 @@ function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate,
       sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#9C27B0').setFontColor('#FFFFFF');
       currentRow++;
       
-      // Tablo başlıkları
-      const headers = [
+      // ========================================
+      // POZİTİF FUNNEL TABLOSU
+      // ========================================
+      sheet.getRange(currentRow, 1).setValue('✅ POZİTİF FUNNEL');
+      sheet.getRange(currentRow, 1, 1, 7).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#4CAF50').setFontColor('#FFFFFF');
+      currentRow++;
+      
+      const positiveHeaders = [
         'Temsilci',
-        'Toplam Aktivite',
         'Arama',
         'Fırsat',
         'Randevu',
         'Toplantı',
-        'Satış',
-        'Geçersiz Numara',
-        'Ulaşılamadı',
-        'İlgilenmiyor',
-        'Kurumsal',
-        'Randevu İptal/Ertelendi',
-        'Fırsat Kaybedilen',
-        'Performans Skoru',
-        'Sıra'
+        'Satış'
       ];
       
-      for (let col = 1; col <= headers.length; col++) {
-        sheet.getRange(currentRow, col).setValue(headers[col - 1]);
-        sheet.getRange(currentRow, col).setFontWeight('bold').setBackground('#E1BEE7');
+      for (let col = 1; col <= positiveHeaders.length; col++) {
+        sheet.getRange(currentRow, col).setValue(positiveHeaders[col - 1]);
+        sheet.getRange(currentRow, col).setFontWeight('bold').setBackground('#C8E6C9');
       }
       currentRow++;
       
-      // Her temsilci için satır (performansa göre sıralı - en iyi en üstte)
+      // Her temsilci için satır (seçilen metriğe göre sıralı)
       for (let i = 0; i < funnelData.employees.length; i++) {
         const emp = funnelData.employees[i];
         const f = emp.funnel;
         
         let col = 1;
         sheet.getRange(currentRow, col++).setValue(`${emp.employeeCode} - ${emp.employeeName}`);
-        sheet.getRange(currentRow, col++).setValue(f.total);
-        sheet.getRange(currentRow, col++).setValue(f.positive.counts['Arama'] || 0);
+        sheet.getRange(currentRow, col++).setValue(f.positive.counts['Arama'] || 0); // Arama = Tüm aktiviteler
         sheet.getRange(currentRow, col++).setValue(f.positive.counts['Fırsat'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.positive.counts['Randevu'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.positive.counts['Toplantı'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.positive.counts['Satış'] || 0);
+        
+        // Zebra striping
+        if (i % 2 === 0) {
+          sheet.getRange(currentRow, 1, 1, positiveHeaders.length).setBackground('#E8F5E9');
+        }
+        
+        currentRow++;
+      }
+      
+      // POZİTİF TOPLAM SATIRI
+      currentRow++;
+      let col = 1;
+      sheet.getRange(currentRow, col++).setValue('📊 TOPLAM');
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Arama'] || 0); // Arama = Tüm aktiviteler
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Fırsat'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Randevu'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Toplantı'] || 0);
+      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Satış'] || 0);
+      
+      // Toplam satırını vurgula
+      sheet.getRange(currentRow, 1, 1, positiveHeaders.length)
+        .setFontWeight('bold')
+        .setBackground('#2E7D32')
+        .setFontColor('#FFFFFF');
+      
+      currentRow += 3;
+      
+      // ========================================
+      // NEGATİF FUNNEL TABLOSU
+      // ========================================
+      sheet.getRange(currentRow, 1).setValue('❌ NEGATİF FUNNEL');
+      sheet.getRange(currentRow, 1, 1, 7).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#F44336').setFontColor('#FFFFFF');
+      currentRow++;
+      
+      const negativeHeaders = [
+        'Temsilci',
+        'Geçersiz Numara',
+        'Ulaşılamadı',
+        'İlgilenmiyor',
+        'Kurumsal',
+        'Randevu İptal/Ertelendi',
+        'Fırsat Kaybedilen'
+      ];
+      
+      for (let col = 1; col <= negativeHeaders.length; col++) {
+        sheet.getRange(currentRow, col).setValue(negativeHeaders[col - 1]);
+        sheet.getRange(currentRow, col).setFontWeight('bold').setBackground('#FFCDD2');
+      }
+      currentRow++;
+      
+      // Her temsilci için satır (aynı sıralama)
+      for (let i = 0; i < funnelData.employees.length; i++) {
+        const emp = funnelData.employees[i];
+        const f = emp.funnel;
+        
+        let col = 1;
+        sheet.getRange(currentRow, col++).setValue(`${emp.employeeCode} - ${emp.employeeName}`);
         sheet.getRange(currentRow, col++).setValue(f.negative.counts['Geçersiz Numara'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.negative.counts['Ulaşılamadı'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.negative.counts['İlgilenmiyor'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.negative.counts['Kurumsal'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.negative.counts['Randevu İptal/Ertelendi'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.negative.counts['Fırsat Kaybedilen'] || 0);
-        sheet.getRange(currentRow, col++).setValue(emp.performanceScore);
-        sheet.getRange(currentRow, col++).setValue(i + 1);
         
         // Zebra striping
         if (i % 2 === 0) {
-          sheet.getRange(currentRow, 1, 1, headers.length).setBackground('#F3E5F5');
+          sheet.getRange(currentRow, 1, 1, negativeHeaders.length).setBackground('#FFEBEE');
         }
         
         currentRow++;
       }
       
-      // TOPLAM SATIRI (en sonda)
+      // NEGATİF TOPLAM SATIRI
       currentRow++;
-      let col = 1;
+      col = 1;
       sheet.getRange(currentRow, col++).setValue('📊 TOPLAM');
-      sheet.getRange(currentRow, col++).setValue(funnelData.total.total);
-      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Arama'] || 0);
-      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Fırsat'] || 0);
-      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Randevu'] || 0);
-      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Toplantı'] || 0);
-      sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Satış'] || 0);
       sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Geçersiz Numara'] || 0);
       sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Ulaşılamadı'] || 0);
       sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['İlgilenmiyor'] || 0);
       sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Kurumsal'] || 0);
       sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Randevu İptal/Ertelendi'] || 0);
       sheet.getRange(currentRow, col++).setValue(funnelData.total.negative.counts['Fırsat Kaybedilen'] || 0);
-      sheet.getRange(currentRow, col++).setValue('-'); // Performans skoru toplamı yok
-      sheet.getRange(currentRow, col++).setValue('-'); // Sıra toplamı yok
       
       // Toplam satırını vurgula
-      sheet.getRange(currentRow, 1, 1, headers.length)
+      sheet.getRange(currentRow, 1, 1, negativeHeaders.length)
         .setFontWeight('bold')
-        .setBackground('#FF9800')
+        .setBackground('#C62828')
         .setFontColor('#FFFFFF');
       
       currentRow += 2;
       
       // Sütun genişliklerini ayarla
       sheet.setColumnWidth(1, 250); // Temsilci
-      for (let c = 2; c <= headers.length; c++) {
+      for (let c = 2; c <= 7; c++) {
         sheet.setColumnWidth(c, 120);
       }
       
