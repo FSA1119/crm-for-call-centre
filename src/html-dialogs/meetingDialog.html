@@ -358,8 +358,8 @@
       </div>
       
       <div class="form-group">
-        <label for="meetingResult">✅ Toplantı Sonucu</label>
-        <select id="meetingResult" name="meetingResult">
+        <label for="meetingResult">✅ Toplantı Sonucu <span class="required">*</span></label>
+        <select id="meetingResult" name="meetingResult" required>
           <option value="">Sonuç seçin</option>
         </select>
       </div>
@@ -548,8 +548,44 @@
               ciroInput.value = '';
             }
             
-            // "Teklif Detayı (İsteğe Bağlı)" göster - Teklif gönderilecek paketler
+            // "Teklif Detayı" göster - Teklif gönderilecek paketler
             if (extraFieldsGroup) extraFieldsGroup.style.display = 'flex';
+            
+            // "Teklif İletildi" seçildiğinde Teklif Detayı ve Satış Potansiyeli ZORUNLU
+            if (isTeklifIletildi) {
+              if (teklifDetayiSelect) {
+                teklifDetayiSelect.setAttribute('required', 'required');
+                // Label'ı güncelle
+                const teklifDetayiLabel = extraFieldsGroup ? extraFieldsGroup.querySelector('label[for="teklifDetayi"]') : null;
+                if (teklifDetayiLabel) {
+                  teklifDetayiLabel.innerHTML = '📦 Teklif Detayı <span class="required">*</span>';
+                }
+              }
+              if (satisPotansiyeliSelect) {
+                satisPotansiyeliSelect.setAttribute('required', 'required');
+                // Label'ı güncelle
+                const satisPotansiyeliLabel = extraFieldsGroup2 ? extraFieldsGroup2.querySelector('label[for="satisPotansiyeli"]') : null;
+                if (satisPotansiyeliLabel) {
+                  satisPotansiyeliLabel.innerHTML = '🔥 Satış Potansiyeli <span class="required">*</span>';
+                }
+              }
+            } else {
+              // Beklemede seçildiğinde zorunlu değil
+              if (teklifDetayiSelect) {
+                teklifDetayiSelect.removeAttribute('required');
+                const teklifDetayiLabel = extraFieldsGroup ? extraFieldsGroup.querySelector('label[for="teklifDetayi"]') : null;
+                if (teklifDetayiLabel) {
+                  teklifDetayiLabel.innerHTML = '📦 Teklif Detayı <span class="optional">(İsteğe Bağlı)</span>';
+                }
+              }
+              if (satisPotansiyeliSelect) {
+                satisPotansiyeliSelect.removeAttribute('required');
+                const satisPotansiyeliLabel = extraFieldsGroup2 ? extraFieldsGroup2.querySelector('label[for="satisPotansiyeli"]') : null;
+                if (satisPotansiyeliLabel) {
+                  satisPotansiyeliLabel.innerHTML = '🔥 Satış Potansiyeli <span class="optional">(İsteğe Bağlı)</span>';
+                }
+              }
+            }
             
             // Satış Potansiyeli göster - Müşterinin sıcaklık durumu
             if (extraFieldsGroup2) extraFieldsGroup2.style.display = 'flex';
@@ -1068,6 +1104,34 @@
         const toplantiYapan = document.getElementById('toplantiYapan').value;
         if (!toplantiYapan) {
           alert('⚠️ Lütfen "Toplantıyı Yapan" kişiyi seçin!');
+          isSubmitting = false;
+          return;
+        }
+      }
+      
+      // Toplantı Sonucu zorunlu kontrolü
+      const meetingResult = document.getElementById('meetingResult').value;
+      if (!meetingResult) {
+        alert('⚠️ Lütfen "Toplantı Sonucu" seçin!');
+        isSubmitting = false;
+        return;
+      }
+      
+      // "Teklif İletildi" seçildiğinde Teklif Detayı ve Satış Potansiyeli zorunlu
+      const meetingResultLower = meetingResult.toLowerCase();
+      if (meetingResultLower.includes('teklif')) {
+        const teklifDetayi = document.getElementById('teklifDetayi').value;
+        const satisPotansiyeli = document.getElementById('satisPotansiyeli').value;
+        
+        if (!teklifDetayi) {
+          alert('⚠️ "Teklif İletildi" seçildiğinde "Teklif Detayı" zorunludur!');
+          isSubmitting = false;
+          return;
+        }
+        
+        if (!satisPotansiyeli) {
+          alert('⚠️ "Teklif İletildi" seçildiğinde "Satış Potansiyeli" zorunludur!');
+          isSubmitting = false;
           return;
         }
       }
@@ -1097,7 +1161,8 @@
         ciro: document.getElementById('ciro') ? (document.getElementById('ciro').value || 0) : 0, // Ciro (Satış Yapıldı için)
         satisCiro: document.getElementById('ciro') ? (document.getElementById('ciro').value || 0) : 0, // Backward compatibility
         satisTuru: document.getElementById('satisTuru') ? document.getElementById('satisTuru').value : '', // Satış Türü (Yerinde Satış / Teklif Sonrası)
-        teklifDetayiSale: document.getElementById('teklifDetayiSale') ? document.getElementById('teklifDetayiSale').value : '' // Satış için Teklif Detayı
+        teklifDetayiSale: document.getElementById('teklifDetayiSale') ? document.getElementById('teklifDetayiSale').value : '', // Satış için Teklif Detayı
+        paket: document.getElementById('teklifDetayiSale') ? document.getElementById('teklifDetayiSale').value : '' // Paket (backward compatibility - teklifDetayiSale ile aynı)
       };
       
       // "Toplantı Gerçekleşti" durumunda ekstra alanlar
