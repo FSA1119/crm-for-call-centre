@@ -139,6 +139,17 @@
       box-shadow: 0 8px 16px rgba(46, 125, 50, 0.3);
     }
     
+    .performance-warning {
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 10px 15px;
+      margin: 15px 20px;
+      font-size: 13px;
+      color: #856404;
+      display: none;
+    }
+    
     .btn-secondary {
       background: #6b7280;
       color: white;
@@ -182,6 +193,9 @@
       <h1>💰 Toplantıdan Satışa Geç</h1>
       <p>Satış bilgilerini doldurun</p>
     </div>
+    
+    <!-- Performance Warning -->
+    <div id="performanceWarning" class="performance-warning"></div>
     
     <!-- Company Information -->
     <div class="company-info">
@@ -339,6 +353,15 @@
           .withSuccessHandler(function(result) {
             isSubmitting = false;
             if (result.success) {
+              // Show performance warning if exists
+              if (result.performanceWarning) {
+                const warningDiv = document.getElementById('performanceWarning');
+                if (warningDiv) {
+                  warningDiv.textContent = result.performanceWarning;
+                  warningDiv.style.display = 'block';
+                }
+              }
+              
               setTimeout(function() {
                 try {
                   google.script.host.close();

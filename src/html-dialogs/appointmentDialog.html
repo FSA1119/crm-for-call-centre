@@ -135,6 +135,17 @@
       margin-top: 5px;
     }
     
+    .performance-warning {
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 10px 15px;
+      margin-bottom: 15px;
+      font-size: 13px;
+      color: #856404;
+      display: none;
+    }
+    
     .company-info {
       background-color: #e8f5e8;
       border: 1px solid #c3e6c3;
@@ -163,6 +174,9 @@
     </div>
     
     <div class="form-container">
+      <!-- Performance Warning -->
+      <div id="performanceWarning" class="performance-warning"></div>
+      
       <!-- Company Information -->
       <div class="company-info">
         <h3>🏢 Firma Bilgileri</h3>
@@ -284,6 +298,7 @@
       // Clear previous messages
       document.getElementById('errorMessage').style.display = 'none';
       document.getElementById('successMessage').style.display = 'none';
+      document.getElementById('performanceWarning').style.display = 'none';
       
       // Validate required fields
       const isimSoyisim = document.getElementById('isimSoyisim').value.trim();
