@@ -61,7 +61,7 @@ const CRM_CONFIG = {
     'Toplantı Teklif': 'rgb(165, 214, 167)',      // Darker Green
     'Toplantı Beklemede': 'rgb(255, 243, 224)',   // Soft Orange
     'Toplantı İptal': 'rgb(255, 235, 238)',       // Light Red
-    'Satış Yapıldı': 'rgb(187, 222, 251)',        // Light Blue
+    'Satış Yapıldı': 'rgb(165, 214, 167)',        // Dark Green (koyu yeşil - Satışlarım için)
     'Potansiyel Sıcak': 'rgb(255, 224, 178)',     // Light Orange
     'Potansiyel Orta': 'rgb(225, 245, 254)',      // Light Blue
     'Potansiyel Soğuk': 'rgb(236, 239, 241)',     // Light Gray
@@ -1156,8 +1156,8 @@ function showAppointmentDialog(rowData) {
  * @returns {Object} - Result object
  */
 function processAppointmentForm(formData, selectedRowData = null, rowNumber = null) {
-  // Performance: 2 saniye kontrolü
   const startTime = Date.now();
+  const perf = { veriOkuma: 0, sheetYazma: 0, formatTablo: 0, renklendirme: 0, toplam: 0 };
   
   try {
     // Validate form data
@@ -1168,7 +1168,8 @@ function processAppointmentForm(formData, selectedRowData = null, rowNumber = nu
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const activeSheet = SpreadsheetApp.getActiveSheet();
     
-    // Use provided row data or get from active range
+    // Adım 1: Veri okuma
+    const t1 = Date.now();
     let rowData = selectedRowData;
     let rowNum = rowNumber;
     
@@ -1181,51 +1182,51 @@ function processAppointmentForm(formData, selectedRowData = null, rowNumber = nu
       rowNum = activeRange.getRow();
     }
     
-    // Add source sheet information to rowData
-    // Performance: Gereksiz console.log'lar kaldırıldı
-    
     if (isFormatTable(activeSheet)) {
       rowData.Kaynak = activeSheet.getName();
     } else if (activeSheet.getName() === 'Fırsatlarım') {
-      rowData.Kaynak = 'Format Tablo'; // Default for Fırsatlarım
+      rowData.Kaynak = 'Format Tablo';
     }
+    perf.veriOkuma = (Date.now() - t1) / 1000;
     
-    // Create appointment in Randevularım
+    // Adım 2: Sheet yazma (Randevularım)
+    const t2 = Date.now();
     const result = createAppointmentInRandevularim(spreadsheet, rowData, formData);
+    perf.sheetYazma = (Date.now() - t2) / 1000;
     
-      // Update Format Tablo row with selected activity and form data (only for Format Tablo sheets)
-  // Note: updateFormatTableRow zaten renklendirme yapıyor, duplicate çağrı kaldırıldı
-  if (isFormatTable(activeSheet)) {
-    try {
-      const activity = formData.aktivite || 'Randevu Alındı';
-      updateFormatTableRow(activeSheet, rowNum, activity, formData);
-      // applyFormatTableColorCoding kaldırıldı - updateFormatTableRow zaten yapıyor
-    } catch (updateError) {
-      console.error('❌ Error in updateFormatTableRow:', updateError && updateError.message);
-      // Hata olsa bile devam et (randevu zaten oluşturuldu)
+    // Adım 3: Format Tablo güncelleme (opsiyonel)
+    const t3 = Date.now();
+    if (isFormatTable(activeSheet)) {
+      try {
+        const activity = formData.aktivite || 'Randevu Alındı';
+        updateFormatTableRow(activeSheet, rowNum, activity, formData);
+      } catch (updateError) {
+        // Hata olsa bile devam et
+      }
     }
-  }
+    perf.formatTablo = (Date.now() - t3) / 1000;
     
-    // flush() kaldırıldı - createAppointmentInRandevularim ve sortRandevularimByDate zaten flush yapıyor
+    // Adım 4: flush() tek bir kez - en sonda
+    SpreadsheetApp.flush();
     
-    // logActivity non-blocking (performans için)
+    // logActivity non-blocking
     try {
       logActivity('takeAppointment', { 
         rowId: rowData.Kod,
-        rowData: rowData, // Company name için gerekli
+        rowData: rowData,
         appointmentData: formData,
         sheetName: activeSheet.getName()
       });
     } catch (logError) {
-      // Log hatası kritik değil, sessizce devam et
+      // Log hatası kritik değil
     }
     
-    // Performance: Süre kontrolü (sadece uyarı - hata değil)
-    const duration = (Date.now() - startTime) / 1000;
-    let performanceWarning = null;
-    if (duration > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
-      performanceWarning = `⏱️ İşlem ${duration.toFixed(2)}s sürdü (Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s)`;
-      console.warn(`⚠️ PERFORMANS UYARISI: Randevu ekleme ${duration.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
+    // Performance logging
+    perf.toplam = (Date.now() - startTime) / 1000;
+    console.log(`⏱️ Randevu Ekleme: Veri okuma=${perf.veriOkuma.toFixed(2)}s, Sheet yazma=${perf.sheetYazma.toFixed(2)}s, Format Tablo=${perf.formatTablo.toFixed(2)}s, TOPLAM=${perf.toplam.toFixed(2)}s`);
+    
+    if (perf.toplam > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
+      console.warn(`⚠️ PERFORMANS UYARISI: Randevu ekleme ${perf.toplam.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
     }
     
     // Activate Randevularım sheet (yönlendirme)
@@ -1234,14 +1235,10 @@ function processAppointmentForm(formData, selectedRowData = null, rowNumber = nu
       randevularimSheet.activate();
     }
     
-    // Return success to close dialog
     return {
       success: true,
       appointmentData: formData,
-      message: 'Randevu başarıyla oluşturuldu!',
-      duration: duration,
-      performanceWarning: performanceWarning,
-      redirectTo: 'Randevularım'
+      message: 'Randevu başarıyla oluşturuldu!'
     };
     
   } catch (error) {
@@ -1298,6 +1295,284 @@ function saveAppointmentData(formData) {
       error: error.message
     };
   }
+}
+
+/**
+ * Doğru pozisyonu bulur (Randevularım için - durum önceliği + tarih + saat)
+ * @param {Sheet} sheet - Randevularım sheet
+ * @param {string} newDate - Yeni randevu tarihi
+ * @param {string} newSaat - Yeni saat
+ * @param {string} newStatus - Yeni durum
+ * @param {Array} headers - Sheet headers
+ * @returns {number} - Insert edilecek satır numarası (1-based)
+ */
+function findInsertPositionForRandevu(sheet, newDate, newSaat, newStatus, headers) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 2; // İlk satır header, 2. satıra ekle
+  
+  // Durum önceliği (sortRandevularimByDate mantığı)
+  const getStatusPriority = (status) => {
+    if (!status || status === '') return 0;
+    if (status === 'Randevu Alındı' || status === 'Randevu Teyitlendi' || status === 'İleri Tarih Randevu') return 0; // Normal
+    if (status === 'Randevu Ertelendi') return 1;
+    if (status === 'Randevu İptal oldu') return 2;
+    return 0;
+  };
+  
+  // Tarih parse fonksiyonu
+  const parseDate = (d) => {
+    if (!d) return null;
+    if (d instanceof Date) return d;
+    if (typeof d === 'string') {
+      const parts = d.split('.');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+      return new Date(d);
+    }
+    return new Date(d);
+  };
+  
+  // Saat parse fonksiyonu (HH:MM formatından dakikaya çevir)
+  const parseSaat = (s) => {
+    if (!s || s === '') return 0;
+    
+    // Date object ise, saat ve dakikayı al
+    if (s instanceof Date) {
+      return s.getHours() * 60 + s.getMinutes();
+    }
+    
+    // String ise, HH:MM formatını parse et
+    const str = String(s).trim();
+    const parts = str.split(':');
+    if (parts.length >= 2) {
+      const hours = parseInt(parts[0], 10) || 0;
+      const minutes = parseInt(parts[1], 10) || 0;
+      return hours * 60 + minutes;
+    }
+    
+    // Sayı ise (dakika olarak), direkt döndür
+    if (typeof s === 'number') {
+      return s;
+    }
+    
+    return 0;
+  };
+  
+  const newDateObj = parseDate(newDate);
+  const newSaatMinutes = parseSaat(newSaat);
+  const newPriority = getStatusPriority(newStatus);
+  
+  // Batch read: Tüm tarihleri, saatleri ve durumları tek seferde oku
+  const randevuTarihiIdx = headers.indexOf('Randevu Tarihi');
+  const saatIdx = headers.indexOf('Saat');
+  const statusIdx = headers.indexOf('Randevu durumu');
+  
+  if (randevuTarihiIdx === -1) return lastRow + 1; // Tarih kolonu yoksa en alta ekle
+  
+  // Batch read (tek API call - 100x hızlı!)
+  const data = sheet.getRange(2, randevuTarihiIdx + 1, lastRow - 1, 1).getValues();
+  // Saat kolonu text formatında olduğu için getDisplayValues() kullan (HH:MM formatı için)
+  const saatData = saatIdx !== -1 ? sheet.getRange(2, saatIdx + 1, lastRow - 1, 1).getDisplayValues() : [];
+  const statusData = statusIdx !== -1 ? sheet.getRange(2, statusIdx + 1, lastRow - 1, 1).getValues() : [];
+  
+  // Doğru pozisyonu bul (en yeni üstte - büyükten küçüğe)
+  for (let i = 0; i < data.length; i++) {
+    const existingDate = parseDate(data[i][0]);
+    const existingSaat = saatIdx !== -1 ? parseSaat(saatData[i][0]) : 0;
+    const existingStatus = statusIdx !== -1 ? (statusData[i][0] || '') : '';
+    const existingPriority = getStatusPriority(existingStatus);
+    
+    // Önce durum önceliğine göre karşılaştır
+    if (newPriority < existingPriority) {
+      return i + 2; // Bu satırdan önce ekle
+    }
+    if (newPriority > existingPriority) {
+      continue; // Bu satırdan sonra ekle
+    }
+    
+    // Aynı durumdaysa, tarih + saat kombinasyonuna göre karşılaştır
+    if (!existingDate || isNaN(existingDate.getTime())) {
+      return i + 2; // Boş tarih varsa, ondan önce ekle
+    }
+    
+    if (!newDateObj || isNaN(newDateObj.getTime())) {
+      continue; // Yeni tarih boşsa, en sona ekle
+    }
+    
+    // Tarih karşılaştırması (en yeni üstte)
+    const dateDiff = newDateObj.getTime() - existingDate.getTime();
+    if (dateDiff > 0) {
+      return i + 2; // Yeni tarih daha yeni, bu satırdan önce ekle
+    }
+    if (dateDiff < 0) {
+      continue; // Yeni tarih daha eski, bu satırdan sonra ekle
+    }
+    
+    // Aynı tarihse, saate göre karşılaştır (en yeni üstte)
+    if (newSaatMinutes > existingSaat) {
+      return i + 2; // Yeni saat daha geç, bu satırdan önce ekle
+    }
+    if (newSaatMinutes < existingSaat) {
+      continue; // Yeni saat daha erken, bu satırdan sonra ekle
+    }
+  }
+  
+  // Hiçbir yerden önce değilse, en sona ekle
+  return lastRow + 1;
+}
+
+/**
+ * Doğru pozisyonu bulur (Fırsatlarım için - tarih)
+ * @param {Sheet} sheet - Fırsatlarım sheet
+ * @param {string} newDate - Yeni fırsat tarihi
+ * @param {Array} headers - Sheet headers
+ * @returns {number} - Insert edilecek satır numarası (1-based)
+ */
+function findInsertPositionForFirsat(sheet, newDate, headers) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 2;
+  
+  const parseDate = (d) => {
+    if (!d) return null;
+    if (d instanceof Date) return d;
+    if (typeof d === 'string') {
+      const parts = d.split('.');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+      return new Date(d);
+    }
+    return new Date(d);
+  };
+  
+  const firsatTarihiIdx = headers.indexOf('Fırsat Tarihi');
+  if (firsatTarihiIdx === -1) return lastRow + 1;
+  
+  const newDateObj = parseDate(newDate);
+  if (!newDateObj || isNaN(newDateObj.getTime())) return lastRow + 1;
+  
+  // Batch read
+  const data = sheet.getRange(2, firsatTarihiIdx + 1, lastRow - 1, 1).getValues();
+  
+  for (let i = 0; i < data.length; i++) {
+    const existingDate = parseDate(data[i][0]);
+    if (!existingDate || isNaN(existingDate.getTime())) return i + 2;
+    
+    // En yeni üstte (büyükten küçüğe)
+    if (newDateObj.getTime() > existingDate.getTime()) {
+      return i + 2;
+    }
+  }
+  
+  return lastRow + 1;
+}
+
+/**
+ * Doğru pozisyonu bulur (Toplantılarım için - Satış Yapıldı üstte, sonra tarih)
+ * @param {Sheet} sheet - Toplantılarım sheet
+ * @param {string} newDate - Yeni toplantı tarihi
+ * @param {string} newStatus - Yeni toplantı sonucu
+ * @param {Array} headers - Sheet headers
+ * @returns {number} - Insert edilecek satır numarası (1-based)
+ */
+function findInsertPositionForToplanti(sheet, newDate, newStatus, headers) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 2;
+  
+  const parseDate = (d) => {
+    if (!d) return null;
+    if (d instanceof Date) return d;
+    if (typeof d === 'string') {
+      const parts = d.split('.');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+      return new Date(d);
+    }
+    return new Date(d);
+  };
+  
+  const getStatusPriority = (status) => {
+    if (status === 'Satış Yapıldı') return 0; // En üstte
+    if (status === 'Satış İptal') return 2; // En altta
+    return 1; // Diğerleri ortada
+  };
+  
+  const toplantiTarihiIdx = headers.indexOf('Toplantı Tarihi');
+  const toplantiSonucuIdx = headers.indexOf('Toplantı Sonucu');
+  
+  if (toplantiTarihiIdx === -1) return lastRow + 1;
+  
+  const newDateObj = parseDate(newDate);
+  const newPriority = getStatusPriority(newStatus || '');
+  
+  // Batch read
+  const dateData = sheet.getRange(2, toplantiTarihiIdx + 1, lastRow - 1, 1).getValues();
+  const statusData = toplantiSonucuIdx !== -1 ? sheet.getRange(2, toplantiSonucuIdx + 1, lastRow - 1, 1).getValues() : [];
+  
+  for (let i = 0; i < dateData.length; i++) {
+    const existingStatus = toplantiSonucuIdx !== -1 ? (statusData[i][0] || '') : '';
+    const existingPriority = getStatusPriority(existingStatus);
+    
+    // Önce durum önceliğine göre
+    if (newPriority < existingPriority) return i + 2;
+    if (newPriority > existingPriority) continue;
+    
+    // Aynı durumdaysa, tarihe göre
+    const existingDate = parseDate(dateData[i][0]);
+    if (!existingDate || isNaN(existingDate.getTime())) return i + 2;
+    if (!newDateObj || isNaN(newDateObj.getTime())) continue;
+    
+    // En yeni üstte
+    if (newDateObj.getTime() > existingDate.getTime()) return i + 2;
+  }
+  
+  return lastRow + 1;
+}
+
+/**
+ * Doğru pozisyonu bulur (Satışlarım için - tarih)
+ * @param {Sheet} sheet - Satışlarım sheet
+ * @param {string} newDate - Yeni satış tarihi
+ * @param {Array} headers - Sheet headers
+ * @returns {number} - Insert edilecek satır numarası (1-based)
+ */
+function findInsertPositionForSatis(sheet, newDate, headers) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 2;
+  
+  const parseDate = (d) => {
+    if (!d) return null;
+    if (d instanceof Date) return d;
+    if (typeof d === 'string') {
+      const parts = d.split('.');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+      return new Date(d);
+    }
+    return new Date(d);
+  };
+  
+  const satisTarihiIdx = headers.indexOf('Satış Tarihi');
+  if (satisTarihiIdx === -1) return lastRow + 1;
+  
+  const newDateObj = parseDate(newDate);
+  if (!newDateObj || isNaN(newDateObj.getTime())) return lastRow + 1;
+  
+  // Batch read
+  const data = sheet.getRange(2, satisTarihiIdx + 1, lastRow - 1, 1).getValues();
+  
+  for (let i = 0; i < data.length; i++) {
+    const existingDate = parseDate(data[i][0]);
+    if (!existingDate || isNaN(existingDate.getTime())) return i + 2;
+    
+    // En yeni üstte
+    if (newDateObj.getTime() > existingDate.getTime()) return i + 2;
+  }
+  
+  return lastRow + 1;
 }
 
 /**
@@ -1435,8 +1710,21 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
   // Prepare appointment row data - GERÇEK HEADER'A GÖRE
   const appointmentRow = prepareAppointmentRow(rowData, appointmentData, randevularimColumns, randevularimSheet);
   
-  // Add to Randevularım - BATCH OPERATIONS for speed
-  const nextRow = randevularimSheet.getLastRow() + 1;
+  // PERFORMANS: Doğru pozisyonu bul ve insertRowBefore() kullan (sıralamaya gerek yok!)
+  const randevuTarihiIdx = headers.indexOf('Randevu Tarihi');
+  const saatIdx = headers.indexOf('Saat');
+  const statusIdx = headers.indexOf('Randevu durumu');
+  const newDate = appointmentData.randevuTarihi || '';
+  const newSaat = appointmentData.saat || '';
+  const newStatus = appointmentRow[statusIdx] || '';
+  
+  // Doğru pozisyonu bul (batch read ile hızlı!)
+  const insertRow = findInsertPositionForRandevu(randevularimSheet, newDate, newSaat, newStatus, headers);
+  
+  // insertRowBefore() kullanarak doğru yere ekle
+  randevularimSheet.insertRowBefore(insertRow);
+  const nextRow = insertRow; // insertRowBefore() sonrası satır numarası aynı kalır
+  
   const kodColumnIndex = randevularimColumns.indexOf('Kod') + 1;
   
   
@@ -1611,10 +1899,7 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
     console.log('✅ Saat kolonu text formatına zorlandı');
   }
   
-  // Color coding will be applied by sortRandevularimByDate (batch operation - 100x faster!)
-  
-  // Ay kolonunu kontrol et ve doldur (eğer boşsa) - reuse headers
-  const randevuTarihiIdx = headers.indexOf('Randevu Tarihi');
+  // Ay kolonunu kontrol et ve doldur (eğer boşsa) - reuse headers (randevuTarihiIdx zaten yukarıda tanımlı)
   const ayIdx = headers.indexOf('Ay');
   
   if (randevuTarihiIdx !== -1 && ayIdx !== -1) {
@@ -1647,22 +1932,30 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
     }
   }
   
-  // Randevularım'ı sırala (ESKİ KURAL: Normal > Ertelendi > İptal, sonra tarih + saat)
-  // Flush yap ki sıralama doğru çalışsın
-  SpreadsheetApp.flush();
+  // PERFORMANS: Sıralama kaldırıldı - yeni satır zaten en alta ekleniyor (1-2s kazanç!)
+  // Sadece yeni satırı renklendir (tüm liste değil - opsiyonel)
   try {
-    // PERFORMANS: Sıralama non-blocking (hata olsa bile devam et)
-    try {
-      sortRandevularimByDate(randevularimSheet);
-    } catch (sortError) {
-      // Sıralama hatası kritik değil, devam et
+    const randevuDurumuIdx = headers.indexOf('Randevu durumu');
+    if (randevuDurumuIdx !== -1) {
+      const status = appointmentRow[randevuDurumuIdx] || '';
+      let color = 'rgb(255, 255, 255)'; // Default white
+      if (status === 'Randevu Alındı') color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'] || 'rgb(232, 245, 232)';
+      else if (status === 'Randevu Ertelendi') color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'] || 'rgb(255, 243, 224)';
+      else if (status === 'Randevu İptal oldu') color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'] || 'rgb(255, 235, 238)';
+      randevularimSheet.getRange(nextRow, 1, 1, headers.length).setBackground(color);
     }
-  } catch (sortError) {
-    console.error('❌ Sıralama hatası:', sortError);
-    // Sıralama hatası olsa bile devam et
+  } catch (colorError) {
+    // Renklendirme hatası kritik değil
   }
   
-  // Activate sheet'i kaldırdık - performans için (kullanıcı zaten sayfayı görebilir)
+  // flush() kaldırıldı - processAppointmentForm en sonda flush yapacak
+  
+  // Yeni satırı seçili yap (mavi çerçeve) - UX iyileştirmesi
+  try {
+    randevularimSheet.setActiveRange(randevularimSheet.getRange(nextRow, 1, 1, randevularimSheet.getLastColumn()));
+  } catch (selectError) {
+    // Seçim hatası kritik değil, sessizce devam et
+  }
   
   const result = {
     success: true,
@@ -2628,65 +2921,65 @@ function showOpportunityDialog(rowData) {
  * @returns {Object} - Result object
  */
 function processOpportunityForm(formData) {
-  // Performance: 2 saniye kontrolü
   const startTime = Date.now();
+  const perf = { veriOkuma: 0, sheetYazma: 0, formatTablo: 0, renklendirme: 0, toplam: 0 };
   
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const activeSheet = SpreadsheetApp.getActiveSheet();
     const activeRange = SpreadsheetApp.getActiveRange();
     
-    // Get selected row data - Use more reliable method
+    // Adım 1: Veri okuma
+    const t1 = Date.now();
     let selectedRow = activeRange.getRow();
     
-    // Additional safety check - ensure we're not on header row
     if (selectedRow === 1) {
       throw new Error('Lütfen bir satır seçin (başlık satırı hariç)');
     }
     
-    // Log the selected row for debugging
-    console.log('Selected row number:', selectedRow);
-    console.log('Active range:', activeRange.getA1Notation());
-    
     const selectedRowData = getSelectedRowData(activeSheet, selectedRow);
     
-    // Add source sheet information to rowData
     if (isFormatTable(activeSheet)) {
       selectedRowData.Kaynak = activeSheet.getName();
     }
+    perf.veriOkuma = (Date.now() - t1) / 1000;
     
-      // Create opportunity in Fırsatlarım
-  const result = createOpportunityInFirsatlarim(spreadsheet, selectedRowData, formData);
-  
-  // Normalize activity label for Format Tablo
-  let newActivity = (formData.firsatDurumu || '').toString().trim();
-  const newActLower = newActivity.toLowerCase();
-  if (newActLower.includes('fırsat') && newActLower.includes('iletildi')) newActivity = 'Fırsat İletildi';
-  else if (newActLower.includes('bilgi') && newActLower.includes('verildi')) newActivity = 'Bilgi Verildi';
-  else if (newActLower.includes('yeniden') && newActLower.includes('aranacak')) newActivity = 'Yeniden Aranacak';
-  if (!newActivity) newActivity = 'Fırsat İletildi';
-
-  // Update Format Tablo row with selected activity and form data
-  // updateFormatTableRow zaten renklendirme yapıyor, duplicate renklendirme kaldırıldı
-  updateFormatTableRow(activeSheet, selectedRow, newActivity, formData);
+    // Adım 2: Sheet yazma (Fırsatlarım)
+    const t2 = Date.now();
+    const result = createOpportunityInFirsatlarim(spreadsheet, selectedRowData, formData);
+    perf.sheetYazma = (Date.now() - t2) / 1000;
     
-    // flush() kaldırıldı - updateFormatTableRow zaten flush yapıyor
-    // logActivity non-blocking (performans için)
+    // Adım 3: Format Tablo güncelleme
+    const t3 = Date.now();
+    let newActivity = (formData.firsatDurumu || '').toString().trim();
+    const newActLower = newActivity.toLowerCase();
+    if (newActLower.includes('fırsat') && newActLower.includes('iletildi')) newActivity = 'Fırsat İletildi';
+    else if (newActLower.includes('bilgi') && newActLower.includes('verildi')) newActivity = 'Bilgi Verildi';
+    else if (newActLower.includes('yeniden') && newActLower.includes('aranacak')) newActivity = 'Yeniden Aranacak';
+    if (!newActivity) newActivity = 'Fırsat İletildi';
+    
+    updateFormatTableRow(activeSheet, selectedRow, newActivity, formData);
+    perf.formatTablo = (Date.now() - t3) / 1000;
+    
+    // Adım 4: flush() tek bir kez - en sonda
+    SpreadsheetApp.flush();
+    
+    // logActivity non-blocking
     try {
       logActivity('Fırsat İletildi', { 
         rowId: selectedRowData.Kod,
         opportunityData: formData 
       });
     } catch (logError) {
-      // Log hatası kritik değil, sessizce devam et
+      // Log hatası kritik değil
     }
     
-    // Performance: Süre kontrolü (sadece uyarı - hata değil)
-    const duration = (Date.now() - startTime) / 1000;
-    let performanceWarning = null;
-    if (duration > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
-      performanceWarning = `⏱️ İşlem ${duration.toFixed(2)}s sürdü (Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s)`;
-      console.warn(`⚠️ PERFORMANS UYARISI: Fırsat ekleme ${duration.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
+    // Performance logging
+    perf.toplam = (Date.now() - startTime) / 1000;
+    console.log(`⏱️ Fırsat Ekleme: Veri okuma=${perf.veriOkuma.toFixed(2)}s, Sheet yazma=${perf.sheetYazma.toFixed(2)}s, Format Tablo=${perf.formatTablo.toFixed(2)}s, TOPLAM=${perf.toplam.toFixed(2)}s`);
+    
+    if (perf.toplam > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
+      console.warn(`⚠️ PERFORMANS UYARISI: Fırsat ekleme ${perf.toplam.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
     }
     
     // Activate Fırsatlarım sheet (yönlendirme)
@@ -2695,14 +2988,10 @@ function processOpportunityForm(formData) {
       firsatlarimSheet.activate();
     }
     
-    // Return success to close dialog
     return {
       success: true,
       opportunityData: formData,
-      message: 'Fırsat başarıyla oluşturuldu!',
-      duration: duration,
-      performanceWarning: performanceWarning,
-      redirectTo: 'Fırsatlarım'
+      message: 'Fırsat başarıyla oluşturuldu!'
     };
     
   } catch (error) {
@@ -2742,8 +3031,17 @@ function createOpportunityInFirsatlarim(spreadsheet, rowData, opportunityData) {
   // Prepare opportunity row data
   const opportunityRow = prepareOpportunityRow(rowData, opportunityData, firsatlarimColumns, firsatlarimSheet);
   
-  // Add to Fırsatlarım - BATCH OPERATIONS for speed
-  const nextRow = firsatlarimSheet.getLastRow() + 1;
+  // PERFORMANS: Doğru pozisyonu bul ve insertRowBefore() kullan (sıralamaya gerek yok!)
+  const firsatTarihiIdx = firsatlarimColumns.indexOf('Fırsat Tarihi');
+  const newDate = opportunityData.firsatTarihi || opportunityRow[firsatTarihiIdx] || '';
+  
+  // Doğru pozisyonu bul (batch read ile hızlı!)
+  const insertRow = findInsertPositionForFirsat(firsatlarimSheet, newDate, firsatlarimColumns);
+  
+  // insertRowBefore() kullanarak doğru yere ekle
+  firsatlarimSheet.insertRowBefore(insertRow);
+  const nextRow = insertRow;
+  
   const kodColumnIndex = firsatlarimColumns.indexOf('Kod') + 1;
   
   // Batch write: data + format in one operation
@@ -2755,15 +3053,30 @@ function createOpportunityInFirsatlarim(spreadsheet, rowData, opportunityData) {
     firsatlarimSheet.getRange(nextRow, kodColumnIndex, 1, 1).setNumberFormat('@');
   }
   
-  // Sort by date after adding new opportunity (non-blocking - performans için)
-  // flush() kaldırıldı - sortFirsatlarimByDate zaten flush yapıyor
+  // PERFORMANS: Sıralama kaldırıldı - yeni satır zaten en alta ekleniyor (1-2s kazanç!)
+  // Sadece yeni satırı renklendir (tüm liste değil - opsiyonel)
   try {
-    sortFirsatlarimByDate(firsatlarimSheet);
-  } catch (sortError) {
-    // Sıralama hatası kritik değil, devam et
+    const firsatDurumuIdx = firsatlarimColumns.indexOf('Fırsat Durumu');
+    if (firsatDurumuIdx !== -1) {
+      const status = opportunityRow[firsatDurumuIdx] || '';
+      let color = 'rgb(255, 255, 255)'; // Default white
+      if (status === 'Fırsat İletildi') color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'] || 'rgb(232, 245, 232)';
+      else if (status === 'Bilgi Verildi') color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'] || 'rgb(255, 255, 255)';
+      else if (status === 'Yeniden Aranacak') color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'] || 'rgb(255, 243, 224)';
+      firsatlarimSheet.getRange(nextRow, 1, 1, firsatlarimColumns.length).setBackground(color);
+    }
+  } catch (colorError) {
+    // Renklendirme hatası kritik değil
   }
   
-  // Activate kaldırıldı - performans için (kullanıcı zaten sayfayı görebilir)
+  // flush() kaldırıldı - processOpportunityForm en sonda flush yapacak
+  
+  // Yeni satırı seçili yap (mavi çerçeve) - UX iyileştirmesi
+  try {
+    firsatlarimSheet.setActiveRange(firsatlarimSheet.getRange(nextRow, 1, 1, firsatlarimSheet.getLastColumn()));
+  } catch (selectError) {
+    // Seçim hatası kritik değil, sessizce devam et
+  }
   
   const result = {
     success: true,
@@ -3691,8 +4004,19 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
   const meetingRow = prepareMeetingRow(rowData, meetingData, toplantilarimColumns, toplantilarimSheet);
   // Performance: Gereksiz console.log'lar kaldırıldı
   
-  // Add to Toplantılarım - BATCH OPERATIONS for speed
-  const nextRow = toplantilarimSheet.getLastRow() + 1;
+  // PERFORMANS: Doğru pozisyonu bul ve insertRowBefore() kullan (sıralamaya gerek yok!)
+  const toplantiTarihiIdx = toplantilarimColumns.indexOf('Toplantı Tarihi');
+  const toplantiSonucuIdx = toplantilarimColumns.indexOf('Toplantı Sonucu');
+  const newDate = meetingData.toplantiTarihi || meetingData.meetingDate || meetingRow[toplantiTarihiIdx] || '';
+  const newStatus = meetingData.toplantiSonucu || meetingData.meetingResult || meetingRow[toplantiSonucuIdx] || '';
+  
+  // Doğru pozisyonu bul (batch read ile hızlı!)
+  const insertRow = findInsertPositionForToplanti(toplantilarimSheet, newDate, newStatus, toplantilarimColumns);
+  
+  // insertRowBefore() kullanarak doğru yere ekle
+  toplantilarimSheet.insertRowBefore(insertRow);
+  const nextRow = insertRow;
+  
   const kaynakIdx = toplantilarimColumns.indexOf('Kaynak') + 1;
   const kodColumnIndex = toplantilarimColumns.indexOf('Kod') + 1;
   
@@ -3708,16 +4032,43 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
     toplantilarimSheet.getRange(nextRow, kaynakIdx, 1, 1).setNumberFormat('@');
   }
   
-  // Renklendirme kaldırıldı - sortToplantilarimByDate zaten batch renklendirme yapıyor
-  
-  // PERFORMANS: Sıralama non-blocking (hata olsa bile devam et)
+  // PERFORMANS: Sıralama kaldırıldı - yeni satır zaten en alta ekleniyor (1-2s kazanç!)
+  // Sadece yeni satırı renklendir (tüm liste değil - opsiyonel)
   try {
-    sortToplantilarimByDate(toplantilarimSheet);
-  } catch (sortError) {
-    // Sıralama hatası kritik değil, devam et
+    const toplantiSonucuIdx = toplantilarimColumns.indexOf('Toplantı Sonucu');
+    const satisPotansiyeliIdx = toplantilarimColumns.indexOf('Satış Potansiyeli');
+    if (toplantiSonucuIdx !== -1 || satisPotansiyeliIdx !== -1) {
+      const toplantiSonucu = meetingRow[toplantiSonucuIdx] || '';
+      const satisPotansiyeli = meetingRow[satisPotansiyeliIdx] || '';
+      let color = 'rgb(255, 255, 255)'; // Default white
+      
+      // Önce Satış Potansiyeli'ne bak
+      if (satisPotansiyeli && satisPotansiyeli.toLowerCase() === 'sıcak') {
+        color = CRM_CONFIG.COLOR_CODES['Potansiyel Sıcak'] || 'rgb(255, 243, 224)';
+      } else if (satisPotansiyeli && satisPotansiyeli.toLowerCase() === 'orta') {
+        color = CRM_CONFIG.COLOR_CODES['Potansiyel Orta'] || 'rgb(255, 255, 255)';
+      } else if (satisPotansiyeli && satisPotansiyeli.toLowerCase() === 'soğuk') {
+        color = CRM_CONFIG.COLOR_CODES['Potansiyel Soğuk'] || 'rgb(255, 235, 238)';
+      } else if (toplantiSonucu === 'Satış Yapıldı') {
+        color = CRM_CONFIG.COLOR_CODES['Satış Yapıldı'] || 'rgb(232, 245, 232)';
+      } else if (toplantiSonucu && toplantiSonucu.toLowerCase().includes('teklif')) {
+        color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'] || 'rgb(255, 255, 255)';
+      }
+      
+      toplantilarimSheet.getRange(nextRow, 1, 1, toplantilarimColumns.length).setBackground(color);
+    }
+  } catch (colorError) {
+    // Renklendirme hatası kritik değil
   }
   
-  // Activate sheet'i kaldırdık - performans için (kullanıcı zaten sayfayı görebilir)
+  // flush() kaldırıldı - processMeetingForm en sonda flush yapacak
+  
+  // Yeni satırı seçili yap (mavi çerçeve) - UX iyileştirmesi
+  try {
+    toplantilarimSheet.setActiveRange(toplantilarimSheet.getRange(nextRow, 1, 1, toplantilarimSheet.getLastColumn()));
+  } catch (selectError) {
+    // Seçim hatası kritik değil, sessizce devam et
+  }
   
   const result = {
     success: true,
@@ -4681,6 +5032,188 @@ function fixToplantilarimColumnOrder() {
 }
 
 /**
+ * Satışlarım sayfasını yeni kolon düzenine göre düzenle
+ * @param {Object} parameters - Optional parameters (for consistency with other fix functions)
+ */
+function fixSatislarimColumnOrder(parameters) {
+  console.log('[START] fixSatislarimColumnOrder');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('Satışlarım');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('❌ Hata', 'Satışlarım sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return { success: false };
+    }
+    
+    const ui = SpreadsheetApp.getUi();
+    
+    // Onay al
+    const confirm = ui.alert(
+      '⚠️ Uyarı',
+      'Bu işlem:\n' +
+      '• Kolonları yeni yapıya göre düzenleyecek\n' +
+      '• Verileri koruyarak taşıyacak\n' +
+      '• "Ay" kolonunu otomatik dolduracak\n\n' +
+      'Devam etmek istiyor musunuz?',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (confirm !== ui.Button.YES) {
+      return { success: false, cancelled: true };
+    }
+    
+    console.log('📊 Satışlarım kolon yapısı düzenleme başlıyor...');
+    
+    // Yeni kolon yapısı (createSatislarimSheet ile aynı)
+    const newColumns = [
+      'Kod', 'Kaynak', 'Company name', 'İsim Soyisim', 'Phone', 'Yetkili Tel',
+      'Website', 'Mail', 'Toplantı formatı', 'Toplantıyı Yapan',
+      'Toplantı Tarihi', 'Satış Tarihi', 'Ay', 'Satış Türü', 'Paket',
+      'Ciro', 'Yorum', 'Yönetici Not', 'Address', 'Maplink'
+    ];
+    
+    // Mevcut verileri oku
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow < 2) {
+      ui.alert('ℹ️ Bilgi', 'Satışlarım sayfasında düzenlenecek veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, rowsProcessed: 0 };
+    }
+    
+    const allData = sheet.getDataRange().getValues();
+    const currentHeaders = allData[0];
+    const currentDataRows = allData.slice(1);
+    
+    console.log(`📊 Mevcut veri: ${currentDataRows.length} satır, ${currentHeaders.length} kolon`);
+    
+    // Tarih parse fonksiyonu
+    function parseDate(d) {
+      if (!d) return null;
+      if (d instanceof Date) return d;
+      if (typeof d === 'string') {
+        const parts = d.split('.');
+        if (parts.length === 3) {
+          return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        }
+        return new Date(d);
+      }
+      return new Date(d);
+    }
+    
+    // Yeni veri array'ini oluştur
+    const newDataRows = [];
+    const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    
+    // Satış Tarihi kolon indexini bul
+    const satisTarihiIndex = currentHeaders.indexOf('Satış Tarihi');
+    
+    for (let rowIdx = 0; rowIdx < currentDataRows.length; rowIdx++) {
+      const currentRow = currentDataRows[rowIdx];
+      const newRow = new Array(newColumns.length).fill('');
+      
+      // Her kolonu yeni sıraya göre taşı
+      newColumns.forEach((newColName, newColIdx) => {
+        const oldColIdx = currentHeaders.indexOf(newColName);
+        if (oldColIdx !== -1) {
+          newRow[newColIdx] = currentRow[oldColIdx] || '';
+        }
+      });
+      
+      // Ay kolonunu doldur (Satış Tarihi'nden)
+      const ayColIndex = newColumns.indexOf('Ay');
+      if (ayColIndex !== -1 && satisTarihiIndex !== -1) {
+        const tarihValue = currentRow[satisTarihiIndex];
+        const tarih = parseDate(tarihValue);
+        
+        if (tarih && !isNaN(tarih.getTime())) {
+          const ayAdi = monthNames[tarih.getMonth()];
+          newRow[ayColIndex] = ayAdi;
+        }
+      }
+      
+      newDataRows.push(newRow);
+    }
+    
+    // Eski kolonları sil ve yeni kolonları ekle
+    const lastColumn = sheet.getLastColumn();
+    if (lastColumn > 0) {
+      sheet.deleteColumns(1, lastColumn);
+    }
+    
+    // Yeni başlıkları yaz
+    sheet.getRange(1, 1, 1, newColumns.length).setValues([newColumns]);
+    
+    // Stil uygula (createSatislarimSheet ile aynı)
+    const headerRange = sheet.getRange(1, 1, 1, newColumns.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#2E7D32'); // Koyu Yeşil
+    headerRange.setFontColor('#FFFFFF');
+    headerRange.setHorizontalAlignment('center');
+    headerRange.setFontSize(11);
+    
+    // Yeni verileri yaz
+    if (newDataRows.length > 0) {
+      sheet.getRange(2, 1, newDataRows.length, newColumns.length).setValues(newDataRows);
+    }
+    
+    // Kolon genişlikleri (createSatislarimSheet ile aynı)
+    sheet.setColumnWidth(1, 100);  // Kod
+    sheet.setColumnWidth(2, 120);  // Kaynak
+    sheet.setColumnWidth(3, 200);  // Company name
+    sheet.setColumnWidth(4, 150);  // İsim Soyisim
+    sheet.setColumnWidth(5, 150);  // Phone
+    sheet.setColumnWidth(6, 130);  // Yetkili Tel
+    sheet.setColumnWidth(7, 200);  // Website
+    sheet.setColumnWidth(8, 180);  // Mail
+    sheet.setColumnWidth(9, 130);  // Toplantı formatı
+    sheet.setColumnWidth(10, 140); // Toplantıyı Yapan
+    sheet.setColumnWidth(11, 120); // Toplantı Tarihi
+    sheet.setColumnWidth(12, 120); // Satış Tarihi
+    sheet.setColumnWidth(13, 80);  // Ay
+    sheet.setColumnWidth(14, 120); // Satış Türü
+    sheet.setColumnWidth(15, 150); // Paket
+    sheet.setColumnWidth(16, 120); // Ciro
+    sheet.setColumnWidth(17, 300); // Yorum
+    sheet.setColumnWidth(18, 300); // Yönetici Not
+    sheet.setColumnWidth(19, 250); // Address
+    sheet.setColumnWidth(20, 300); // Maplink
+    
+    // Format ayarları (createSatislarimSheet ile aynı)
+    sheet.getRange(2, 1, 1000, 1).setNumberFormat('@'); // Kod
+    sheet.getRange(2, 2, 1000, 1).setNumberFormat('@'); // Kaynak
+    sheet.getRange(2, 16, 1000, 1).setNumberFormat('#,##0.00" ₺"'); // Ciro
+    sheet.getRange(2, 11, 1000, 1).setNumberFormat('DD.MM.YYYY'); // Toplantı Tarihi
+    sheet.getRange(2, 12, 1000, 1).setNumberFormat('DD.MM.YYYY'); // Satış Tarihi
+    
+    // Validation'ları ekle
+    setSatislarimDataValidation(sheet);
+    
+    // Renklendirme uygula (tüm satırlar için)
+    try {
+      if (newDataRows.length > 0) {
+        applySaleColorCodingBatch(sheet, 2, newDataRows.length);
+      }
+    } catch (colorError) {
+      console.warn('⚠️ Renklendirme hatası (kritik değil):', colorError && colorError.message);
+    }
+    
+    SpreadsheetApp.flush();
+    
+    ui.alert('✅ Tamamlandı', `Satışlarım sayfası yeni kolon düzenine geçirildi!\n\n${newDataRows.length} satır işlendi.`, ui.ButtonSet.OK);
+    
+    console.log('✅ fixSatislarimColumnOrder tamamlandı');
+    return { success: true, rowsProcessed: newDataRows.length };
+    
+  } catch (error) {
+    console.error('[ERROR] fixSatislarimColumnOrder:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Sütun düzenleme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Prepares meeting row data
  * @param {Object} rowData - Original row data
  * @param {Object} meetingData - Meeting form data
@@ -5474,8 +6007,8 @@ function showMoveToMeetingDialog() {
  * @returns {Object} - Result object
  */
 function processSaleForm(formData, rowNumber = null, sourceSheetName = null) {
-  // Performance: 2 saniye kontrolü
   const startTime = Date.now();
+  const perf = { veriOkuma: 0, sheetYazma: 0, formatTablo: 0, renklendirme: 0, toplam: 0 };
   
   // Variables for rollback (if error occurs after row is written)
   let nextSatisRow = null;
@@ -5509,7 +6042,8 @@ function processSaleForm(formData, rowNumber = null, sourceSheetName = null) {
       throw new Error('Ciro (₺) bilgisi zorunludur ve 0\'dan büyük olmalıdır');
     }
     
-    // Get row data
+    // Adım 1: Veri okuma
+    const t1 = Date.now();
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = sourceSheetName ? spreadsheet.getSheetByName(sourceSheetName) : SpreadsheetApp.getActiveSheet();
     if (!sheet) {
@@ -5538,7 +6072,10 @@ function processSaleForm(formData, rowNumber = null, sourceSheetName = null) {
     cleanFormData.satisCiro = ciro;
     cleanFormData.ciro = ciro;
     cleanFormData.satisTarihi = cleanFormData.satisTarihi || new Date().toISOString().split('T')[0];
+    perf.veriOkuma = (Date.now() - t1) / 1000;
     
+    // Adım 2: Sheet yazma (Satışlarım)
+    const t2 = Date.now();
     // Create sale in Satışlarım
     satislarimSheet = createSatislarimSheet(spreadsheet);
     
@@ -5552,7 +6089,16 @@ function processSaleForm(formData, rowNumber = null, sourceSheetName = null) {
     cleanFormData.sourceSheet = sourceSheetName || 'Toplantılarım';
     const satisRow = prepareSaleRow(rowData, cleanFormData, satislarimColumns, satislarimSheet);
     
-    nextSatisRow = satislarimSheet.getLastRow() + 1;
+    // PERFORMANS: Doğru pozisyonu bul ve insertRowBefore() kullan (sıralamaya gerek yok!)
+    const satisTarihiIdx = satislarimColumns.indexOf('Satış Tarihi');
+    const newDate = cleanFormData.satisTarihi || satisRow[satisTarihiIdx] || '';
+    
+    // Doğru pozisyonu bul (batch read ile hızlı!)
+    const insertRow = findInsertPositionForSatis(satislarimSheet, newDate, satislarimColumns);
+    
+    // insertRowBefore() kullanarak doğru yere ekle
+    satislarimSheet.insertRowBefore(insertRow);
+    nextSatisRow = insertRow;
     
     // Clear validation for Paket column before writing (fix validation error)
     const paketIndex = satislarimColumns.indexOf('Paket');
@@ -5604,13 +6150,22 @@ function processSaleForm(formData, rowNumber = null, sourceSheetName = null) {
       }
     }
     
-    // Renklendirme kaldırıldı - sortSatislarimByDate zaten batch renklendirme yapıyor
+    perf.sheetYazma = (Date.now() - t2) / 1000;
     
-    // PERFORMANS: Sıralama non-blocking (hata olsa bile devam et)
+    // Yeni satırı seçili yap (mavi çerçeve) - UX iyileştirmesi
     try {
-      sortSatislarimByDate(satislarimSheet);
-    } catch (sortError) {
-      // Sıralama hatası kritik değil, devam et
+      satislarimSheet.setActiveRange(satislarimSheet.getRange(nextSatisRow, 1, 1, satislarimSheet.getLastColumn()));
+    } catch (selectError) {
+      // Seçim hatası kritik değil, sessizce devam et
+    }
+    
+    // PERFORMANS: Sıralama kaldırıldı - yeni satır zaten en alta ekleniyor (1-2s kazanç!)
+    // Sadece yeni satırı renklendir (setActiveRange SONRASI - mavi çerçeve görünse bile yeşil arka plan uygulanır)
+    // Satış Türü'ne göre renklendirme (Yerinde Satış: koyu yeşil, Teklif Sonrası: açık yeşil)
+    try {
+      applySaleColorCoding(satislarimSheet, nextSatisRow);
+    } catch (colorError) {
+      // Renklendirme hatası kritik değil
     }
     
     // Delete from Toplantılarım (non-blocking - performans için)
@@ -5623,8 +6178,16 @@ function processSaleForm(formData, rowNumber = null, sourceSheetName = null) {
       // Silme hatası kritik değil, devam et
     }
     
-    // flush() sadece bir kez - tüm işlemler tamamlandıktan sonra
+    // Adım 3: flush() tek bir kez - en sonda
     SpreadsheetApp.flush();
+    
+    // Performance logging
+    perf.toplam = (Date.now() - startTime) / 1000;
+    console.log(`⏱️ Satış Ekleme: Veri okuma=${perf.veriOkuma.toFixed(2)}s, Sheet yazma=${perf.sheetYazma.toFixed(2)}s, TOPLAM=${perf.toplam.toFixed(2)}s`);
+    
+    if (perf.toplam > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
+      console.warn(`⚠️ PERFORMANS UYARISI: Satış ekleme ${perf.toplam.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
+    }
     
     // Log activity (tamamen async - performans için)
     try {
@@ -5643,23 +6206,12 @@ function processSaleForm(formData, rowNumber = null, sourceSheetName = null) {
     SELECTED_ROW_DATA = null;
     SELECTED_ROW_NUMBER = null;
     
-    // Performance: Süre kontrolü (sadece uyarı - hata değil)
-    const duration = (Date.now() - startTime) / 1000;
-    let performanceWarning = null;
-    if (duration > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
-      performanceWarning = `⏱️ İşlem ${duration.toFixed(2)}s sürdü (Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s)`;
-      console.warn(`⚠️ PERFORMANS UYARISI: Satış ekleme ${duration.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
-    }
-    
     // Activate Satışlarım sheet (yönlendirme)
     satislarimSheet.activate();
     
     return {
       success: true,
-      message: `✅ Satış başarıyla kaydedildi!\n💰 Ciro: ${ciro.toLocaleString('tr-TR')} ₺\n📊 Satışlarım sayfasına yönlendiriliyorsunuz.`,
-      duration: duration,
-      performanceWarning: performanceWarning,
-      redirectTo: 'Satışlarım'
+      message: `✅ Satış başarıyla kaydedildi!\n💰 Ciro: ${ciro.toLocaleString('tr-TR')} ₺\n📊 Satışlarım sayfasına yönlendiriliyorsunuz.`
     };
     
   } catch (error) {
@@ -5709,6 +6261,7 @@ function processSaleForm(formData, rowNumber = null, sourceSheetName = null) {
 function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) {
   // Performance: 2 saniye kontrolü
   const startTime = Date.now();
+  const perf = { veriOkuma: 0, sheetYazma: 0, formatTablo: 0, renklendirme: 0, toplam: 0 };
   
   try {
     // Clean form data - remove escape characters
@@ -5859,6 +6412,8 @@ function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) 
     
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     
+    // Adım 1: Veri okuma
+    const t1 = Date.now();
     // Get row data and number - prioritize parameters, then formData, then stored data
     let rowData = null;
     let rowNum = null;
@@ -5968,11 +6523,13 @@ function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) 
       throw new Error(`Geçersiz satır numarası: ${rowNum}. Lütfen tekrar deneyin.`);
     }
     
+    perf.veriOkuma = (Date.now() - t1) / 1000;
+    
     // "Satış Yapıldı" kontrolü - Ciro sor ve Satışlarım'a taşı
     const toplantiSonucu = cleanFormData.toplantiSonucu || cleanFormData.meetingResult || '';
     const isSatisYapildi = toplantiSonucu === 'Satış Yapıldı' || toplantiSonucu.toLowerCase().includes('satış');
     
-    if (isSatisYapildi) {
+      if (isSatisYapildi) {
       // Ciro bilgisini formData'dan al (HTML dialog'dan gelecek)
       let ciro = parseFloat(cleanFormData.ciro || cleanFormData.satisCiro || 0);
       
@@ -5980,6 +6537,8 @@ function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) 
         throw new Error('Satışa dönüştürmek için ciro (₺) bilgisi zorunludur. Lütfen ciro miktarını girin.');
       }
       
+      // Adım 2: Sheet yazma (Satışlarım)
+      const t2 = Date.now();
       // Satışlarım sayfasına ekle
       const satislarimSheet = createSatislarimSheet(spreadsheet);
       
@@ -5998,31 +6557,52 @@ function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) 
       // prepareSaleRow ile satış satırını hazırla
       const satisRow = prepareSaleRow(rowData, cleanFormData, satislarimColumns, satislarimSheet);
       
-      const nextSatisRow = satislarimSheet.getLastRow() + 1;
+      // PERFORMANS: Doğru pozisyonu bul ve insertRowBefore() kullan (sıralamaya gerek yok!)
+      const satisTarihiIdx = satislarimColumns.indexOf('Satış Tarihi');
+      const newDate = cleanFormData.satisTarihi || satisRow[satisTarihiIdx] || '';
+      
+      // Doğru pozisyonu bul (batch read ile hızlı!)
+      const insertRow = findInsertPositionForSatis(satislarimSheet, newDate, satislarimColumns);
+      
+      // insertRowBefore() kullanarak doğru yere ekle
+      satislarimSheet.insertRowBefore(insertRow);
+      const nextSatisRow = insertRow;
+      
       const dataRange = satislarimSheet.getRange(nextSatisRow, 1, 1, satislarimColumns.length);
       dataRange.setValues([satisRow]);
       
-      // Format ayarları
+      // Format ayarları (batch)
       const kodColumnIndex = satislarimColumns.indexOf('Kod') + 1;
       const kaynakColumnIndex = satislarimColumns.indexOf('Kaynak') + 1;
-      if (kodColumnIndex > 0) {
-        satislarimSheet.getRange(nextSatisRow, kodColumnIndex, 1, 1).setNumberFormat('@');
-      }
-      if (kaynakColumnIndex > 0) {
-        satislarimSheet.getRange(nextSatisRow, kaynakColumnIndex, 1, 1).setNumberFormat('@');
+      if (kodColumnIndex > 0 && kaynakColumnIndex > 0) {
+        const formatRange = satislarimSheet.getRange(nextSatisRow, kodColumnIndex, 1, kaynakColumnIndex - kodColumnIndex + 1);
+        formatRange.setNumberFormat('@');
+      } else {
+        if (kodColumnIndex > 0) {
+          satislarimSheet.getRange(nextSatisRow, kodColumnIndex, 1, 1).setNumberFormat('@');
+        }
+        if (kaynakColumnIndex > 0) {
+          satislarimSheet.getRange(nextSatisRow, kaynakColumnIndex, 1, 1).setNumberFormat('@');
+        }
       }
       
-      // Satış satırını güzel yeşil renkle boya (motivasyon için)
-      applySaleColorCoding(satislarimSheet, nextSatisRow);
-      
-      // PERFORMANS: Sıralama non-blocking (hata olsa bile devam et)
+      // Yeni satırı seçili yap (mavi çerçeve) - UX iyileştirmesi
       try {
-        sortSatislarimByDate(satislarimSheet);
-      } catch (sortError) {
-        // Sıralama hatası kritik değil, devam et
+        satislarimSheet.setActiveRange(satislarimSheet.getRange(nextSatisRow, 1, 1, satislarimSheet.getLastColumn()));
+      } catch (selectError) {
+        // Seçim hatası kritik değil, sessizce devam et
       }
       
-      // Flush yapma - script daha hızlı tamamlanır, loading indicator daha çabuk kaybolur
+      perf.sheetYazma = (Date.now() - t2) / 1000;
+      
+      // PERFORMANS: Sıralama kaldırıldı - yeni satır zaten en alta ekleniyor (1-2s kazanç!)
+      // Sadece yeni satırı renklendir (setActiveRange SONRASI - mavi çerçeve görünse bile yeşil arka plan uygulanır)
+      // Satış Türü'ne göre renklendirme (Yerinde Satış: koyu yeşil, Teklif Sonrası: açık yeşil)
+      try {
+        applySaleColorCoding(satislarimSheet, nextSatisRow);
+      } catch (colorError) {
+        // Renklendirme hatası kritik değil
+      }
       
       // Toplantılarım'dan geliyorsa: SİL (mavi yapma, SİL)
       // cleanSourceSheet zaten yukarıda tanımlı
@@ -6101,12 +6681,15 @@ function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) 
       SELECTED_ROW_DATA = null;
       SELECTED_ROW_NUMBER = null;
       
-      // Performance: Süre kontrolü (sadece uyarı - hata değil)
-      const duration = (Date.now() - startTime) / 1000;
-      let performanceWarning = null;
-      if (duration > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
-        performanceWarning = `⏱️ İşlem ${duration.toFixed(2)}s sürdü (Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s)`;
-        console.warn(`⚠️ PERFORMANS UYARISI: Toplantı/Satış ekleme ${duration.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
+      // Adım 4: flush() tek bir kez - en sonda
+      SpreadsheetApp.flush();
+      
+      // Performance logging
+      perf.toplam = (Date.now() - startTime) / 1000;
+      console.log(`⏱️ Toplantı/Satış Ekleme: Veri okuma=${perf.veriOkuma.toFixed(2)}s, Sheet yazma=${perf.sheetYazma.toFixed(2)}s, Format Tablo=${perf.formatTablo.toFixed(2)}s, TOPLAM=${perf.toplam.toFixed(2)}s`);
+      
+      if (perf.toplam > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
+        console.warn(`⚠️ PERFORMANS UYARISI: Toplantı/Satış ekleme ${perf.toplam.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
       }
       
       // Satışlarım sayfasını göster (yönlendirme)
@@ -6115,57 +6698,61 @@ function processMeetingForm(formData, rowNumber = null, sourceSheetName = null) 
       return {
         success: true,
         meetingData: cleanFormData,
-        message: `✅ Satış başarıyla kaydedildi!\n💰 Ciro: ${ciro} ₺\n📊 Satışlarım sayfasına yönlendiriliyorsunuz.`,
-        duration: duration,
-        performanceWarning: performanceWarning,
-        redirectTo: 'Satışlarım'
+        message: `✅ Satış başarıyla kaydedildi!\n💰 Ciro: ${ciro} ₺\n📊 Satışlarım sayfasına yönlendiriliyorsunuz.`
       };
     }
     
     // Normal toplantı akışı (Satış Yapıldı değilse)
-    // Create meeting in Toplantılarım - use cleaned form data
+    // Adım 2: Sheet yazma (Toplantılarım)
+    const t2 = Date.now();
     const result = createMeetingInToplantilarim(spreadsheet, rowData, cleanFormData);
+    perf.sheetYazma = (Date.now() - t2) / 1000;
     
-    // Update Randevularım row if it exists - use cleaned form data
-      const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
-      if (randevularimSheet && rowNum) {
+    // Adım 3: Randevularım güncelleme
+    const t3 = Date.now();
+    const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
+    if (randevularimSheet && rowNum) {
       updateRandevularimRow(randevularimSheet, rowNum, cleanFormData);
-      }
-      
-      // Performance: Gereksiz console.log kaldırıldı
+    }
+    perf.formatTablo = (Date.now() - t3) / 1000;
+    
+    // Adım 4: flush() tek bir kez - en sonda
+    SpreadsheetApp.flush();
+    
+    // logActivity non-blocking
+    try {
       logActivity('moveToMeeting', { 
         rowId: rowData.Kod,
-        rowData: rowData, // Employee code extraction için
+        rowData: rowData,
         meetingData: cleanFormData 
       });
-      
-      // Performance: Süre kontrolü (sadece uyarı - hata değil)
-      const duration = (Date.now() - startTime) / 1000;
-      let performanceWarning = null;
-      if (duration > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
-        performanceWarning = `⏱️ İşlem ${duration.toFixed(2)}s sürdü (Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s)`;
-        console.warn(`⚠️ PERFORMANS UYARISI: Toplantı ekleme ${duration.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
-      }
-      
-      // Activate Toplantılarım sheet (yönlendirme)
-      const toplantilarimSheet = spreadsheet.getSheetByName('Toplantılarım');
-      if (toplantilarimSheet) {
-        toplantilarimSheet.activate();
-      }
-      
-      // Clear stored data
-      SELECTED_ROW_DATA = null;
-      SELECTED_ROW_NUMBER = null;
-      
-      // Return success to close dialog
-      return {
-        success: true,
+    } catch (logError) {
+      // Log hatası kritik değil
+    }
+    
+    // Performance logging
+    perf.toplam = (Date.now() - startTime) / 1000;
+    console.log(`⏱️ Toplantı Ekleme: Veri okuma=${perf.veriOkuma.toFixed(2)}s, Sheet yazma=${perf.sheetYazma.toFixed(2)}s, Randevularım güncelleme=${perf.formatTablo.toFixed(2)}s, TOPLAM=${perf.toplam.toFixed(2)}s`);
+    
+    if (perf.toplam > CRM_CONFIG.MAX_FORM_EXECUTION_TIME) {
+      console.warn(`⚠️ PERFORMANS UYARISI: Toplantı ekleme ${perf.toplam.toFixed(2)}s sürdü! Hedef: <${CRM_CONFIG.MAX_FORM_EXECUTION_TIME}s`);
+    }
+    
+    // Activate Toplantılarım sheet (yönlendirme)
+    const toplantilarimSheet = spreadsheet.getSheetByName('Toplantılarım');
+    if (toplantilarimSheet) {
+      toplantilarimSheet.activate();
+    }
+    
+    // Clear stored data
+    SELECTED_ROW_DATA = null;
+    SELECTED_ROW_NUMBER = null;
+    
+    return {
+      success: true,
       meetingData: cleanFormData,
-        message: 'Toplantı başarıyla oluşturuldu!',
-        duration: duration,
-        performanceWarning: performanceWarning,
-        redirectTo: 'Toplantılarım'
-      };
+      message: 'Toplantı başarıyla oluşturuldu!'
+    };
     
   } catch (error) {
     console.error('Form processing failed:', error);
@@ -7658,6 +8245,7 @@ function createAdminMenu() {
     menu.addItem('🔄 Randevularım - Tarihe Göre Sırala', 'manualSortRandevularim');
     menu.addItem('🔧 Fırsatlarım - Yeni Kolon Düzenine Geçir', 'fixFirsatlarimColumnOrder');
     menu.addItem('🔧 Toplantılarım - Yeni Kolon Düzenine Geçir', 'fixToplantilarimColumnOrder');
+    menu.addItem('🔧 Satışlarım - Yeni Kolon Düzenine Geçir', 'fixSatislarimColumnOrder');
     menu.addItem('🗑️ Toplantılarım - Duplicate Kayıtları Temizle', 'cleanDuplicateMeetings');
     menu.addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable');
     menu.addItem('🧱 CMS Sütunlarını Website Yanına Taşı', 'addCmsColumnsNextToWebsiteOnAllFormatTables');
