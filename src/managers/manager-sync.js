@@ -5996,7 +5996,7 @@ function openMeetingDetailsEditor() {
           <input type="hidden" name="rowIndex" value="${rowIndex}" />
           <label>Teklif Detayı (çoklu seçim)</label>
           <div class="row">
-            ${['Custom','Elite','Platinium Plus','Platinium','Entegre','Digifirst Custom','Digifirst Plus','Digifirst','Digifirst Setup'].map(opt => `
+            ${['Next','Elite','Platinium Plus','Platinium','Entegre','Pro','Digifirst','Custom'].map(opt => `
               <label><input type="checkbox" name="teklifDetayi" value="${opt}"> ${opt}</label>
             `).join('')}
           </div>
@@ -10069,38 +10069,58 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
           
           if (allData.length >= 2) {
             const headers = allData[0];
-            const aktiviteTarihiIndex = headers.indexOf('Tarih') !== -1 ? headers.indexOf('Tarih') : headers.indexOf('Aktivite Tarihi');
-            const logIndex = headers.indexOf('Log Detayı') !== -1 ? headers.indexOf('Log Detayı') : headers.indexOf('Log');
-            const aktiviteIndex = headers.indexOf('Aktivite');
+            // STANDART LOG ARŞİVİ KOLONLARI (backend.js ile aynı)
+            const tarihIndex = headers.indexOf('Tarih');
             const saatIndex = headers.indexOf('Saat');
+            const aktiviteIndex = headers.indexOf('Aktivite');
+            const logDetayIndex = headers.indexOf('Log Detayı');
+            const kaynakSayfaIndex = headers.indexOf('Kaynak Sayfa');
+            const kodIndex = headers.indexOf('Kod');
+            const companyNameIndex = headers.indexOf('Company name');
             
-            if (aktiviteTarihiIndex !== -1 && logIndex !== -1 && aktiviteIndex !== -1) {
+            // Tüm zorunlu kolonlar mevcut mu kontrol et
+            if (tarihIndex !== -1 && saatIndex !== -1 && aktiviteIndex !== -1 && logDetayIndex !== -1) {
               for (let row = 1; row < allData.length; row++) {
-                const aktiviteTarihi = allData[row][aktiviteTarihiIndex];
-                let logValue = allData[row][logIndex];
+                const tarih = allData[row][tarihIndex];
+                const saat = allData[row][saatIndex];
                 const aktivite = allData[row][aktiviteIndex];
-                const saat = saatIndex !== -1 ? allData[row][saatIndex] : null;
+                let logDetay = allData[row][logDetayIndex];
+                const kaynakSayfa = kaynakSayfaIndex !== -1 ? allData[row][kaynakSayfaIndex] : '';
+                const kod = kodIndex !== -1 ? allData[row][kodIndex] : '';
+                const companyName = companyNameIndex !== -1 ? allData[row][companyNameIndex] : '';
                 
-                if (!aktiviteTarihi || !logValue || !aktivite) continue;
+                if (!tarih || !aktivite) continue;
                 
-                // Eğer log'da zaman yoksa ama "Saat" kolonu varsa, zamanı log'a ekle
-                if (saat && !extractTimeFromLog(logValue)) {
-                  const saatStr = String(saat);
-                  // Saat formatını kontrol et ve log'a ekle
-                  if (saatStr.match(/\d{1,2}:\d{2}/)) {
-                    logValue = `${logValue} ${saatStr}`;
+                // Log Detayı boşsa, standart format oluştur
+                if (!logDetay || String(logDetay).trim() === '') {
+                  logDetay = aktivite;
+                  if (companyName) logDetay += ` - ${companyName}`;
+                  if (tarih) {
+                    const tarihStr = tarih instanceof Date 
+                      ? Utilities.formatDate(tarih, 'Europe/Istanbul', 'dd.MM.yyyy')
+                      : String(tarih);
+                    logDetay += ` - ${tarihStr}`;
                   }
                 }
                 
-                // Tarih parse etme
+                // Saat bilgisini log'a ekle (eğer yoksa)
+                if (saat && !extractTimeFromLog(logDetay)) {
+                  const saatStr = String(saat).trim();
+                  // Saat formatını kontrol et (HH:mm:ss veya HH:mm)
+                  if (saatStr.match(/\d{1,2}:\d{2}(:\d{2})?/)) {
+                    logDetay = `${logDetay} ${saatStr}`;
+                  }
+                }
+                
+                // Tarih parse etme (standart format: dd.MM.yyyy)
                 let logDate = null;
-                if (aktiviteTarihi instanceof Date) {
-                  logDate = new Date(aktiviteTarihi);
+                if (tarih instanceof Date) {
+                  logDate = new Date(tarih);
                 } else {
-                  logDate = parseDdMmYyyy(aktiviteTarihi);
+                  logDate = parseDdMmYyyy(tarih);
                   if (!logDate) {
                     try {
-                      logDate = new Date(String(aktiviteTarihi));
+                      logDate = new Date(String(tarih));
                       if (isNaN(logDate.getTime())) continue;
                     } catch (e) {
                       continue;
@@ -10117,10 +10137,13 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
                 
                 if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
                   logsFromArchive.push({
-                    date: aktiviteTarihi,
-                    log: logValue,
+                    date: tarih,
+                    log: logDetay,
                     aktivite: aktivite,
-                    source: 'Log Arşivi'
+                    source: 'Log Arşivi',
+                    kaynakSayfa: kaynakSayfa || '',
+                    kod: kod || '',
+                    companyName: companyName || ''
                   });
                 }
               }
@@ -11408,28 +11431,28 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
         continue;
       }
       
-      // Format Tablo header'larını kontrol et: Aktivite + (Aktivite Tarihi veya Log) - T-Aktivite Özet mantığı
+      // Format Tablo header'larını kontrol et: Aktivite + Aktivite Tarihi (Log kolonu opsiyonel - varsa kullanılır)
       const hasAktivite = headers.some(h => h && h.toString().toLowerCase().includes('aktivite'));
       const hasTarihi = headers.some(h => h && h.toString().toLowerCase().includes('aktivite tarihi') || h && h.toString().toLowerCase().includes('tarih'));
-      const hasLog = headers.some(h => h && h.toString().toLowerCase().includes('log') || h && h.toString().toLowerCase().includes('günlük'));
+      const hasLog = headers.some(h => h && h.toString().toLowerCase().includes('log'));
       
-      // Daha esnek kontrol: Aktivite + (Tarih veya Log) - T-Aktivite Özet mantığı
+      // Format Tablo kontrolü: Aktivite + Aktivite Tarihi olmalı (Log kolonu opsiyonel)
       const aktiviteIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('aktivite'));
       const tarihIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('aktivite tarihi') || h && h.toString().toLowerCase().includes('tarih'));
-      const logIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('log') || h && h.toString().toLowerCase().includes('günlük'));
+      const logIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('log'));
       
       console.log(`🔍 "${sheet.getName()}" kontrol: Aktivite=${hasAktivite}(${aktiviteIndex}), Tarih=${hasTarihi}(${tarihIndex}), Log=${hasLog}(${logIndex})`);
       
-      // Sıkı kontrol: Aktivite + Tarih + Log - HEPSİ OLMALI
-      if (hasAktivite && hasTarihi && hasLog && aktiviteIndex !== -1 && tarihIndex !== -1 && logIndex !== -1) {
+      // Format Tablo kontrolü: Aktivite + Aktivite Tarihi olmalı (Log kolonu opsiyonel - varsa kullanılır)
+      if (hasAktivite && hasTarihi && aktiviteIndex !== -1 && tarihIndex !== -1) {
         // Header'lar uygunsa sayfayı al - veri kontrolü yapma (çok yavaş)
         formatTableSheets.push({
           sheet: sheet,
           aktiviteIndex: aktiviteIndex,
           tarihIndex: tarihIndex,
-          logIndex: logIndex
+          logIndex: logIndex !== -1 ? logIndex : null // Log kolonu varsa index, yoksa null
         });
-        console.log(`✅ Format Tablo sayfası bulundu: "${sheet.getName()}" (header kontrolü ile)`);
+        console.log(`✅ Format Tablo sayfası bulundu: "${sheet.getName()}" (Log kolonu: ${logIndex !== -1 ? 'VAR' : 'YOK'})`);
       }
     }
     
@@ -11455,7 +11478,7 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
           _sheetName: sheet.getName(),
           _aktiviteIndex: formatSheet.aktiviteIndex,
           _tarihIndex: formatSheet.tarihIndex,
-          _logIndex: formatSheet.logIndex
+          _logIndex: formatSheet.logIndex // Log kolonu varsa index, yoksa null
         })));
       }
     }
@@ -11464,11 +11487,11 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     
     // Veri işleme için kolon indekslerini kullan (ilk sayfadan)
     const firstSheet = formatTableSheets[0];
-    const logIdx = firstSheet.logIndex;
     const aktiviteTarihiIdx = firstSheet.tarihIndex;
     const aktiviteIdx = firstSheet.aktiviteIndex;
+    const logIdx = firstSheet.logIndex;
     
-    console.log(`🔍 Kolon indeksleri (ilk sayfadan): Log=${logIdx}, Tarih=${aktiviteTarihiIdx}, Aktivite=${aktiviteIdx}`);
+    console.log(`🔍 Kolon indeksleri (ilk sayfadan): Tarih=${aktiviteTarihiIdx}, Aktivite=${aktiviteIdx}, Log=${logIdx !== null ? logIdx : 'YOK (standart format kullanılacak)'}`);
     
     // Tarih bazlı gruplama
     const logsByDate = new Map();
@@ -11491,12 +11514,37 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
       const row = allData[i];
       
       // Her satırın kendi indekslerini kullan
-      const logValue = row[row._logIndex];
       const aktiviteTarihi = row[row._tarihIndex];
       const aktivite = row[row._aktiviteIndex];
       
+      // Log değerini al: Önce Log kolonunu kontrol et (varsa kullan, yoksa standart format oluştur)
+      let logValue = '';
+      if (row._logIndex !== null && row._logIndex !== undefined) {
+        logValue = String(row[row._logIndex] || '').trim();
+      }
+      
+      // Eğer Log kolonu yoksa veya boşsa, standart format oluştur (Log Arşivi ile aynı)
+      if (!logValue || logValue === '') {
+        // İsim Soyisim kolonunu bul (standart format oluşturmak için)
+        const sheet = formatTableSheets.find(ft => ft.sheet.getName() === row._sheetName)?.sheet;
+        let isimSoyisim = '';
+        if (sheet) {
+          const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+          const isimSoyisimIndex = headers.indexOf('İsim Soyisim');
+          if (isimSoyisimIndex !== -1) {
+            isimSoyisim = String(row[isimSoyisimIndex] || '').trim();
+          }
+        }
+        
+        // Standart format: Aktivite - İsim Soyisim - Tarih (Log Arşivi ile aynı)
+        const parts = [aktivite];
+        if (isimSoyisim) parts.push(isimSoyisim);
+        parts.push(aktiviteTarihi);
+        logValue = parts.join(' - ');
+      }
+      
       // "Ham veri'den aktarıldı" kontrolü - bunları atla
-      const isHamVeri = logValue && String(logValue).toLowerCase().includes('ham veri');
+      const isHamVeri = String(aktivite || '').toLowerCase().includes('ham veri');
       
       if (isHamVeri) {
         hamVeriSkippedCount++;
@@ -11505,7 +11553,6 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
       
       // Boş değer kontrolü
       const hasAktiviteTarihi = aktiviteTarihi && String(aktiviteTarihi).trim() !== '';
-      const hasLogValue = logValue && String(logValue).trim() !== '';
       const hasAktivite = aktivite && String(aktivite).trim() !== '';
 
       // Son 30 gün filtresi (Aktivite Tarihi üzerinden)
@@ -11518,7 +11565,7 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
         }
       }
       
-      if (hasAktiviteTarihi && hasLogValue && hasAktivite) {
+      if (hasAktiviteTarihi && hasAktivite) {
         // GEÇİCİ: Tüm log'ları al (tarih karşılaştırmasını devre dışı bırak)
         // TODO: Tarih karşılaştırması daha sonra aktif edilecek
         
@@ -12077,6 +12124,7 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
             if (!s) return '';
             if (s.indexOf('ulasil') !== -1 || s.indexOf('ulas') !== -1) return CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
             if (s.indexOf('ilgilenmiyor') !== -1 || s.indexOf('ilgi yok') !== -1) return CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
+            if (s.indexOf('gecersiz numara') !== -1 || s.indexOf('geçersiz numara') !== -1) return CRM_CONFIG.COLOR_CODES['Geçersiz Numara'];
             if (s.indexOf('randevu al') !== -1) return CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
             if (s.indexOf('teyit') !== -1) return CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
             if (s.indexOf('erte') !== -1) return CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
@@ -12084,7 +12132,8 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
             if (s.indexOf('yeniden') !== -1 || s.indexOf('ara') !== -1) return CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
             if (s.indexOf('bilgi') !== -1) return CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
             if (s.indexOf('firsat') !== -1 || s.indexOf('fırsat') !== -1 || s.indexOf('ilet') !== -1) return CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
-            if (s.indexOf('satış yapildi') !== -1 || s.indexOf('satis yapildi') !== -1) return CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
+            if (s.indexOf('toplanti') !== -1 || s.indexOf('toplantı') !== -1) return CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+            if (s.indexOf('satış yapildi') !== -1 || s.indexOf('satis yapildi') !== -1 || s.indexOf('satis yap') !== -1) return CRM_CONFIG.COLOR_CODES['Satış Yapıldı'];
             return '';
           } catch (e) {
             return '';
@@ -13281,10 +13330,10 @@ function collectLogsFromFormatTables(employeeFile, startDate, endDate) {
       const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       const aktiviteIndex = headers.indexOf('Aktivite');
       const aktiviteTarihiIndex = headers.indexOf('Aktivite Tarihi') !== -1 ? headers.indexOf('Aktivite Tarihi') : headers.indexOf('Tarih');
-      const logIndex = headers.indexOf('Log');
+      const logIndex = headers.indexOf('Log'); // Log kolonu varsa kullan (yedek kaynak)
       
-      // Format Tablo kontrolü: Aktivite + (Aktivite Tarihi veya Log) olmalı
-      if (aktiviteIndex === -1 || (aktiviteTarihiIndex === -1 && logIndex === -1)) {
+      // Format Tablo kontrolü: Aktivite + Aktivite Tarihi olmalı (Log kolonu opsiyonel - varsa kullanılır)
+      if (aktiviteIndex === -1 || aktiviteTarihiIndex === -1) {
         continue;
       }
       
@@ -13298,19 +13347,8 @@ function collectLogsFromFormatTables(employeeFile, startDate, endDate) {
         const aktivite = String(data[row][aktiviteIndex] || '').trim();
         if (!aktivite) continue;
         
-        // Tarih bul
-        let aktiviteTarihi = null;
-        if (aktiviteTarihiIndex !== -1) {
-          aktiviteTarihi = data[row][aktiviteTarihiIndex];
-        } else if (logIndex !== -1) {
-          // Log'dan tarih çıkar
-          const logValue = String(data[row][logIndex] || '');
-          const dateMatch = logValue.match(/(\d{2}\.\d{2}\.\d{4})/);
-          if (dateMatch) {
-            aktiviteTarihi = dateMatch[1];
-          }
-        }
-        
+        // Tarih bul (Log kolonu artık yok - sadece Aktivite Tarihi kullan)
+        const aktiviteTarihi = data[row][aktiviteTarihiIndex];
         if (!aktiviteTarihi) continue;
         
         // Tarih parse et
@@ -13338,8 +13376,24 @@ function collectLogsFromFormatTables(employeeFile, startDate, endDate) {
         
         if (logDateOnly < startDateOnly || logDateOnly > endDateOnly) continue;
         
-        // Log değeri oluştur
-        const logValue = logIndex !== -1 ? String(data[row][logIndex] || '') : `${aktivite} - ${aktiviteTarihi}`;
+        // Log değeri oluştur (STANDART FORMAT: Aktivite - İsim Soyisim - Tarih)
+        // Önce Log kolonunu kontrol et (varsa kullan, yoksa standart format oluştur)
+        let logValue = '';
+        if (logIndex !== -1) {
+          logValue = String(data[row][logIndex] || '').trim();
+        }
+        
+        // Eğer Log kolonu yoksa veya boşsa, standart format oluştur (Log Arşivi ile aynı)
+        if (!logValue || logValue === '') {
+          const isimSoyisimIndex = headers.indexOf('İsim Soyisim');
+          const isimSoyisim = isimSoyisimIndex !== -1 ? String(data[row][isimSoyisimIndex] || '').trim() : '';
+          
+          // Standart format: Aktivite - İsim Soyisim - Tarih (Log Arşivi ile aynı)
+          const parts = [aktivite];
+          if (isimSoyisim) parts.push(isimSoyisim);
+          parts.push(aktiviteTarihi);
+          logValue = parts.join(' - ');
+        }
         
         logs.push({
           date: aktiviteTarihi,
@@ -14759,7 +14813,8 @@ function collectFunnelData(employeeCode, startDate, endDate) {
                   date: logDate,
                   aktivite: aktivite,
                   log: log,
-                  source: 'Log Arşivi'
+                  source: 'Log Arşivi',
+                  ciro: 0 // Log Arşivi'nde ciro yok (Satışlarım'dan alınacak)
                 });
               }
             }
@@ -14846,7 +14901,8 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
                 date: logDate,
                 aktivite: mappedActivity,
                 log: aktivite,
-                source: 'Randevularım'
+                source: 'Randevularım',
+                ciro: 0 // Randevularım'da ciro yok
               });
               randevuCount++;
             }
@@ -14907,7 +14963,8 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
                 date: logDate,
                 aktivite: mappedActivity,
                 log: aktivite,
-                source: 'Fırsatlarım'
+                source: 'Fırsatlarım',
+                ciro: 0 // Fırsatlarım'da ciro yok
               });
               firsatCount++;
             }
@@ -14972,7 +15029,8 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
                 date: logDate,
                 aktivite: mappedActivity,
                 log: aktivite,
-                source: 'Toplantılarım'
+                source: 'Toplantılarım',
+                ciro: 0 // Toplantılarım'da ciro yok
               });
               toplantiCount++;
             }
@@ -14982,6 +15040,53 @@ function collectFunnelDataFromBackup(employeeFile, startDate, endDate) {
       console.log(`📊 Toplantılarım: ${toplantiCount} toplantı aktivitesi eklendi`);
     } else {
       console.log(`⚠️ Toplantılarım: Aktivite veya Tarih kolonu bulunamadı`);
+    }
+  }
+  
+  // Satışlarım - Ciro bilgisini topla
+  const satislarimSheet = employeeFile.getSheetByName('Satışlarım');
+  if (satislarimSheet && satislarimSheet.getLastRow() > 1) {
+    const data = satislarimSheet.getDataRange().getValues();
+    const headers = data[0];
+    const satisTarihiIndex = headers.findIndex(h => {
+      const hStr = String(h || '').toLowerCase();
+      return hStr.includes('satış tarihi') || hStr.includes('satis tarihi');
+    });
+    const ciroIndex = headers.indexOf('Ciro');
+    
+    console.log(`🔍 Satışlarım: Satış Tarihi kolonu index=${satisTarihiIndex}, Ciro kolonu index=${ciroIndex}`);
+    
+    if (satisTarihiIndex !== -1 && ciroIndex !== -1) {
+      let satisCount = 0;
+      let totalCiro = 0;
+      for (let row = 1; row < data.length; row++) {
+        const satisTarihi = data[row][satisTarihiIndex];
+        const ciro = parseFloat(data[row][ciroIndex] || 0);
+        
+        if (satisTarihi && !isNaN(ciro) && ciro > 0) {
+          let logDate = parseDdMmYyyy(satisTarihi) || (satisTarihi instanceof Date ? new Date(satisTarihi) : null);
+          if (logDate && !isNaN(logDate.getTime())) {
+            const logDateOnly = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
+            const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            if (logDateOnly >= startDateOnly && logDateOnly <= endDateOnly) {
+              // Satış aktivitesi ekle (ciro bilgisi ile)
+              activities.push({
+                date: logDate,
+                aktivite: 'Satış Yapıldı',
+                log: 'Satış Yapıldı',
+                source: 'Satışlarım',
+                ciro: ciro
+              });
+              satisCount++;
+              totalCiro += ciro;
+            }
+          }
+        }
+      }
+      console.log(`📊 Satışlarım: ${satisCount} satış aktivitesi eklendi, Toplam Ciro: ${totalCiro.toFixed(2)} ₺`);
+    } else {
+      console.log(`⚠️ Satışlarım: Satış Tarihi veya Ciro kolonu bulunamadı`);
     }
   }
   
@@ -15021,6 +15126,9 @@ function processFunnelData(activities) {
     'Fırsat Kaybedilen': 0
   };
   
+  // Ciro toplamı (sadece satışlar için)
+  let totalCiro = 0;
+  
   // Aktivite mapping (case-insensitive)
   const activityMap = getActivityMapping();
   
@@ -15032,6 +15140,12 @@ function processFunnelData(activities) {
     if (!aktivite) continue;
     
     totalActivities++;
+    
+    // Ciro bilgisini topla (sadece satışlar için)
+    const ciro = parseFloat(activity.ciro || 0);
+    if (!isNaN(ciro) && ciro > 0) {
+      totalCiro += ciro;
+    }
     
     // Aktivite mapping'den bul
     const mappedActivity = activityMap[aktivite] || null;
@@ -15101,7 +15215,8 @@ function processFunnelData(activities) {
       counts: negativeFunnel,
       percentages: negativePercentages
     },
-    total: totalActivities
+    total: totalActivities,
+    totalCiro: totalCiro
   };
 }
 
@@ -15168,7 +15283,12 @@ function processFunnelDataByEmployee(activities, sortBy) {
     return b.totalActivities - a.totalActivities;
   });
   
-  // Toplam hesapla
+  // Toplam hesapla (ciro dahil)
+  let totalCiro = 0;
+  for (const emp of employeeFunnels) {
+    totalCiro += emp.funnel.totalCiro || 0;
+  }
+  
   const totalFunnel = {
     positive: {
       counts: {
@@ -15382,7 +15502,8 @@ function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate,
         'Fırsat',
         'Randevu',
         'Toplantı',
-        'Satış'
+        'Satış',
+        'Ciro (₺)'
       ];
       
       for (let col = 1; col <= positiveHeaders.length; col++) {
@@ -15403,6 +15524,9 @@ function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate,
         sheet.getRange(currentRow, col++).setValue(f.positive.counts['Randevu'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.positive.counts['Toplantı'] || 0);
         sheet.getRange(currentRow, col++).setValue(f.positive.counts['Satış'] || 0);
+        const empCiroValue = emp.totalCiro || 0;
+        sheet.getRange(currentRow, col++).setValue(empCiroValue);
+        sheet.getRange(currentRow, col - 1).setNumberFormat('#,##0.00" ₺"');
         
         // Zebra striping
         if (i % 2 === 0) {
@@ -15421,6 +15545,9 @@ function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate,
       sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Randevu'] || 0);
       sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Toplantı'] || 0);
       sheet.getRange(currentRow, col++).setValue(funnelData.total.positive.counts['Satış'] || 0);
+      const totalCiroValue = funnelData.total.totalCiro || 0;
+      sheet.getRange(currentRow, col++).setValue(totalCiroValue);
+      sheet.getRange(currentRow, col - 1).setNumberFormat('#,##0.00" ₺"');
       
       // Toplam satırını vurgula
       sheet.getRange(currentRow, 1, 1, positiveHeaders.length)
@@ -15497,9 +15624,10 @@ function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate,
       
       // Sütun genişliklerini ayarla
       sheet.setColumnWidth(1, 250); // Temsilci
-      for (let c = 2; c <= 7; c++) {
+      for (let c = 2; c <= 6; c++) {
         sheet.setColumnWidth(c, 120);
       }
+      sheet.setColumnWidth(7, 150); // Ciro kolonu daha geniş
       
     } else {
       // ========================================
@@ -15547,6 +15675,15 @@ function createFunnelReportSheet(managerFile, funnelData, timeFilter, startDate,
         currentRow++;
       }
       
+      // Ciro satırı ekle
+      currentRow++;
+      sheet.getRange(currentRow, 1).setValue('💰 TOPLAM CİRO');
+      sheet.getRange(currentRow, 1, 1, 2).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setBackground('#FFC107').setFontColor('#000000');
+      const totalCiroValue = funnelData.totalCiro || 0;
+      sheet.getRange(currentRow, 3).setValue(totalCiroValue);
+      sheet.getRange(currentRow, 3).setNumberFormat('#,##0.00" ₺"').setFontWeight('bold').setFontSize(14);
+      sheet.getRange(currentRow, 3, 1, 2).merge();
       currentRow += 2;
       
       // NEGATİF FUNNEL

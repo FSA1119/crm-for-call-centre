@@ -237,3 +237,32 @@ Ek kontroller: [başka ne yaptın]
 - Dokümantasyon: Otomatik güncelle
 - camelCase kullan
 - Modüler yapı
+
+validateArrayHeaderSync() - Array-Header Senkronizasyonu
+ZORUNLU: Her array oluşturmadan ÖNCE çağır
+
+
+function validateArrayHeaderSync(array, headers) {
+  if (array.length !== headers.length) {
+    console.error('❌ KRİTİK: Array-Header uyumsuz!');
+    console.error(`Headers (${headers.length}):`, headers);
+    console.error(`Array (${array.length}):`, array);
+    throw new Error(`Array (${array.length}) ≠ Headers (${headers.length})`);
+  }
+  
+  console.log('📋 Array-Header Mapping:');
+  array.forEach((value, index) => {
+    console.log(`  ${index}: ${headers[index]} = "${value}"`);
+  });
+  
+  console.log('✅ Array-Header sync OK');
+}
+KULLANIM:
+
+
+const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+const appointmentRow = [rowObject.Kod, 'Kaynak', rowObject['Company name'], ...];
+validateArrayHeaderSync(appointmentRow, headers); // ZORUNLU!
+sheet.getRange(newRow, 1, 1, appointmentRow.length).setValues([appointmentRow]);
+YASAK: Hardcoded array sırası, kontrolsüz yazma
+

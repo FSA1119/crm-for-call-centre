@@ -64,7 +64,8 @@ const CRM_CONFIG = {
     'Satış Yapıldı': 'rgb(187, 222, 251)',        // Light Blue
     'Potansiyel Sıcak': 'rgb(255, 224, 178)',     // Light Orange
     'Potansiyel Orta': 'rgb(225, 245, 254)',      // Light Blue
-    'Potansiyel Soğuk': 'rgb(236, 239, 241)'      // Light Gray
+    'Potansiyel Soğuk': 'rgb(236, 239, 241)',     // Light Gray
+    'Satış İptal': 'rgb(250, 210, 210)'          // Light Red (diğerleriyle çakışmayacak)
   },
   
   // Activity options (all)
@@ -547,14 +548,23 @@ function logActivity(action, data = {}) {
     };
     const aktivite = activityMap[action] || action; // Eğer mapping'de yoksa action'ı olduğu gibi kullan
     
-    // Log Detayı oluştur
+    // Log Detayı oluştur (STANDART FORMAT: Aktivite - İsim Soyisim - Tarih)
+    // Bu format hem Log Arşivi hem de Yönetici log okuma için tutarlı olmalı
     let logDetay = aktivite;
-    if (data.appointmentData) {
-      logDetay = `${aktivite} - ${data.appointmentData.isimSoyisim || ''} - ${data.appointmentData.randevuTarihi || ''}`;
-    } else if (data.meetingData) {
-      logDetay = `${aktivite} - ${data.meetingData.isimSoyisim || ''} - ${data.meetingData.toplantiTarihi || ''}`;
-    } else if (data.opportunityData) {
-      logDetay = `${aktivite} - ${data.opportunityData.isimSoyisim || ''}`;
+    const isimSoyisim = data.appointmentData?.isimSoyisim || 
+                       data.meetingData?.isimSoyisim || 
+                       data.opportunityData?.isimSoyisim || 
+                       '';
+    const ilgiliTarih = data.appointmentData?.randevuTarihi || 
+                       data.meetingData?.toplantiTarihi || 
+                       '';
+    
+    // Standart format: Aktivite - İsim Soyisim - Tarih
+    if (isimSoyisim || ilgiliTarih) {
+      const parts = [aktivite];
+      if (isimSoyisim) parts.push(isimSoyisim);
+      if (ilgiliTarih) parts.push(ilgiliTarih);
+      logDetay = parts.join(' - ');
     }
     
     // Kaynak Sayfa
@@ -3523,8 +3533,7 @@ function showMeetingDialog(rowData) {
   }
   
   const teklifDetayiOptions = [
-    'Custom', 'Elite', 'Platinium Plus', 'Platinium', 'Entegre',
-    'Digifirst Custom', 'Digifirst Plus', 'Digifirst', 'Digifirst Setup'
+    'Next', 'Elite', 'Platinium Plus', 'Platinium', 'Entegre', 'Pro', 'Digifirst', 'Custom'
   ];
   let teklifDetayiHTML = '';
   for (const option of teklifDetayiOptions) {
@@ -3813,8 +3822,7 @@ function setSatislarimDataValidation(sheet) {
   const paketIndex = headers.indexOf('Paket');
   if (paketIndex > 0) {
     const paketOptions = [
-      'Custom', 'Elite', 'Platinium Plus', 'Platinium', 'Entegre',
-      'Digifirst Custom', 'Digifirst Plus', 'Digifirst', 'Digifirst Setup'
+      'Next', 'Elite', 'Platinium Plus', 'Platinium', 'Entegre', 'Pro', 'Digifirst', 'Custom'
     ];
     const paketRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(paketOptions, true)
@@ -4972,8 +4980,7 @@ function setToplantilarimDataValidation(sheet) {
   const teklifDetayIndex = headers.indexOf('Teklif Detayı') + 1;
   if (teklifDetayIndex > 0) {
     const teklifOptions = [
-      'Custom', 'Elite', 'Platinium Plus', 'Platinium', 'Entegre',
-      'Digifirst Custom', 'Digifirst Plus', 'Digifirst', 'Digifirst Setup', 'Next'
+      'Next', 'Elite', 'Platinium Plus', 'Platinium', 'Entegre', 'Pro', 'Digifirst', 'Custom'
     ];
     const teklifRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(teklifOptions, true)
@@ -5073,6 +5080,9 @@ function applyMeetingColorCoding(sheet, rowNumber) {
         } else if (toplantiSonucuLower.indexOf('beklemede') !== -1) {
           color = CRM_CONFIG.COLOR_CODES['Toplantı Beklemede'];
           console.log(`🎨 Toplantılarım Row ${rowNumber}: Toplantı Beklemede color applied`);
+        } else if (toplantiSonucu === 'Satış İptal' || toplantiSonucuLower.indexOf('satış iptal') !== -1) {
+          color = CRM_CONFIG.COLOR_CODES['Satış İptal'];
+          console.log(`🎨 Toplantılarım Row ${rowNumber}: Satış İptal color applied`);
         } else if (toplantiSonucuLower.indexOf('iptal') !== -1) {
           color = CRM_CONFIG.COLOR_CODES['Toplantı İptal'];
           console.log(`🎨 Toplantılarım Row ${rowNumber}: Toplantı İptal color applied`);
@@ -6701,7 +6711,6 @@ function onOpen() {
       .addItem('Satışa Geç', 'showMoveToSaleDialog')
       .addSeparator()
       .addItem('💰 Satışlarım', 'showSatislarimSheet')
-      .addItem('📋 Log Arşivi', 'showLogArchiveSheet')
       .addSeparator()
       .addItem('📦 Dataset Raporu', 'showDatasetReportDialog')
       .addSeparator()
@@ -7506,6 +7515,10 @@ function createAdminMenu() {
     menu.addItem('🗑️ Toplantılarım - Duplicate Kayıtları Temizle', 'cleanDuplicateMeetings');
     menu.addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable');
     menu.addItem('🧱 CMS Sütunlarını Website Yanına Taşı', 'addCmsColumnsNextToWebsiteOnAllFormatTables');
+    
+    // 📋 Log Arşivi (Admin only - en altta, daha az göze çarpan)
+    menu.addSeparator();
+    menu.addItem('📋 Log Arşivi (Admin)', 'showLogArchiveSheet');
     
     // Add menu to UI
     menu.addToUi();
@@ -10215,8 +10228,13 @@ function sortToplantilarimByDate(sheet) {
         const dateValue = row[toplantiTarihiIndex];
         const status = statusValues[index] || '';
         
-        // Satış Yapıldı ise priority=0 (en üstte), diğerleri priority=1
-        const priority = (status === 'Satış Yapıldı') ? 0 : 1;
+        // Priority: Satış Yapıldı=0 (en üstte), Satış İptal=2 (en altta), diğerleri=1
+        let priority = 1;
+        if (status === 'Satış Yapıldı') {
+          priority = 0;
+        } else if (status === 'Satış İptal') {
+          priority = 2;
+        }
         
         return {
           rowIndex: index + 2,
@@ -10228,11 +10246,11 @@ function sortToplantilarimByDate(sheet) {
       })
       .filter(item => item !== null); // Boş satırları filtrele
     
-    // Önce Satış Yapıldı'yı üste, sonra tarihe göre sırala (en yeni önce)
+    // Önce Satış Yapıldı'yı üste, Satış İptal'ı alta, sonra tarihe göre sırala (en yeni önce)
     dateData.sort((a, b) => {
-      // Önce durum önceliğine göre sırala - Satış Yapıldı üste
+      // Önce durum önceliğine göre sırala - Satış Yapıldı (0) üste, Satış İptal (2) altta
       if (a.statusPriority !== b.statusPriority) {
-        return a.statusPriority - b.statusPriority; // Satış Yapıldı (0) < Diğerleri (1)
+        return a.statusPriority - b.statusPriority; // 0 < 1 < 2
       }
       
       // Aynı durumdaysa, tarihe göre sırala (en yeni önce)

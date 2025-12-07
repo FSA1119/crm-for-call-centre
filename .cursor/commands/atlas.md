@@ -790,3 +790,372 @@ function onOpen() {
     
   console.log('[MENU] CRM menu created successfully');
 }
+
+validateArrayHeaderSync() - Array-Header Senkronizasyonu
+ZORUNLU: Her array oluşturmadan ÖNCE çağır
+
+
+function validateArrayHeaderSync(array, headers) {
+  if (array.length !== headers.length) {
+    console.error('❌ KRİTİK: Array-Header uyumsuz!');
+    console.error(`Headers (${headers.length}):`, headers);
+    console.error(`Array (${array.length}):`, array);
+    throw new Error(`Array (${array.length}) ≠ Headers (${headers.length})`);
+  }
+  
+  console.log('📋 Array-Header Mapping:');
+  array.forEach((value, index) => {
+    console.log(`  ${index}: ${headers[index]} = "${value}"`);
+  });
+  
+  console.log('✅ Array-Header sync OK');
+}
+KULLANIM:
+
+
+const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+const appointmentRow = [rowObject.Kod, 'Kaynak', rowObject['Company name'], ...];
+validateArrayHeaderSync(appointmentRow, headers); // ZORUNLU!
+sheet.getRange(newRow, 1, 1, appointmentRow.length).setValues([appointmentRow]);
+YASAK: Hardcoded array sırası, kontrolsüz yazma
+
+
+
+measurePerformance() - Performance Ölçümü ve Monitoring
+HEDEF: Her işlem 2-3 saniye (MAX 5 saniye)
+
+
+function measurePerformance(funcName, func) {
+  const start = Date.now();
+  const result = func();
+  const duration = (Date.now() - start) / 1000;
+  
+  const status = duration < 2 ? '✅' : duration < 5 ? '⚠️' : '❌';
+  console.log(`⏱️ ${status} ${funcName}: ${duration.toFixed(2)}s`);
+  
+  if (duration > 3) {
+    console.warn(`⚠️ YAVAŞ İŞLEM! ${funcName} ${duration.toFixed(2)}s (Hedef: <2s)`);
+  }
+  
+  return { result, duration };
+}
+// Adım adım ölçüm
+function measureSteps(operationName) {
+  console.log(`⏱️ === ${operationName} PERFORMANCE ===`);
+  const totalStart = Date.now();
+  
+  return {
+    step: (stepName, func) => {
+      const t = Date.now();
+      const result = func();
+      console.log(`  📊 ${stepName}: ${((Date.now() - t) / 1000).toFixed(2)}s`);
+      return result;
+    },
+    end: () => {
+      const total = (Date.now() - totalStart) / 1000;
+      console.log(`⏱️ TOPLAM: ${total.toFixed(2)}s`);
+      if (total > 3) console.error('❌ HEDEF AŞILDI! Optimizasyon gerekli!');
+      return total;
+    }
+  };
+}
+KULLANIM:
+
+
+// Tek işlem
+const { result, duration } = measurePerformance('Randevu Ekleme', () => {
+  return addAppointment(data);
+});
+// Adım adım
+const perf = measureSteps('Randevu Ekleme');
+const rowData = perf.step('Veri okuma', () => getRowData(rowNumber));
+const newRow = perf.step('Array oluşturma', () => createAppointmentRow(rowData));
+perf.step('Sheet yazma', () => writeToSheet(newRow));
+perf.step('Sıralama', () => sortSheet());
+const totalDuration = perf.end();
+SLA HEDEFLERĠ:
+
+Veri okuma: <0.5s
+Sheet yazma: <1s
+Sıralama: <1s
+Renklendirme: <0.5s
+TOPLAM: <3s
+
+
+
+smartRetry() - Akıllı Retry Mekanizması
+KURAL: Aynı hatayı 2+ kere TEKRARLAMA, her denemede FARKLI yöntem kullan
+
+
+function smartRetry(operationName, operation, maxRetries = 2) {
+  const attempts = [];
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 ${operationName} - Deneme ${attempt}/${maxRetries}`);
+      
+      const result = operation(attempt);
+      
+      console.log(`✅ ${operationName} başarılı (${attempt}. denemede)`);
+      return result;
+      
+    } catch (error) {
+      attempts.push({
+        attempt,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.error(`❌ Deneme ${attempt} başarısız: ${error.message}`);
+      
+      if (attempt === maxRetries) {
+        console.error(`❌ ${operationName} ${maxRetries} denemede de başarısız!`);
+        console.error('📋 Hata geçmişi:', JSON.stringify(attempts, null, 2));
+        
+        throw new Error(
+          `${operationName} başarısız. ${maxRetries} farklı yöntem denendi. Manuel müdahale gerekli!`
+        );
+      }
+      
+      console.warn(`⚠️ Bir sonraki denemede FARKLI yöntem kullanılacak...`);
+    }
+  }
+}
+KULLANIM:
+
+
+// Her denemede FARKLI yöntem
+smartRetry('Randevu Ekleme', (attempt) => {
+  if (attempt === 1) {
+    // İlk deneme: Batch write
+    console.log('📝 Yöntem 1: Batch write');
+    return batchWriteAppointment(data);
+  } else if (attempt === 2) {
+    // İkinci deneme: Validation temizle + tek tek yaz
+    console.log('📝 Yöntem 2: Validation temizle + tek tek');
+    clearValidations();
+    return individualWriteAppointment(data);
+  }
+});
+YASAK:
+
+
+// ❌ ASLA BÖYLE YAPMA!
+for (let i = 0; i < 15; i++) {
+  try {
+    sameMethod(); // Aynı yöntem 15 kere!
+  } catch (e) {
+    continue; // Aynı hatayı tekrarla
+  }
+}
+
+
+
+handleValidationError() - Validation Hatası Yönetimi
+SORUN: Yanlış kolonda validation var → Sadece o kolonun validation'ını temizle
+
+
+function handleValidationError(error, sheet) {
+  const cellMatch = error.message.match(/([A-Z]+)(\d+)/);
+  
+  if (!cellMatch) {
+    console.error('❌ Hücre adresi bulunamadı:', error.message);
+    throw error;
+  }
+  
+  const columnLetter = cellMatch[1]; // Örn: "L"
+  const rowNumber = parseInt(cellMatch[2]); // Örn: 85
+  
+  console.warn(`⚠️ Validation hatası: ${columnLetter}${rowNumber}`);
+  
+  // Kolon harfini numaraya çevir (A=1, B=2, ..., Z=26, AA=27)
+  let columnNumber = 0;
+  for (let i = 0; i < columnLetter.length; i++) {
+    columnNumber = columnNumber * 26 + (columnLetter.charCodeAt(i) - 64);
+  }
+  
+  // Header'dan kolon adını bul
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const columnName = headers[columnNumber - 1];
+  
+  console.log(`📋 Kolon: ${columnLetter} (${columnNumber}) = "${columnName}"`);
+  
+  // Batch: Tüm kolonun validation'ını kaldır
+  const lastRow = sheet.getLastRow();
+  const columnRange = sheet.getRange(2, columnNumber, lastRow - 1, 1);
+  columnRange.clearDataValidations();
+  
+  console.log(`✅ ${columnLetter} kolonu validation'ı temizlendi (${lastRow - 1} hücre)`);
+  
+  return { columnLetter, columnNumber, columnName };
+}
+KULLANIM:
+
+
+try {
+  sheet.getRange(newRow, 1, 1, appointmentRow.length).setValues([appointmentRow]);
+} catch (error) {
+  if (error.message.includes('veri doğrulama')) {
+    const info = handleValidationError(error, sheet);
+    console.log(`🔧 ${info.columnName} validation'ı temizlendi, tekrar deneniyor...`);
+    
+    // Tekrar dene
+    sheet.getRange(newRow, 1, 1, appointmentRow.length).setValues([appointmentRow]);
+    console.log('✅ İkinci denemede başarılı!');
+  } else {
+    throw error;
+  }
+}
+ÖNEMLİ: Sadece problematik kolonun validation'ını temizle (tüm sheet değil!)
+
+
+
+BATCH OPERATIONS ZORUNLULUĞU
+KURAL: For loop içinde getValue/setValue YASAK! (Anti-pattern - 100x yavaş)
+
+❌ YAVAŞ (Anti-pattern):
+
+
+// 90 satır için 90 API call = 9+ saniye!
+for (let i = 2; i <= 91; i++) {
+  const value = sheet.getRange(i, 1).getValue(); // Her satır ayrı call
+  sheet.getRange(i, 2).setValue(value + ' updated'); // Her satır ayrı call
+  SpreadsheetApp.flush(); // 90 kere flush!
+}
+// Renklendirme - 90 API call
+for (let i = 2; i <= 91; i++) {
+  sheet.getRange(i, 1, 1, 17).setBackground('#e8f5e8');
+}
+✅ HIZLI (Batch - Google Best Practice):
+
+
+// 1 API call = 0.5 saniye!
+const values = sheet.getRange(2, 1, 90, 1).getValues(); // Tek seferde oku
+const updated = values.map(row => [row[0] + ' updated']);
+sheet.getRange(2, 2, 90, 1).setValues(updated); // Tek seferde yaz
+SpreadsheetApp.flush(); // 1 kere flush!
+// Renklendirme - 1 API call
+const colors = Array(90).fill(Array(17).fill('#e8f5e8'));
+sheet.getRange(2, 1, 90, 17).setBackgrounds(colors);
+BATCH METODLARI:
+
+getValues() / setValues() - Çok satır/kolon
+getBackgrounds() / setBackgrounds() - Renkler
+getDataValidations() / clearDataValidations() - Validations
+getFontWeights() / setFontWeights() - Font stilleri
+PERFORMANS:
+
+Loop: O(n) API calls = n × 100ms
+Batch: O(1) API call = 100ms
+100x daha hızlı!
+YASAK:
+
+
+// ❌ For loop içinde API call
+for (...) { getValue(), setValue(), setBackground(), flush() }
+// ❌ getDisplayValues() - yavaş (getValues() kullan)
+// ❌ Her işlemde flush() - sadece en sonda 1 kez
+
+
+
+
+
+learnFromExecution() - Self-Learning Mekanizması
+AMAÇ: Agent kendi hatalarından öğrensin, başarılı yöntemleri tekrar kullansın
+
+
+const LEARNING_DATA = {
+  successfulMethods: {},
+  failedMethods: {},
+  performanceHistory: []
+};
+function learnFromExecution(methodName, duration, success, context = {}) {
+  const entry = {
+    method: methodName,
+    duration,
+    success,
+    timestamp: new Date().toISOString(),
+    context
+  };
+  
+  LEARNING_DATA.performanceHistory.push(entry);
+  
+  if (success) {
+    if (!LEARNING_DATA.successfulMethods[methodName]) {
+      LEARNING_DATA.successfulMethods[methodName] = [];
+    }
+    LEARNING_DATA.successfulMethods[methodName].push(entry);
+    console.log(`📚 ÖĞRENILDI (Başarılı): ${methodName} ${duration.toFixed(2)}s'de çalıştı`);
+    
+  } else {
+    if (!LEARNING_DATA.failedMethods[methodName]) {
+      LEARNING_DATA.failedMethods[methodName] = [];
+    }
+    LEARNING_DATA.failedMethods[methodName].push(entry);
+    console.warn(`📚 ÖĞRENILDI (Başarısız): ${methodName} kullanma!`);
+  }
+  
+  // Recommendation
+  if (LEARNING_DATA.successfulMethods[methodName]?.length >= 3) {
+    const avgDuration = LEARNING_DATA.successfulMethods[methodName]
+      .reduce((sum, e) => sum + e.duration, 0) / 
+      LEARNING_DATA.successfulMethods[methodName].length;
+    console.log(`💡 ÖNERİ: ${methodName} güvenilir (${avgDuration.toFixed(2)}s ortalama)`);
+  }
+  
+  if (LEARNING_DATA.failedMethods[methodName]?.length >= 2) {
+    console.error(`⚠️ UYARI: ${methodName} 2+ kere başarısız, kullanma!`);
+  }
+}
+function getRecommendedMethod(operation) {
+  console.log(`🤔 ${operation} için en iyi yöntem aranıyor...`);
+  
+  const candidates = Object.keys(LEARNING_DATA.successfulMethods)
+    .filter(method => method.includes(operation))
+    .map(method => {
+      const executions = LEARNING_DATA.successfulMethods[method];
+      const avgDuration = executions.reduce((sum, e) => sum + e.duration, 0) / executions.length;
+      const successRate = executions.length / 
+        (executions.length + (LEARNING_DATA.failedMethods[method]?.length || 0));
+      return { method, avgDuration, successRate, executions: executions.length };
+    })
+    .sort((a, b) => b.successRate !== a.successRate ? 
+      b.successRate - a.successRate : a.avgDuration - b.avgDuration);
+  
+  if (candidates.length > 0) {
+    const best = candidates[0];
+    console.log(`✅ ÖNERİLEN: ${best.method} (${(best.successRate * 100).toFixed(0)}% başarı, ${best.avgDuration.toFixed(2)}s)`);
+    return best.method;
+  }
+  
+  return null;
+}
+KULLANIM:
+
+
+const t = Date.now();
+try {
+  const recommended = getRecommendedMethod('Randevu Ekleme');
+  
+  if (recommended === 'batchWrite') {
+    batchWriteAppointment(data);
+  } else {
+    batchWriteAppointment(data); // Varsayılan
+  }
+  
+  const duration = (Date.now() - t) / 1000;
+  learnFromExecution('batchWrite', duration, true, { rows: 1 });
+  
+} catch (error) {
+  const duration = (Date.now() - t) / 1000;
+  learnFromExecution('batchWrite', duration, false, { error: error.message });
+  
+  // Farklı yöntem dene
+  try {
+    individualWriteAppointment(data);
+    learnFromExecution('individualWrite', duration, true, { rows: 1 });
+  } catch (error2) {
+    learnFromExecution('individualWrite', duration, false, { error: error2.message });
+  }
+}
+SONUÇ: Agent hangi yöntemin başarılı olduğunu öğrenir ve bir dahaki sefere onu kullanır
