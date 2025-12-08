@@ -341,18 +341,20 @@ function formatTimeValue(value) {
     
     // Handle Date objects
     if (value instanceof Date) {
-      const hours = value.getHours().toString().padStart(2, '0');
-      const minutes = value.getMinutes().toString().padStart(2, '0');
-      return `${hours}:${minutes}`;
+      const hours = value.getHours();
+      const minutes = value.getMinutes();
+      // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+      return `${hours}:${String(minutes).padStart(2, '0')}`;
     }
     
     // Handle string dates (like "30.12.1899")
     if (typeof value === 'string') {
       const date = new Date(value);
       if (!isNaN(date.getTime()) && date.getFullYear() !== 1899) {
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+        // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+        return `${hours}:${String(minutes).padStart(2, '0')}`;
       }
     }
     
@@ -608,10 +610,17 @@ function logActivity(action, data = {}) {
       logSheet = createLogArchiveSheet(spreadsheet);
     }
     
-    // Tarih ve saat (saniye dahil - detaylı timestamp için)
+    // ✅ DÜZELTME: Tarih ve saat formatı (21.6 kuralları)
     const now = new Date();
+    // Tarih: DD.MM.YYYY formatında (ISO 8601 DEĞİL!)
     const tarih = Utilities.formatDate(now, 'Europe/Istanbul', 'dd.MM.yyyy');
-    const saat = Utilities.formatDate(now, 'Europe/Istanbul', 'HH:mm:ss'); // Saniye dahil
+    
+    // Saat: H:MM formatında (21.6.1 kuralı: Saat padStart YOK, Dakika padStart VAR)
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const s = now.getSeconds();
+    const saat = `${h}:${String(m).padStart(2, '0')}`; // Saat kolonu: "13:05"
+    const saatWithSeconds = `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; // Log detay için: "13:05:42"
     
     // Action'ı Türkçe aktivite ismine çevir (Funnel Report için)
     const activityMap = {
@@ -629,27 +638,40 @@ function logActivity(action, data = {}) {
     };
     const aktivite = activityMap[action] || action; // Eğer mapping'de yoksa action'ı olduğu gibi kullan
     
-    // Log Detayı oluştur (STANDART FORMAT: Aktivite - İsim Soyisim - Tarih)
-    // Bu format hem Log Arşivi hem de Yönetici log okuma için tutarlı olmalı
-    let logDetay = aktivite;
-    const isimSoyisim = data.appointmentData?.isimSoyisim || 
-                       data.meetingData?.isimSoyisim || 
-                       data.opportunityData?.isimSoyisim || 
-                       '';
-    const ilgiliTarih = data.appointmentData?.randevuTarihi || 
-                       data.meetingData?.toplantiTarihi || 
-                       '';
+    // ✅ DÜZELTME: Log Detayı formatı - ESKİ FORMATA DÖN (21.6 kuralları)
+    // DOĞRU FORMAT: "Aktivite - DD.MM.YYYY HH:MM:SS" (İsim Soyisim YOK!)
+    // ÖRNEK: "Randevu Alındı - 09.12.2024 13:05:42"
+    const logDetay = `${aktivite} - ${tarih} ${saatWithSeconds}`;
     
-    // Standart format: Aktivite - İsim Soyisim - Tarih
-    if (isimSoyisim || ilgiliTarih) {
-      const parts = [aktivite];
-      if (isimSoyisim) parts.push(isimSoyisim);
-      if (ilgiliTarih) parts.push(ilgiliTarih);
-      logDetay = parts.join(' - ');
+    // ✅ DÜZELTME: Kaynak Sayfa - Format kodunu çıkar (TeksBH, otoanadolu), "Log Arşivi" YAZMA!
+    let kaynakSayfa = data.sheetName || data.source || '';
+    
+    // Sheet adından format kodunu çıkar
+    if (kaynakSayfa) {
+      const sheetName = String(kaynakSayfa);
+      // Örnek: "Format Tablo - TeksBH" → "TeksBH"
+      // Örnek: "Format Tablo - otoanadolu" → "otoanadolu"
+      const formatMatch = sheetName.match(/[-–—]\s*([^-–—]+)$/); // Son kısım (tire'den sonra)
+      if (formatMatch) {
+        kaynakSayfa = formatMatch[1].trim();
+      } else if (sheetName.toLowerCase().includes('format tablo')) {
+        // "Format Tablo" içeriyorsa ama format kodu yoksa, sheet adının kendisini kullan
+        kaynakSayfa = sheetName.replace(/format\s+tablo\s*-?\s*/i, '').trim();
+        if (!kaynakSayfa || kaynakSayfa.toLowerCase() === 'format tablo') {
+          kaynakSayfa = ''; // Boş bırak
+        }
+      } else {
+        // Zaten format kodu gibi görünüyor
+        kaynakSayfa = sheetName;
+      }
+      
+      // "Log Arşivi" yazma!
+      if (kaynakSayfa.toLowerCase().includes('log arşivi')) {
+        kaynakSayfa = ''; // Boş bırak
+      }
     }
     
-    // Kaynak Sayfa
-    const kaynakSayfa = data.sheetName || data.source || 'Format Tablo';
+    // Eğer hala boşsa, varsayılan değer verme (boş bırak)
     
     // Kod
     const kod = data.rowId || (rowData && rowData.Kod) || '';
@@ -672,11 +694,11 @@ function logActivity(action, data = {}) {
     // Format ayarları (BATCH - tek seferde, performans için)
     const formatRange = logSheet.getRange(nextRow, 1, 1, 7);
     formatRange.setNumberFormats([[
-      'dd.MM.yyyy',  // Tarih
-      'HH:mm:ss',    // Saat (saniye dahil)
+      'dd.MM.yyyy',  // Tarih (DD.MM.YYYY)
+      '@',           // Saat (text - H:MM formatında)
       '@',           // Aktivite (text)
       '@',           // Log Detayı (text)
-      '@',           // Kaynak Sayfa (text)
+      '@',           // Kaynak Sayfa (text - Format kodu)
       '@',           // Kod (text)
       '@'            // Company name (text)
     ]]);
@@ -769,6 +791,7 @@ function createFormatTable(spreadsheet, hamVeriSheet, tableName) {
     }
   }
   applyFormatTableStyling(newSheet);
+  setDataValidation(newSheet); // Aktivite dropdown'ı ekle
   return { success: true, tableName, rowCount: mappedData.length, message: `${tableName} başarıyla oluşturuldu. ${mappedData.length} satır aktarıldı.` };
 }
 
@@ -2187,15 +2210,22 @@ function prepareAppointmentRow(rowData, appointmentData, columns, sheet) {
     let saatValue = appointmentData.saat || '';
     if (saatValue) {
       if (saatValue instanceof Date) {
-        const hours = saatValue.getHours().toString().padStart(2, '0');
-        const minutes = saatValue.getMinutes().toString().padStart(2, '0');
-        saatValue = `${hours}:${minutes}`;
+        const hours = saatValue.getHours();
+        const minutes = saatValue.getMinutes();
+        // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+        saatValue = `${hours}:${String(minutes).padStart(2, '0')}`;
       } else if (typeof saatValue === 'string') {
         const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
         if (timeMatch) {
-          const hours = timeMatch[1].padStart(2, '0');
-          const minutes = timeMatch[2].padStart(2, '0');
-          saatValue = `${hours}:${minutes}`;
+          const hours = parseInt(timeMatch[1], 10);
+          const minutes = parseInt(timeMatch[2], 10);
+          if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+            // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+            saatValue = `${hours}:${String(minutes).padStart(2, '0')}`;
+          } else {
+            console.warn(`⚠️ Saat formatı yanlış: ${saatValue}, temizleniyor...`);
+            saatValue = '';
+          }
         } else {
           console.warn(`⚠️ Saat formatı yanlış: ${saatValue}, temizleniyor...`);
           saatValue = '';
@@ -2443,37 +2473,49 @@ function applyFormatTableColorCoding(sheet, rowNumber, activity) {
     
     // Aktivite düzeltme kaldırıldı - updateFormatTableRow zaten yapıyor (performans için)
     
-    let color = 'rgb(255, 255, 255)'; // Default white
+    // Helper: rgb(...) formatını #hex formatına çevir (Google Sheets için)
+    const rgbToHex = (rgb) => {
+      if (!rgb || typeof rgb !== 'string') return '#ffffff';
+      if (rgb.startsWith('#')) return rgb; // Zaten hex formatında
+      const match = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (!match) return '#ffffff';
+      const r = parseInt(match[1]).toString(16).padStart(2, '0');
+      const g = parseInt(match[2]).toString(16).padStart(2, '0');
+      const b = parseInt(match[3]).toString(16).padStart(2, '0');
+      return `#${r}${g}${b}`.toUpperCase();
+    };
+    
+    let color = '#ffffff'; // Default white (hex format)
     
     // Check if activity is empty, null, or undefined
     if (!normalizedActivity) {
-      color = 'rgb(255, 255, 255)'; // White
+      color = '#ffffff'; // White
     }
     // Map activity to color using centralized system
     else if (normalizedActivity === 'Randevu Alındı') {
-      color = CRM_CONFIG.COLOR_CODES['Randevu Alındı'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Randevu Alındı']);
     } else if (normalizedActivity === 'İleri Tarih Randevu') {
-      color = CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu']);
     } else if (normalizedActivity === 'Randevu Teyitlendi') {
-      color = CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi']);
     } else if (normalizedActivity === 'Randevu Ertelendi') {
-      color = CRM_CONFIG.COLOR_CODES['Randevu Ertelendi'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Randevu Ertelendi']);
     } else if (normalizedActivity === 'Randevu İptal oldu') {
-      color = CRM_CONFIG.COLOR_CODES['Randevu İptal oldu'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Randevu İptal oldu']);
     } else if (normalizedActivity === 'Fırsat İletildi') {
-      color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Fırsat İletildi']);
     } else if (normalizedActivity === 'Bilgi Verildi') {
-      color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Bilgi Verildi']);
     } else if (normalizedActivity === 'Yeniden Aranacak') {
-      color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Yeniden Aranacak']);
     } else if (normalizedActivity === 'İlgilenmiyor') {
-      color = CRM_CONFIG.COLOR_CODES['İlgilenmiyor'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['İlgilenmiyor']);
     } else if (normalizedActivity === 'Ulaşılamadı') {
-      color = CRM_CONFIG.COLOR_CODES['Ulaşılamadı'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Ulaşılamadı']);
     } else if (normalizedActivity === 'Geçersiz Numara') {
-      color = CRM_CONFIG.COLOR_CODES['Geçersiz Numara'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Geçersiz Numara']);
     } else if (normalizedActivity === 'Toplantı Tamamlandı') {
-      color = CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı'];
+      color = rgbToHex(CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı']);
     }
     
     // Apply color to entire row
@@ -3225,14 +3267,20 @@ function prepareOpportunityRow(rowData, opportunityData, columns, sheet) {
         let saatValue = opportunityData.saat || '';
         if (saatValue) {
           if (saatValue instanceof Date) {
-            const hours = saatValue.getHours().toString().padStart(2, '0');
-            const minutes = saatValue.getMinutes().toString().padStart(2, '0');
-            saatValue = `${hours}:${minutes}`;
+            const hours = saatValue.getHours();
+            const minutes = saatValue.getMinutes();
+            // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+            saatValue = `${hours}:${String(minutes).padStart(2, '0')}`;
           } else if (typeof saatValue === 'string') {
             // Parse time string (HH:mm format)
             const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
             if (timeMatch) {
-              saatValue = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+              const hours = parseInt(timeMatch[1], 10);
+              const minutes = parseInt(timeMatch[2], 10);
+              if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+                // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+                saatValue = `${hours}:${String(minutes).padStart(2, '0')}`;
+              }
             }
           }
         }
@@ -3500,35 +3548,81 @@ function applyOpportunityColorCodingBatch(sheet, startRow, numRows) {
       return;
     }
     
-    // Get headers once
-    const headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
-    const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+    // Get headers once (getValues kullan - daha hızlı)
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    
+    // Esnek kolon bulma (typo toleranslı)
+    const normalizeHeader = (h) => String(h || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    const firsatDurumuIndex = headers.findIndex(h => {
+      const normalized = normalizeHeader(h);
+      return normalized === 'fırsat durumu' || 
+             normalized === 'fırsat durumi' || // Typo toleransı
+             normalized.includes('fırsat') && normalized.includes('durum');
+    });
     
     if (firsatDurumuIndex === -1) {
+      console.error('❌ applyOpportunityColorCodingBatch: "Fırsat Durumu" kolonu bulunamadı!');
+      console.error('📋 Mevcut kolonlar:', headers.map((h, i) => `${i + 1}: "${h}"`).join(', '));
+      SpreadsheetApp.getUi().alert(
+        '⚠️ Uyarı',
+        '"Fırsat Durumu" kolonu bulunamadı!\n\n' +
+        'Lütfen sayfada "Fırsat Durumu" kolonunun olduğundan emin olun.\n\n' +
+        'Detaylar console\'da.',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
       return;
     }
     
+    console.log(`🎨 Fırsatlarım batch renklendirme: ${numRows} satır, kolon ${firsatDurumuIndex + 1}`);
+    
     // Read all status values in one batch (single API call)
+    // ÖNCE getDisplayValues() dene (dropdown değerleri için), sonra getValues() (fallback)
     const statusRange = sheet.getRange(startRow, firsatDurumuIndex + 1, numRows, 1);
-    const statusValues = statusRange.getDisplayValues();
+    let statusValues = statusRange.getDisplayValues(); // getDisplayValues: dropdown değerlerini doğru okur
+    
+    // Eğer tüm değerler boşsa, getValues() dene
+    const allEmpty = statusValues.every(row => !row[0] || String(row[0]).trim() === '');
+    if (allEmpty) {
+      console.warn('⚠️ getDisplayValues() boş döndü, getValues() deneniyor...');
+      statusValues = statusRange.getValues();
+    }
+    
+    console.log(`📊 İlk 3 satır durum değerleri:`, statusValues.slice(0, 3).map(v => `"${v[0]}"`));
+    console.log(`📊 Tüm durum değerleri (ilk 10):`, statusValues.slice(0, 10).map(v => `"${v[0]}"`));
+    console.log(`📊 Boş olmayan durum sayısı:`, statusValues.filter(v => v[0] && String(v[0]).trim() !== '').length);
     
     // Determine colors for all rows (in memory, very fast)
+    // DİKKAT: Google Sheets API rgb(...) formatını tercih eder, #hex değil! (Diğer fonksiyonlarda da öyle)
     const backgroundColorMatrix = [];
     for (let i = 0; i < numRows; i++) {
       const status = String(statusValues[i][0] || '').trim();
-      let color = 'rgb(255, 255, 255)'; // Default white
+      let color = 'rgb(255, 255, 255)'; // Default white (rgb format - Google Sheets standardı!)
       
       if (status) {
         const normalizedStatus = status.trim();
         
         // Check exact match first
         if (CRM_CONFIG.COLOR_CODES[normalizedStatus]) {
-          color = CRM_CONFIG.COLOR_CODES[normalizedStatus];
+          color = CRM_CONFIG.COLOR_CODES[normalizedStatus]; // Zaten rgb(...) formatında
         }
         // Special handling for Fırsat İletildi
         else if (normalizedStatus.toLowerCase().includes('fırsat') && normalizedStatus.toLowerCase().includes('iletildi')) {
-          color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'];
+          color = CRM_CONFIG.COLOR_CODES['Fırsat İletildi'] || 'rgb(255, 235, 238)';
         }
+        // Special handling for Bilgi Verildi
+        else if (normalizedStatus.toLowerCase().includes('bilgi') && normalizedStatus.toLowerCase().includes('verildi')) {
+          color = CRM_CONFIG.COLOR_CODES['Bilgi Verildi'] || 'rgb(243, 229, 245)';
+        }
+        // Special handling for Yeniden Aranacak
+        else if (normalizedStatus.toLowerCase().includes('yeniden') && normalizedStatus.toLowerCase().includes('aranacak')) {
+          color = CRM_CONFIG.COLOR_CODES['Yeniden Aranacak'] || 'rgb(227, 242, 253)';
+        } else {
+          // Bilinmeyen durum - debug için log
+          console.log(`⚠️ Bilinmeyen durum: "${normalizedStatus}" (satır ${startRow + i})`);
+        }
+      } else {
+        // Boş durum - debug için log
+        if (i < 5) console.log(`⚠️ Boş durum (satır ${startRow + i})`);
       }
       
       // Create a row array with the same color for all columns
@@ -3536,12 +3630,19 @@ function applyOpportunityColorCodingBatch(sheet, startRow, numRows) {
       backgroundColorMatrix.push(rowColors);
     }
     
+    console.log(`🎨 Renk örnekleri (ilk 3 satır):`, backgroundColorMatrix.slice(0, 3).map(row => row[0]));
+    
     // Apply all colors in a SINGLE batch operation (ultra-fast!)
     const allRowsRange = sheet.getRange(startRow, 1, numRows, lastColumn);
     allRowsRange.setBackgrounds(backgroundColorMatrix);
     
+    // Renklerin görünmesi için flush (kritik!)
+    SpreadsheetApp.flush();
+    console.log(`✅ Fırsatlarım batch renklendirme tamamlandı: ${numRows} satır`);
+    
   } catch (error) {
     console.error('❌ Error applying batch opportunity color coding:', error);
+    throw error;
   }
 }
 
@@ -3845,11 +3946,12 @@ function showMeetingDialog(rowData) {
   
   if (rowData['Saat'] && rowData['Saat'] instanceof Date) {
     const saat = rowData['Saat'];
-    const hours = saat.getHours().toString().padStart(2, '0');
-    const minutes = saat.getMinutes().toString().padStart(2, '0');
-    defaultMeetingTime = `${hours}:${minutes}`;
-    defaultMeetingHour = hours;
-    defaultMeetingMinute = minutes;
+    const hours = saat.getHours();
+    const minutes = saat.getMinutes();
+    // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+    defaultMeetingTime = `${hours}:${String(minutes).padStart(2, '0')}`;
+    defaultMeetingHour = hours.toString();
+    defaultMeetingMinute = String(minutes).padStart(2, '0');
     rowData['Saat'] = defaultMeetingTime;
   } else if (rowData['Saat'] && typeof rowData['Saat'] === 'string') {
     // Parse time string (HH:mm format)
@@ -7857,9 +7959,10 @@ function onEdit(e) {
           
           // Eğer tarih formatında görünüyorsa, düzelt
           if (saatValue instanceof Date) {
-            const hours = saatValue.getHours().toString().padStart(2, '0');
-            const minutes = saatValue.getMinutes().toString().padStart(2, '0');
-            const saatFormatted = `${hours}:${minutes}`;
+            const hours = saatValue.getHours();
+            const minutes = saatValue.getMinutes();
+            // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+            const saatFormatted = `${hours}:${String(minutes).padStart(2, '0')}`;
             sheet.getRange(row, saatIdx + 1).setNumberFormat('@');
             sheet.getRange(row, saatIdx + 1).setValue(saatFormatted);
             console.log(`✅ Saat formatı düzeltildi: ${saatFormatted}`);
@@ -7868,16 +7971,19 @@ function onEdit(e) {
             console.warn(`⚠️ Saat formatı yanlış: ${saatValue}, temizleniyor...`);
             sheet.getRange(row, saatIdx + 1).setNumberFormat('@');
             sheet.getRange(row, saatIdx + 1).setValue('');
-          } else if (typeof saatValue === 'string' && !saatValue.match(/^\d{2}:\d{2}$/)) {
-            // HH:mm formatında değilse, düzelt
+          } else if (typeof saatValue === 'string' && !saatValue.match(/^\d{1,2}:\d{2}$/)) {
+            // H:mm veya HH:mm formatında değilse, düzelt (21.6.1: Saat tek haneli olabilir)
             const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
             if (timeMatch) {
-              const hours = timeMatch[1].padStart(2, '0');
-              const minutes = timeMatch[2].padStart(2, '0');
-              const saatFormatted = `${hours}:${minutes}`;
-              sheet.getRange(row, saatIdx + 1).setNumberFormat('@');
-              sheet.getRange(row, saatIdx + 1).setValue(saatFormatted);
-              console.log(`✅ Saat formatı düzeltildi: ${saatFormatted}`);
+              const hours = parseInt(timeMatch[1], 10);
+              const minutes = parseInt(timeMatch[2], 10);
+              if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+                // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+                const saatFormatted = `${hours}:${String(minutes).padStart(2, '0')}`;
+                sheet.getRange(row, saatIdx + 1).setNumberFormat('@');
+                sheet.getRange(row, saatIdx + 1).setValue(saatFormatted);
+                console.log(`✅ Saat formatı düzeltildi: ${saatFormatted}`);
+              }
             }
           }
         }
@@ -8201,6 +8307,14 @@ function createAdminMenu() {
     menu.addItem('📋 Yeni Tablo oluştur', 'showCreateTableDialog');
     menu.addSeparator();
     
+    // 📦 Format Tablo İşlemleri
+    const archiveSubmenu = ui.createMenu('📦 Format Tablo İşlemleri')
+      .addItem('📦 Format Tablo Arşivle', 'archiveFormatTable')
+      .addItem('📊 Format Tabloyu Raporla', 'reportFormatTable')
+      .addItem('🗑️ Format Tabloyu Sil', 'deleteFormatTable');
+    menu.addSubMenu(archiveSubmenu);
+    menu.addSeparator();
+    
     // 🎨 Renklendirme
     const colorSubmenu = ui.createMenu('🎨 Renklendirme')
         .addItem('Manuel Renk Uygula', 'applyManualColorCoding')
@@ -8249,6 +8363,8 @@ function createAdminMenu() {
     menu.addItem('🗑️ Toplantılarım - Duplicate Kayıtları Temizle', 'cleanDuplicateMeetings');
     menu.addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable');
     menu.addItem('🧱 CMS Sütunlarını Website Yanına Taşı', 'addCmsColumnsNextToWebsiteOnAllFormatTables');
+    menu.addSeparator();
+    menu.addItem('✅ Tüm Sayfalara Veri Doğrulama Ekle (Format Tablo + Diğerleri)', 'applyDataValidationToExistingSheets');
     
     // 🔧 Boş Kodları Doldur (Admin only)
     menu.addSeparator();
@@ -8516,6 +8632,870 @@ function showDatasetReportDialog() {
   generateDatasetReport({ mode: 'simple' });
 }
 
+/**
+ * 📦 Format Tablo Analiz ve Arşivleme Sistemi
+ * 
+ * Yeni profesyonel Dataset Raporu sistemi:
+ * 1. Format Tablo'yu analiz eder (istatistikler)
+ * 2. "Hepsi arandı mı" kontrolü yapar
+ * 3. Google Drive'a arşivler
+ * 4. Yönetici dosyasına rapor ekler
+ */
+
+/**
+ * Format Tablo sayfasını analiz eder ve istatistikler döndürür
+ * @param {Sheet} formatTableSheet - Format Tablo sayfası
+ * @param {string} sheetName - Sayfa adı
+ * @returns {Object} Analiz sonuçları
+ */
+function analyzeFormatTableForArchive(formatTableSheet, sheetName) {
+  const startTime = Date.now();
+  console.log(`📊 Format Tablo analizi başlatılıyor: ${sheetName}`);
+  
+  try {
+    if (!formatTableSheet || formatTableSheet.getLastRow() <= 1) {
+      throw new Error('Format Tablo boş veya bulunamadı');
+    }
+    
+    // Batch read: Tüm veriyi tek seferde oku (Google best practice)
+    const allData = formatTableSheet.getDataRange().getValues();
+    const headers = allData[0] || [];
+    const rows = allData.slice(1);
+    
+    // Kolon indekslerini bul
+    const aktiviteIdx = headers.findIndex(h => 
+      h && (String(h).toLowerCase().includes('aktivite') && !String(h).toLowerCase().includes('tarihi'))
+    );
+    const aktiviteTarihiIdx = headers.findIndex(h => 
+      h && (String(h).toLowerCase().includes('aktivite tarihi') || String(h).toLowerCase().includes('tarih'))
+    );
+    const logIdx = headers.findIndex(h => 
+      h && String(h).toLowerCase().includes('log')
+    );
+    const kaynakIdx = headers.indexOf('Kaynak');
+    
+    // Toplam kontak sayısı (boş olmayan satırlar)
+    const totalContacts = rows.filter(r => r.some(c => c && String(c).trim() !== '')).length;
+    
+    // Aktivite sayımları
+    let aramaYapilan = 0; // Aktivite dolu satırlar
+    let aktiviteTarihiDolu = 0; // Aktivite Tarihi dolu satırlar
+    let logDolu = 0; // Log dolu satırlar
+    
+    const aktiviteCounts = {
+      'Ulaşılamadı': 0,
+      'İlgilenmiyor': 0,
+      'Geçersiz Numara': 0,
+      'Randevu Alındı': 0,
+      'Fırsat Oluşturuldu': 0,
+      'Toplantı Yapıldı': 0,
+      'Diğer': 0
+    };
+    
+    // Her satırı analiz et (batch processing)
+    rows.forEach((row, index) => {
+      // Boş satırları atla
+      if (!row.some(c => c && String(c).trim() !== '')) return;
+      
+      // Aktivite kontrolü
+      const aktivite = aktiviteIdx !== -1 ? String(row[aktiviteIdx] || '').trim() : '';
+      if (aktivite) {
+        aramaYapilan++;
+        
+        // Aktivite tipine göre say
+        if (aktiviteCounts.hasOwnProperty(aktivite)) {
+          aktiviteCounts[aktivite]++;
+        } else {
+          aktiviteCounts['Diğer']++;
+        }
+      }
+      
+      // Aktivite Tarihi kontrolü
+      if (aktiviteTarihiIdx !== -1 && row[aktiviteTarihiIdx] && String(row[aktiviteTarihiIdx]).trim()) {
+        aktiviteTarihiDolu++;
+      }
+      
+      // Log kontrolü
+      if (logIdx !== -1 && row[logIdx] && String(row[logIdx]).trim()) {
+        logDolu++;
+      }
+    });
+    
+    // "Hepsi arandı mı" kontrolü
+    // Üç kriterden biri tamamlanmışsa "arandı" kabul edilir
+    const tumuAranmis = (
+      aramaYapilan >= totalContacts ||
+      aktiviteTarihiDolu >= totalContacts ||
+      logDolu >= totalContacts
+    );
+    
+    // Randevu/Fırsat/Toplantı sayımları (Randevularım, Fırsatlarım, Toplantılarım sayfalarından)
+    const ss = formatTableSheet.getParent();
+    const randevuSheet = ss.getSheetByName('Randevularım');
+    const firsatSheet = ss.getSheetByName('Fırsatlarım');
+    const toplantiSheet = ss.getSheetByName('Toplantılarım');
+    
+    // Kaynak kolonuna göre say (batch read)
+    let randevuAlindi = 0;
+    let toplantiYapildi = 0;
+    let satisYapildi = 0;
+    
+    if (randevuSheet && kaynakIdx !== -1) {
+      const randevuData = randevuSheet.getDataRange().getValues();
+      const randevuHeaders = randevuData[0] || [];
+      const randevuRows = randevuData.slice(1);
+      const randevuKaynakIdx = randevuHeaders.indexOf('Kaynak');
+      const randevuDurumIdx = randevuHeaders.indexOf('Randevu durumu');
+      
+      if (randevuKaynakIdx !== -1 && randevuDurumIdx !== -1) {
+        randevuAlindi = randevuRows.filter(r => {
+          const kaynak = String(r[randevuKaynakIdx] || '').trim();
+          const durum = String(r[randevuDurumIdx] || '').trim();
+          return kaynak === sheetName && (
+            durum === 'Randevu Alındı' ||
+            durum === 'Randevu Teyitlendi' ||
+            durum === 'İleri Tarih Randevu'
+          );
+        }).length;
+      }
+    }
+    
+    if (toplantiSheet && kaynakIdx !== -1) {
+      const toplantiData = toplantiSheet.getDataRange().getValues();
+      const toplantiHeaders = toplantiData[0] || [];
+      const toplantiRows = toplantiData.slice(1);
+      const toplantiKaynakIdx = toplantiHeaders.indexOf('Kaynak');
+      const toplantiSonucIdx = toplantiHeaders.indexOf('Toplantı Sonucu');
+      
+      if (toplantiKaynakIdx !== -1 && toplantiSonucIdx !== -1) {
+        toplantiYapildi = toplantiRows.filter(r => {
+          const kaynak = String(r[toplantiKaynakIdx] || '').trim();
+          return kaynak === sheetName;
+        }).length;
+        
+        satisYapildi = toplantiRows.filter(r => {
+          const kaynak = String(r[toplantiKaynakIdx] || '').trim();
+          const sonuc = String(r[toplantiSonucIdx] || '').trim();
+          return kaynak === sheetName && sonuc === 'Satış Yapıldı';
+        }).length;
+      }
+    }
+    
+    // Başarı puanı hesapla (şimdilik randevu sayısı / toplam kontak × 100)
+    const basariPuani = totalContacts > 0 
+      ? Math.round((randevuAlindi / totalContacts) * 100 * 10) / 10 
+      : 0;
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo analizi tamamlandı (${duration}ms)`);
+    
+    return {
+      sheetName: sheetName,
+      totalContacts: totalContacts,
+      aramaYapilan: aramaYapilan,
+      aktiviteTarihiDolu: aktiviteTarihiDolu,
+      logDolu: logDolu,
+      tumuAranmis: tumuAranmis,
+      aktiviteCounts: aktiviteCounts,
+      randevuAlindi: randevuAlindi,
+      toplantiYapildi: toplantiYapildi,
+      satisYapildi: satisYapildi,
+      basariPuani: basariPuani,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error(`❌ Format Tablo analiz hatası: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Format Tablo sayfasını Google Drive klasörüne arşivler
+ * @param {Sheet} formatTableSheet - Format Tablo sayfası
+ * @param {string} archiveFolderId - Google Drive klasör ID
+ * @param {string} uniqueCode - Özel kod (Sayfa İsmi_Uzman Kodu_Tarih)
+ * @returns {Object} Arşivleme sonucu
+ */
+function archiveFormatTableToDrive(formatTableSheet, archiveFolderId, uniqueCode) {
+  const startTime = Date.now();
+  console.log(`📦 Format Tablo arşivleniyor: ${uniqueCode}`);
+  
+  try {
+    if (!formatTableSheet) {
+      throw new Error('Format Tablo sayfası bulunamadı');
+    }
+    
+    if (!archiveFolderId) {
+      throw new Error('Arşiv klasör ID belirtilmedi');
+    }
+    
+    // Klasörü al
+    const archiveFolder = DriveApp.getFolderById(archiveFolderId);
+    
+    // Sayfanın bağlı olduğu dosyayı al
+    const spreadsheet = formatTableSheet.getParent();
+    const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
+    
+    // Yeni dosya oluştur (sadece bu sayfayı içeren)
+    const archiveFileName = `${uniqueCode}_Arşiv.xlsx`;
+    
+    // Sayfanın içeriğini yeni bir spreadsheet'e kopyala
+    const newSpreadsheet = SpreadsheetApp.create(archiveFileName);
+    const newSheet = newSpreadsheet.getActiveSheet();
+    
+    // Veriyi kopyala (batch read + batch write)
+    const allData = formatTableSheet.getDataRange().getValues();
+    if (allData.length > 0) {
+      newSheet.getRange(1, 1, allData.length, allData[0].length).setValues(allData);
+    }
+    
+    // Formatları kopyala (opsiyonel - yavaş olabilir, gerekirse kaldırılabilir)
+    try {
+      const formats = formatTableSheet.getDataRange().getBackgrounds();
+      if (formats.length > 0) {
+        newSheet.getRange(1, 1, formats.length, formats[0].length).setBackgrounds(formats);
+      }
+    } catch (formatError) {
+      console.warn('⚠️ Format kopyalama hatası (devam ediliyor):', formatError.message);
+    }
+    
+    // Yeni dosyayı Excel formatına çevir (opsiyonel - şimdilik .gsheet olarak bırakılabilir)
+    // Excel export için Drive API gerekir, şimdilik Google Sheets formatında sakla
+    
+    // Dosyayı arşiv klasörüne taşı
+    const newSpreadsheetFile = DriveApp.getFileById(newSpreadsheet.getId());
+    newSpreadsheetFile.moveTo(archiveFolder);
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo arşivlendi: ${archiveFileName} (${duration}ms)`);
+    
+    return {
+      success: true,
+      archiveFileName: archiveFileName,
+      archiveFileId: newSpreadsheetFile.getId(),
+      archiveFolderId: archiveFolderId,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error(`❌ Arşivleme hatası: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Yönetici dosyasına Dataset Raporu ekle (manager-sync.js'den çağrılır)
+ * Bu fonksiyon backend.js'den manager-sync.js'deki fonksiyonu çağırır
+ */
+function addDatasetReportToManager(uzmanKodu, sheetName, tarih, analysisResult, archiveFileId, archiveFileName) {
+  try {
+    // manager-sync.js'deki fonksiyonu çağır (Google Apps Script global scope)
+    if (typeof addDatasetReportToManagerSync === 'function') {
+      return addDatasetReportToManagerSync(uzmanKodu, sheetName, tarih, analysisResult, archiveFileId, archiveFileName);
+    } else {
+      console.warn('⚠️ addDatasetReportToManagerSync fonksiyonu bulunamadı, manager-sync.js yüklü mü kontrol edin');
+      throw new Error('Manager sync fonksiyonu bulunamadı');
+    }
+  } catch (error) {
+    console.error('❌ Yönetici raporu ekleme hatası:', error);
+    throw error;
+  }
+}
+
+/**
+ * Format Tablo'yu raporla (Basit versiyon)
+ * Temsilci dosyasında "Format Tablo Raporları" sayfası oluşturur ve özet rapor yazar
+ * @returns {Object} İşlem sonucu
+ */
+function reportFormatTable() {
+  const startTime = Date.now();
+  console.log('📊 Format Tablo raporlama başlatılıyor...');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const activeSheet = ss.getActiveSheet();
+    const sheetName = activeSheet.getName();
+    
+    // Format Tablo kontrolü
+    if (!isFormatTable(activeSheet)) {
+      ui.alert('❌ Hata', 'Aktif sayfa bir Format Tablo değil!', ui.ButtonSet.OK);
+      return { success: false, error: 'Not a Format Table' };
+    }
+    
+    // Temsilci kodunu otomatik bul (dosya adından)
+    let uzmanKodu = '';
+    const fileName = ss.getName();
+    console.log('📁 Dosya adı:', fileName);
+    
+    // Dosya adından kod çıkarmayı dene (örn: "SB_004 - Sinem Bakalcı" veya "SB 004")
+    for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+      if (fileName.includes(code)) {
+        uzmanKodu = code;
+        console.log(`✅ Temsilci kodu bulundu: ${uzmanKodu}`);
+        break;
+      }
+    }
+    
+    // Bulunamazsa kullanıcıya sor (basit prompt)
+    if (!uzmanKodu) {
+      const codeResp = ui.prompt(
+        '📋 Temsilci Kodu',
+        'Temsilci kodunu girin (örn: SB 004):\n\n(Boş bırakırsanız kod olmadan devam eder)',
+        ui.ButtonSet.OK_CANCEL
+      );
+      
+      if (codeResp.getSelectedButton() === ui.Button.OK) {
+        uzmanKodu = codeResp.getResponseText().trim();
+      }
+    }
+    
+    // Format Tablo'yu analiz et
+    console.log('📊 Format Tablo analiz ediliyor...');
+    const analysisResult = analyzeFormatTableForArchive(activeSheet, sheetName);
+    
+    // Tarih formatı: YYYY-MM-DD
+    const today = Utilities.formatDate(new Date(), 'Europe/Istanbul', 'yyyy-MM-dd');
+    
+    // Özel kod oluştur (Sayfa İsmi_Uzman Kodu_Tarih)
+    const uniqueCode = uzmanKodu 
+      ? `${sheetName}_${uzmanKodu}_${today}` 
+      : `${sheetName}_${today}`;
+    
+    // "Format Tablo Raporları" sayfasını oluştur veya al
+    let reportSheet = ss.getSheetByName('Format Tablo Raporları');
+    if (!reportSheet) {
+      reportSheet = ss.insertSheet('Format Tablo Raporları');
+      console.log('✅ "Format Tablo Raporları" sayfası oluşturuldu');
+    }
+    
+    // Eğer sayfa boşsa (header yoksa) başlık ve header ekle
+    const hasHeader = reportSheet.getLastRow() >= 4; // Header 4. satırda olmalı
+    if (!hasHeader) {
+      // Başlık satırı (1. satır)
+      reportSheet.getRange(1, 1, 1, 10).merge();
+      reportSheet.getRange(1, 1).setValue('📊 FORMAT TABLO RAPORLARI');
+      reportSheet.getRange(1, 1).setBackground('#1a73e8');
+      reportSheet.getRange(1, 1).setFontColor('#ffffff');
+      reportSheet.getRange(1, 1).setFontWeight('bold');
+      reportSheet.getRange(1, 1).setFontSize(16);
+      reportSheet.getRange(1, 1).setHorizontalAlignment('center');
+      reportSheet.setRowHeight(1, 40);
+      
+      // Açıklama satırı (2. satır)
+      reportSheet.getRange(2, 1, 1, 10).merge();
+      reportSheet.getRange(2, 1).setValue('Format Tablo analiz raporları - Her satır bir Format Tablo\'nun özet bilgilerini içerir');
+      reportSheet.getRange(2, 1).setBackground('#e8f0fe');
+      reportSheet.getRange(2, 1).setFontColor('#1967d2');
+      reportSheet.getRange(2, 1).setFontSize(10);
+      reportSheet.getRange(2, 1).setHorizontalAlignment('center');
+      reportSheet.setRowHeight(2, 30);
+      
+      // Boş satır (3. satır)
+      reportSheet.setRowHeight(3, 10);
+      
+      // Header satırı (4. satır)
+      const headers = [
+        'Kod',
+        'Tarih',
+        'Format Tablo Adı',
+        'Toplam Kontak',
+        'Arama Yapılan',
+        'Randevu Alındı',
+        'Toplantı Yapıldı',
+        'Satış Yapıldı',
+        'Başarı Puanı (%)',
+        'Tümü Arandı'
+      ];
+      reportSheet.getRange(4, 1, 1, headers.length).setValues([headers]);
+      
+      // Header stilleri
+      const headerRange = reportSheet.getRange(4, 1, 1, headers.length);
+      headerRange.setBackground('#4285f4');
+      headerRange.setFontColor('#ffffff');
+      headerRange.setFontWeight('bold');
+      headerRange.setFontSize(11);
+      headerRange.setHorizontalAlignment('center');
+      reportSheet.setRowHeight(4, 35);
+      
+      // Kolon genişlikleri
+      reportSheet.setColumnWidth(1, 200); // Kod
+      reportSheet.setColumnWidth(2, 100); // Tarih
+      reportSheet.setColumnWidth(3, 200); // Format Tablo Adı
+      reportSheet.setColumnWidth(4, 100); // Toplam Kontak
+      reportSheet.setColumnWidth(5, 120); // Arama Yapılan
+      reportSheet.setColumnWidth(6, 120); // Randevu Alındı
+      reportSheet.setColumnWidth(7, 120); // Toplantı Yapıldı
+      reportSheet.setColumnWidth(8, 120); // Satış Yapıldı
+      reportSheet.setColumnWidth(9, 120); // Başarı Puanı
+      reportSheet.setColumnWidth(10, 100); // Tümü Arandı
+    }
+    
+    // Yeni satır ekle (header'dan sonra - header 4. satırda)
+    const newRow = reportSheet.getLastRow() + 1;
+    
+    // Rapor verilerini yaz
+    const rowData = [
+      uniqueCode, // Kod
+      today, // Tarih
+      sheetName, // Format Tablo Adı
+      analysisResult.totalContacts, // Toplam Kontak
+      analysisResult.aramaYapilan, // Arama Yapılan
+      analysisResult.randevuAlindi, // Randevu Alındı
+      analysisResult.toplantiYapildi, // Toplantı Yapıldı
+      analysisResult.satisYapildi, // Satış Yapıldı
+      analysisResult.basariPuani, // Başarı Puanı (%)
+      analysisResult.tumuAranmis ? 'Evet' : 'Hayır' // Tümü Arandı
+    ];
+    
+    reportSheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+    
+    // Başarı puanına göre renklendirme
+    try {
+      const basariPuaniRange = reportSheet.getRange(newRow, 9); // Başarı Puanı kolonu
+      if (analysisResult.basariPuani >= 20) {
+        basariPuaniRange.setBackground('#c8e6c9'); // Yeşil - İyi
+      } else if (analysisResult.basariPuani >= 10) {
+        basariPuaniRange.setBackground('#fff9c4'); // Sarı - Orta
+      } else {
+        basariPuaniRange.setBackground('#ffcdd2'); // Kırmızı - Düşük
+      }
+    } catch (colorError) {
+      console.warn('⚠️ Renklendirme hatası (devam ediliyor):', colorError.message);
+    }
+    
+    // Tümü arandı kolonunu renklendir
+    try {
+      const tumuAranmisRange = reportSheet.getRange(newRow, 10); // Tümü Arandı kolonu
+      if (analysisResult.tumuAranmis) {
+        tumuAranmisRange.setBackground('#c8e6c9'); // Yeşil
+      } else {
+        tumuAranmisRange.setBackground('#ffcdd2'); // Kırmızı
+      }
+    } catch (colorError) {
+      console.warn('⚠️ Renklendirme hatası (devam ediliyor):', colorError.message);
+    }
+    
+    // Sayfaya geç
+    reportSheet.activate();
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo raporlama tamamlandı (${duration}ms)`);
+    
+    // Başarı mesajı
+    ui.alert(
+      '✅ Format Tablo Raporlandı',
+      `📊 ${sheetName} için rapor oluşturuldu!\n\n` +
+      `📋 Rapor sayfası: "Format Tablo Raporları"\n` +
+      `🆔 Kod: ${uniqueCode}\n` +
+      `📊 Toplam Kontak: ${analysisResult.totalContacts}\n` +
+      `🔍 Arama Yapılan: ${analysisResult.aramaYapilan}\n` +
+      `📅 Randevu Alındı: ${analysisResult.randevuAlindi}\n` +
+      `📈 Başarı Puanı: %${analysisResult.basariPuani}\n` +
+      `✅ Tümü Arandı: ${analysisResult.tumuAranmis ? 'Evet' : 'Hayır'}\n\n` +
+      `💡 Sonraki adımlar:\n` +
+      `1. Format Tablo'yu manuel olarak Google Drive'a arşivle\n` +
+      `2. "Senkronize Et" butonuna basarak raporu yönetici dosyasına gönder\n` +
+      `⏱️ Süre: ${(duration / 1000).toFixed(1)}s`,
+      ui.ButtonSet.OK
+    );
+    
+    return {
+      success: true,
+      uniqueCode: uniqueCode,
+      reportSheet: 'Format Tablo Raporları',
+      rowNumber: newRow,
+      analysis: analysisResult,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error('❌ Format Tablo raporlama hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Raporlama hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Format Tablo sayfasını sil
+ * @returns {Object} İşlem sonucu
+ */
+function deleteFormatTable() {
+  const startTime = Date.now();
+  console.log('🗑️ Format Tablo silme başlatılıyor...');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const activeSheet = ss.getActiveSheet();
+    const sheetName = activeSheet.getName();
+    
+    // Format Tablo kontrolü
+    if (!isFormatTable(activeSheet)) {
+      ui.alert('❌ Hata', 'Aktif sayfa bir Format Tablo değil!', ui.ButtonSet.OK);
+      return { success: false, error: 'Not a Format Table' };
+    }
+    
+    // Onay iste
+    const confirmResp = ui.alert(
+      '⚠️ Format Tablo Silme',
+      `"${sheetName}" sayfasını silmek istediğinizden emin misiniz?\n\n` +
+      `⚠️ Bu işlem geri alınamaz!\n\n` +
+      `Lütfen önce sayfayı arşivlediğinizden emin olun.`,
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (confirmResp !== ui.Button.YES) {
+      return { success: false, message: 'İptal edildi' };
+    }
+    
+    // Sayfayı sil
+    ss.deleteSheet(activeSheet);
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo silindi: ${sheetName} (${duration}ms)`);
+    
+    ui.alert('✅ Format Tablo Silindi', `"${sheetName}" sayfası başarıyla silindi.`, ui.ButtonSet.OK);
+    
+    return {
+      success: true,
+      deletedSheetName: sheetName,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error('❌ Format Tablo silme hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Silme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Format Tablo Arşivleme Fonksiyonu
+ * Log Arşivi'nden istatistikleri çıkarır ve yönetici dosyasına "Arşiv" sheet'ine kart formatında ekler
+ * Format sheet'ini gizler ve gereksiz sheet'leri siler
+ * @returns {Object} İşlem sonucu
+ */
+function archiveFormatTable() {
+  const startTime = Date.now();
+  console.log('📦 Format Tablo arşivleme başlatılıyor...');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const activeSheet = ss.getActiveSheet();
+    const sheetName = activeSheet.getName();
+    
+    // Format Tablo kontrolü
+    if (!isFormatTable(activeSheet)) {
+      ui.alert('❌ Hata', 'Aktif sayfa bir Format Tablo değil!', ui.ButtonSet.OK);
+      return { success: false, error: 'Not a Format Table' };
+    }
+    
+    // 1. Format kodu ve Data adı sor
+    const formatCodeResp = ui.prompt(
+      '📦 Format Tablo Arşivle',
+      'Format kodu nedir? (örn: TeksBH):',
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    if (formatCodeResp.getSelectedButton() !== ui.Button.OK) {
+      return { success: false, message: 'İptal edildi' };
+    }
+    
+    const formatCode = formatCodeResp.getResponseText().trim();
+    if (!formatCode) {
+      ui.alert('❌ Hata', 'Format kodu boş olamaz!', ui.ButtonSet.OK);
+      return { success: false, error: 'Format code is required' };
+    }
+    
+    const dataNameResp = ui.prompt(
+      '📦 Format Tablo Arşivle',
+      'Data adı nedir? (örn: Tekstil Anadolu):',
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    if (dataNameResp.getSelectedButton() !== ui.Button.OK) {
+      return { success: false, message: 'İptal edildi' };
+    }
+    
+    const dataName = dataNameResp.getResponseText().trim();
+    if (!dataName) {
+      ui.alert('❌ Hata', 'Data adı boş olamaz!', ui.ButtonSet.OK);
+      return { success: false, error: 'Data name is required' };
+    }
+    
+    // 2. Temsilci kodunu bul (dosya adından)
+    let temsilciKodu = '';
+    const fileName = ss.getName();
+    for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+      if (fileName.includes(code)) {
+        temsilciKodu = code;
+        break;
+      }
+    }
+    
+    // 3. Log Arşivi'nden istatistikleri çıkar
+    console.log('📊 Log Arşivi\'nden istatistikler çıkarılıyor...');
+    const logStats = extractLogStatisticsFromArchive(ss, sheetName);
+    
+    // 4. Yönetici dosyasına "Arşiv" sheet'ine kart formatında ekle
+    console.log('📦 Yönetici dosyasına arşiv kaydı ekleniyor...');
+    const managerFile = SpreadsheetApp.openById(CRM_CONFIG.MANAGER_FILE_ID);
+    const archiveSheet = getOrCreateArchiveSheet(managerFile);
+    
+    const today = Utilities.formatDate(new Date(), 'Europe/Istanbul', 'yyyy-MM-dd');
+    const archiveCard = createArchiveCard(
+      dataName,
+      formatCode,
+      temsilciKodu,
+      today,
+      logStats
+    );
+    
+    addArchiveCardToSheet(archiveSheet, archiveCard);
+    
+    // 5. Format sheet'ini gizle
+    console.log('🔒 Format Tablo gizleniyor...');
+    activeSheet.hideSheet();
+    
+    // 6. Gereksiz sheet'leri sil (varsa)
+    console.log('🗑️ Gereksiz sheet\'ler kontrol ediliyor...');
+    const datasetSheet = ss.getSheetByName('Dataset Raporu');
+    if (datasetSheet) {
+      ss.deleteSheet(datasetSheet);
+      console.log('✅ "Dataset Raporu" sheet\'i silindi');
+    }
+    
+    // Not: "Format Tablo Raporları" sheet'i silinmeyecek (raporlar için gerekli)
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo arşivleme tamamlandı (${duration}ms)`);
+    
+    ui.alert(
+      '✅ Format Tablo Arşivlendi',
+      `"${sheetName}" başarıyla arşivlendi!\n\n` +
+      `📦 Format Kodu: ${formatCode}\n` +
+      `📋 Data Adı: ${dataName}\n` +
+      `👤 Temsilci: ${temsilciKodu || 'Bilinmiyor'}\n` +
+      `📊 Toplam Log: ${logStats.totalLogs}\n` +
+      `⏱️ Süre: ${(duration / 1000).toFixed(1)}s`,
+      ui.ButtonSet.OK
+    );
+    
+    return {
+      success: true,
+      formatCode,
+      dataName,
+      temsilciKodu,
+      logStats,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error('❌ Format Tablo arşivleme hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Arşivleme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Log Arşivi'nden Format Tablo için istatistikleri çıkarır
+ * @param {Spreadsheet} spreadsheet - Temsilci dosyası
+ * @param {string} formatTableName - Format Tablo adı
+ * @returns {Object} İstatistikler
+ */
+function extractLogStatisticsFromArchive(spreadsheet, formatTableName) {
+  try {
+    // Log Arşivi sayfasını bul
+    let logArchiveSheet = spreadsheet.getSheetByName('📋 Log Arşivi');
+    if (!logArchiveSheet) {
+      logArchiveSheet = spreadsheet.getSheetByName('Log Arşivi');
+    }
+    
+    if (!logArchiveSheet || logArchiveSheet.getLastRow() <= 1) {
+      console.log('⚠️ Log Arşivi bulunamadı veya boş');
+      return {
+        totalLogs: 0,
+        activityDistribution: {}
+      };
+    }
+    
+    // Batch read: Tüm veriyi tek seferde oku
+    const allData = logArchiveSheet.getDataRange().getValues();
+    const headers = allData[0] || [];
+    const rows = allData.slice(1);
+    
+    // Kolon indekslerini bul
+    const kaynakSayfaIdx = headers.findIndex(h => 
+      h && (String(h).toLowerCase().includes('kaynak') || String(h).toLowerCase().includes('kaynak sayfa'))
+    );
+    const aktiviteIdx = headers.findIndex(h => 
+      h && String(h).toLowerCase().includes('aktivite')
+    );
+    
+    if (kaynakSayfaIdx === -1 || aktiviteIdx === -1) {
+      console.log('⚠️ Log Arşivi kolonları bulunamadı');
+      return {
+        totalLogs: 0,
+        activityDistribution: {}
+      };
+    }
+    
+    // Format Tablo'ya ait logları filtrele
+    const formatLogs = rows.filter(row => {
+      const kaynakSayfa = String(row[kaynakSayfaIdx] || '').trim();
+      return kaynakSayfa === formatTableName;
+    });
+    
+    // Aktivite dağılımını hesapla
+    const activityDistribution = {};
+    formatLogs.forEach(row => {
+      const aktivite = String(row[aktiviteIdx] || '').trim();
+      if (aktivite) {
+        activityDistribution[aktivite] = (activityDistribution[aktivite] || 0) + 1;
+      }
+    });
+    
+    return {
+      totalLogs: formatLogs.length,
+      activityDistribution: activityDistribution
+    };
+    
+  } catch (error) {
+    console.error('❌ Log Arşivi istatistik hatası:', error);
+    return {
+      totalLogs: 0,
+      activityDistribution: {}
+    };
+  }
+}
+
+/**
+ * Yönetici dosyasında "Arşiv" sheet'ini oluşturur veya alır
+ * @param {Spreadsheet} managerFile - Yönetici dosyası
+ * @returns {Sheet} Arşiv sheet'i
+ */
+function getOrCreateArchiveSheet(managerFile) {
+  let archiveSheet = managerFile.getSheetByName('Arşiv');
+  
+  if (!archiveSheet) {
+    archiveSheet = managerFile.insertSheet('Arşiv');
+    
+    // Başlık satırı (1. satır)
+    archiveSheet.getRange(1, 1, 1, 10).merge();
+    archiveSheet.getRange(1, 1).setValue('📦 FORMAT TABLO ARŞİVİ');
+    archiveSheet.getRange(1, 1).setBackground('#1a73e8');
+    archiveSheet.getRange(1, 1).setFontColor('#ffffff');
+    archiveSheet.getRange(1, 1).setFontWeight('bold');
+    archiveSheet.getRange(1, 1).setFontSize(16);
+    archiveSheet.getRange(1, 1).setHorizontalAlignment('center');
+    archiveSheet.setRowHeight(1, 40);
+    
+    // Açıklama satırı (2. satır)
+    archiveSheet.getRange(2, 1, 1, 10).merge();
+    archiveSheet.getRange(2, 1).setValue('Arşivlenen Format Tablo\'ların özet bilgileri - Kart formatında');
+    archiveSheet.getRange(2, 1).setBackground('#e8f0fe');
+    archiveSheet.getRange(2, 1).setFontColor('#1967d2');
+    archiveSheet.getRange(2, 1).setFontSize(10);
+    archiveSheet.getRange(2, 1).setHorizontalAlignment('center');
+    archiveSheet.setRowHeight(2, 30);
+    
+    // Boş satır (3. satır)
+    archiveSheet.setRowHeight(3, 10);
+    
+    console.log('✅ "Arşiv" sheet\'i oluşturuldu');
+  }
+  
+  return archiveSheet;
+}
+
+/**
+ * Arşiv kartı oluşturur (5-10 satır, okunabilir format)
+ * @param {string} dataName - Data adı
+ * @param {string} formatCode - Format kodu
+ * @param {string} temsilciKodu - Temsilci kodu
+ * @param {string} tarih - Tarih (YYYY-MM-DD)
+ * @param {Object} logStats - Log istatistikleri
+ * @returns {Array} Kart verisi (her satır bir array)
+ */
+function createArchiveCard(dataName, formatCode, temsilciKodu, tarih, logStats) {
+  const card = [];
+  
+  // Satır 1: Başlık (Data Adı - Format Kodu)
+  card.push([`📦 ${dataName} - ${formatCode}`, '', '', '', '', '', '', '', '', '']);
+  
+  // Satır 2: Temsilci ve Tarih
+  card.push([`👤 Temsilci: ${temsilciKodu || 'Bilinmiyor'}`, `📅 Tarih: ${tarih}`, '', '', '', '', '', '', '', '']);
+  
+  // Satır 3: Toplam Log
+  card.push([`📊 Toplam Log: ${logStats.totalLogs}`, '', '', '', '', '', '', '', '', '']);
+  
+  // Satır 4: Aktivite Dağılımı Başlığı
+  card.push([`📈 Aktivite Dağılımı:`, '', '', '', '', '', '', '', '', '']);
+  
+  // Satır 5-10: Aktivite dağılımı (her aktivite bir satır)
+  const activities = Object.entries(logStats.activityDistribution || {});
+  if (activities.length > 0) {
+    activities.forEach(([activity, count]) => {
+      card.push([`  • ${activity}: ${count}`, '', '', '', '', '', '', '', '', '']);
+    });
+  } else {
+    card.push([`  • Aktivite bulunamadı`, '', '', '', '', '', '', '', '', '']);
+  }
+  
+  // Boş satır (ayırıcı)
+  card.push(['', '', '', '', '', '', '', '', '', '']);
+  
+  return card;
+}
+
+/**
+ * Arşiv kartını sheet'e ekler
+ * @param {Sheet} archiveSheet - Arşiv sheet'i
+ * @param {Array} card - Kart verisi
+ */
+function addArchiveCardToSheet(archiveSheet, card) {
+  const startRow = archiveSheet.getLastRow() + 1;
+  
+  // Kart verilerini yaz
+  archiveSheet.getRange(startRow, 1, card.length, 10).setValues(card);
+  
+  // Stil uygula
+  const cardRange = archiveSheet.getRange(startRow, 1, card.length, 10);
+  
+  // Başlık satırı (ilk satır)
+  archiveSheet.getRange(startRow, 1, 1, 10).merge();
+  archiveSheet.getRange(startRow, 1).setFontWeight('bold');
+  archiveSheet.getRange(startRow, 1).setFontSize(14);
+  archiveSheet.getRange(startRow, 1).setBackground('#e3f2fd');
+  archiveSheet.setRowHeight(startRow, 35);
+  
+  // İkinci satır (Temsilci ve Tarih)
+  archiveSheet.getRange(startRow + 1, 1, 1, 2).setFontSize(11);
+  archiveSheet.setRowHeight(startRow + 1, 25);
+  
+  // Üçüncü satır (Toplam Log)
+  archiveSheet.getRange(startRow + 2, 1).setFontWeight('bold');
+  archiveSheet.getRange(startRow + 2, 1).setFontSize(12);
+  archiveSheet.setRowHeight(startRow + 2, 25);
+  
+  // Aktivite dağılımı başlığı
+  archiveSheet.getRange(startRow + 3, 1).setFontWeight('bold');
+  archiveSheet.setRowHeight(startRow + 3, 25);
+  
+  // Aktivite satırları
+  for (let i = 4; i < card.length - 1; i++) {
+    archiveSheet.setRowHeight(startRow + i, 20);
+  }
+  
+  // Son boş satır
+  archiveSheet.setRowHeight(startRow + card.length - 1, 10);
+  
+  console.log(`✅ Arşiv kartı eklendi (${card.length} satır)`);
+}
+
 
 /**
  * Applies appointment color coding to Fırsatlarım row (when appointment is taken)
@@ -8657,7 +9637,7 @@ function handleRandevularimStatusChange(e, sheet) {
  * @param {number} numRows - Number of rows to process
  * @param {Array} dateData - Array of {status, ...} objects from sortRandevularimByDate
  */
-function applyRandevularimColorCodingBatch(sheet, startRow, numRows, dateData) {
+function applyRandevularimColorCodingBatch(sheet, startRow, numRows) {
   try {
     if (!sheet || !startRow || numRows <= 0) {
       console.error('❌ Invalid parameters for batch Randevularım color coding');
@@ -8670,13 +9650,43 @@ function applyRandevularimColorCodingBatch(sheet, startRow, numRows, dateData) {
       return;
     }
     
+    // BATCH: Read headers once
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
+    
+    // Fuzzy matching: "Randevu Durumu" veya "Randevu durumu" veya benzeri (typo toleranslı)
+    let randevuDurumuIndex = headers.indexOf('Randevu Durumu');
+    if (randevuDurumuIndex === -1) {
+      randevuDurumuIndex = headers.indexOf('Randevu durumu');
+    }
+    if (randevuDurumuIndex === -1) {
+      // Case-insensitive arama
+      const lowerHeaders = headers.map(h => String(h || '').toLowerCase().trim());
+      const lowerIndex = lowerHeaders.indexOf('randevu durumu');
+      if (lowerIndex !== -1) {
+        randevuDurumuIndex = lowerIndex;
+        console.log(`⚠️ "Randevu Durumu" case-insensitive bulundu: index ${randevuDurumuIndex}`);
+      }
+    }
+    
+    if (randevuDurumuIndex === -1) {
+      console.warn('⚠️ "Randevu Durumu" kolonu bulunamadı. Mevcut kolonlar:', headers);
+      // Kolon bulunamazsa renklendirme yapma ama hata verme (21.6: Mevcut sisteme uyum)
+      return;
+    }
+    
+    // BATCH: Read all status values in one operation (ultra-fast!)
+    const statusRange = sheet.getRange(startRow, randevuDurumuIndex + 1, numRows, 1);
+    const statusValues = statusRange.getDisplayValues();
+    
     // Status to color mapping function (reusable)
     const getColorForStatus = (status) => {
       if (!status || status === '' || status === null || status === undefined) {
         return 'rgb(255, 255, 255)'; // White
       }
       
-      switch (status) {
+      const normalizedStatus = String(status).trim();
+      
+      switch (normalizedStatus) {
         case 'Randevu Alındı':
           return CRM_CONFIG.COLOR_CODES['Randevu Alındı'] || 'rgb(232, 245, 232)';
         case 'İleri Tarih Randevu':
@@ -8694,10 +9704,10 @@ function applyRandevularimColorCodingBatch(sheet, startRow, numRows, dateData) {
       }
     };
     
-    // Build color matrix (all rows at once)
+    // Build color matrix (all rows at once - in memory, very fast!)
     const backgroundColorMatrix = [];
     for (let i = 0; i < numRows; i++) {
-      const status = dateData && dateData[i] ? (dateData[i].status || '') : '';
+      const status = String(statusValues[i][0] || '').trim();
       const color = getColorForStatus(status);
       
       // Create a row array with the same color for all columns
@@ -8709,7 +9719,10 @@ function applyRandevularimColorCodingBatch(sheet, startRow, numRows, dateData) {
     const allRowsRange = sheet.getRange(startRow, 1, numRows, lastColumn);
     allRowsRange.setBackgrounds(backgroundColorMatrix);
     
-    // No flush needed - Google handles it automatically
+    // Renklerin görünmesi için flush (kritik!)
+    SpreadsheetApp.flush();
+    
+    console.log(`✅ Randevularım batch renklendirme tamamlandı: ${numRows} satır`);
     
   } catch (error) {
     console.error('❌ Error applying batch Randevularım color coding:', error);
@@ -8938,53 +9951,216 @@ function refreshColorsOnActiveSheet() {
     
     let processedCount = 0;
     
-    // Sayfa tipine göre renklendirme yap
+    // Sayfa tipine göre renklendirme yap (BATCH OPERATIONS - Google Best Practice!)
     if (sheetName === 'Randevularım') {
-      // Randevularım için özel renklendirme
-      for (let row = 2; row <= lastRow; row++) {
+      // Randevularım için BATCH renklendirme (100x hızlı!)
+      const numRows = lastRow - 1; // Header hariç
+      if (numRows > 0) {
         try {
-          const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-          const randevuDurumuIndex = headers.indexOf('Randevu Durumu');
-          
-          if (randevuDurumuIndex !== -1) {
-            const status = sheet.getRange(row, randevuDurumuIndex + 1).getDisplayValue();
-            updateRandevularimRowColor(sheet, row, status);
-            processedCount++;
-    }
-  } catch (error) {
-          console.error(`❌ Satır ${row} renklendirme hatası:`, error);
+          applyRandevularimColorCodingBatch(sheet, 2, numRows);
+          processedCount = numRows;
+          console.log(`✅ Randevularım: ${numRows} satır batch olarak renklendirildi`);
+        } catch (error) {
+          console.error('❌ Randevularım batch renklendirme hatası:', error);
+          // Fallback: Tek tek renklendir (yavaş ama çalışır)
+          for (let row = 2; row <= lastRow; row++) {
+            try {
+              const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+              const randevuDurumuIndex = headers.indexOf('Randevu Durumu');
+              if (randevuDurumuIndex !== -1) {
+                const status = sheet.getRange(row, randevuDurumuIndex + 1).getDisplayValue();
+                updateRandevularimRowColor(sheet, row, status);
+                processedCount++;
+              }
+            } catch (rowError) {
+              console.error(`❌ Satır ${row} renklendirme hatası:`, rowError);
+            }
+          }
         }
       }
     } else if (sheetName === 'Toplantılarım') {
-      // Toplantılarım için özel renklendirme
+      // Toplantılarım için BATCH renklendirme (100x hızlı!)
+      const numRows = lastRow - 1; // Header hariç
+      if (numRows > 0) {
+        try {
+          applyMeetingColorCodingBatch(sheet, 2, numRows);
+          processedCount = numRows;
+          console.log(`✅ Toplantılarım: ${numRows} satır batch olarak renklendirildi`);
+        } catch (error) {
+          console.error('❌ Toplantılarım batch renklendirme hatası:', error);
+          // Fallback: Tek tek renklendir (yavaş ama çalışır)
           for (let row = 2; row <= lastRow; row++) {
             try {
-          applyMeetingColorCoding(sheet, row);
+              applyMeetingColorCoding(sheet, row);
               processedCount++;
-  } catch (error) {
-          console.error(`❌ Satır ${row} renklendirme hatası:`, error);
+            } catch (rowError) {
+              console.error(`❌ Satır ${row} renklendirme hatası:`, rowError);
+            }
+          }
         }
       }
     } else if (sheetName === 'Fırsatlarım') {
-      // Fırsatlarım için özel renklendirme
-      for (let row = 2; row <= lastRow; row++) {
+      // Fırsatlarım için batch renklendirme (hızlı!)
+      const numRows = lastRow - 1; // Header hariç
+      if (numRows > 0) {
         try {
-          applyOpportunityColorCoding(sheet, row);
-          processedCount++;
-  } catch (error) {
-          console.error(`❌ Satır ${row} renklendirme hatası:`, error);
+          // Önce kolon kontrolü yap (typo toleranslı)
+          const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+          const normalizeHeader = (h) => String(h || '').toLowerCase().trim().replace(/\s+/g, ' ');
+          const firsatDurumuIndex = headers.findIndex(h => {
+            const normalized = normalizeHeader(h);
+            return normalized === 'fırsat durumu' || 
+                   normalized === 'fırsat durumi' || // Typo toleransı
+                   (normalized.includes('fırsat') && normalized.includes('durum'));
+          });
+          
+          if (firsatDurumuIndex === -1) {
+            const errorMsg = `"Fırsat Durumu" kolonu bulunamadı!\n\nMevcut kolonlar:\n${headers.map((h, i) => `${String.fromCharCode(65 + i)}: "${h}"`).join('\n')}`;
+            console.error('❌', errorMsg);
+            SpreadsheetApp.getUi().alert('⚠️ Uyarı', errorMsg, SpreadsheetApp.getUi().ButtonSet.OK);
+            return;
+          }
+          
+          applyOpportunityColorCodingBatch(sheet, 2, numRows);
+          processedCount = numRows;
+          console.log(`✅ Fırsatlarım: ${numRows} satır batch olarak renklendirildi`);
+          // NOT: flush() zaten applyOpportunityColorCodingBatch içinde çağrılıyor, gereksiz!
+        } catch (error) {
+          console.error('❌ Fırsatlarım batch renklendirme hatası:', error);
+          console.error('Stack:', error.stack);
+          // Fallback: Tek tek renklendir
+          for (let row = 2; row <= lastRow; row++) {
+            try {
+              applyOpportunityColorCoding(sheet, row);
+              processedCount++;
+            } catch (rowError) {
+              console.error(`❌ Satır ${row} renklendirme hatası:`, rowError);
+            }
+          }
         }
-                  }
-                } else {
+      }
+    } else if (isFormatTable(sheet)) {
+      // Format Tablo için batch renklendirme (hızlı!)
+      console.log(`🎨 Format Tablo tespit edildi: ${sheetName}`);
+      const numRows = lastRow - 1; // Header hariç
+      if (numRows > 0) {
+        try {
+          // Aktivite kolonunu bul
+          const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+          const aktiviteIndex = headers.findIndex(h => 
+            h && String(h).toLowerCase().trim() === 'aktivite'
+          );
+          
+          if (aktiviteIndex === -1) {
+            console.warn('⚠️ Format Tablo: "Aktivite" kolonu bulunamadı');
+            SpreadsheetApp.getUi().alert('Uyarı', 'Format Tablo\'da "Aktivite" kolonu bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+            return;
+          }
+          
+          // Tüm aktivite değerlerini batch oku
+          const aktiviteRange = sheet.getRange(2, aktiviteIndex + 1, numRows, 1);
+          const aktiviteValues = aktiviteRange.getDisplayValues();
+          
+          // Helper: rgb(...) formatını #hex formatına çevir
+          const rgbToHex = (rgb) => {
+            if (!rgb || typeof rgb !== 'string') return '#ffffff';
+            if (rgb.startsWith('#')) return rgb;
+            const match = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (!match) return '#ffffff';
+            const r = parseInt(match[1]).toString(16).padStart(2, '0');
+            const g = parseInt(match[2]).toString(16).padStart(2, '0');
+            const b = parseInt(match[3]).toString(16).padStart(2, '0');
+            return `#${r}${g}${b}`.toUpperCase();
+          };
+          
+          // Renk matrisini oluştur
+          const backgroundColorMatrix = [];
+          const lastColumn = sheet.getLastColumn();
+          
+          for (let i = 0; i < numRows; i++) {
+            const activity = String(aktiviteValues[i][0] || '').trim();
+            let color = '#ffffff'; // Default white
+            
+            if (activity) {
+              // Normalize activity
+              const actLower = activity.toLowerCase();
+              let normalizedActivity = activity;
+              
+              if (actLower.includes('fırsat') && actLower.includes('iletildi')) {
+                normalizedActivity = 'Fırsat İletildi';
+              } else if (actLower.includes('bilgi') && actLower.includes('verildi')) {
+                normalizedActivity = 'Bilgi Verildi';
+              } else if (actLower.includes('yeniden') && actLower.includes('aranacak')) {
+                normalizedActivity = 'Yeniden Aranacak';
+              }
+              
+              // Map to color
+              if (CRM_CONFIG.COLOR_CODES[normalizedActivity]) {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES[normalizedActivity]);
+              } else if (normalizedActivity === 'Randevu Alındı') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['Randevu Alındı']);
+              } else if (normalizedActivity === 'İleri Tarih Randevu') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['İleri Tarih Randevu']);
+              } else if (normalizedActivity === 'Randevu Teyitlendi') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['Randevu Teyitlendi']);
+              } else if (normalizedActivity === 'Randevu Ertelendi') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['Randevu Ertelendi']);
+              } else if (normalizedActivity === 'Randevu İptal oldu') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['Randevu İptal oldu']);
+              } else if (normalizedActivity === 'İlgilenmiyor') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['İlgilenmiyor']);
+              } else if (normalizedActivity === 'Ulaşılamadı') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['Ulaşılamadı']);
+              } else if (normalizedActivity === 'Geçersiz Numara') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['Geçersiz Numara']);
+              } else if (normalizedActivity === 'Toplantı Tamamlandı') {
+                color = rgbToHex(CRM_CONFIG.COLOR_CODES['Toplantı Tamamlandı']);
+              }
+            }
+            
+            // Tüm kolonlar için aynı renk
+            const rowColors = new Array(lastColumn).fill(color);
+            backgroundColorMatrix.push(rowColors);
+          }
+          
+          // Batch olarak tüm renkleri uygula
+          const allRowsRange = sheet.getRange(2, 1, numRows, lastColumn);
+          allRowsRange.setBackgrounds(backgroundColorMatrix);
+          
+          processedCount = numRows;
+          console.log(`✅ Format Tablo: ${numRows} satır batch olarak renklendirildi`);
+        } catch (error) {
+          console.error('❌ Format Tablo batch renklendirme hatası:', error);
+          // Fallback: Tek tek renklendir
+          const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+          const aktiviteIndex = headers.findIndex(h => 
+            h && String(h).toLowerCase().trim() === 'aktivite'
+          );
+          
+          if (aktiviteIndex !== -1) {
+            for (let row = 2; row <= lastRow; row++) {
+              try {
+                const activity = sheet.getRange(row, aktiviteIndex + 1).getDisplayValue();
+                applyFormatTableColorCoding(sheet, row, activity);
+                processedCount++;
+              } catch (rowError) {
+                console.error(`❌ Satır ${row} renklendirme hatası:`, rowError);
+              }
+            }
+          }
+        }
+      }
+    } else {
       // Diğer sayfalar için manuel renklendirme
       applyManualColorCoding();
       processedCount = lastRow - 1;
     }
     
-    const message = `✅ ${sheetName} renklendirme tamamlandı!\n\n📊 İşlenen satır: ${processedCount}`;
-    SpreadsheetApp.getUi().alert('✅ Başarılı', message, SpreadsheetApp.getUi().ButtonSet.OK);
-    
+    // Performance: UI alert yavaş olabilir, sadece console log yap
     console.log(`🎨 ${sheetName} renklendirme tamamlandı: ${processedCount} satır`);
+    
+    // Opsiyonel: Kullanıcıya bilgi ver (non-blocking)
+    // SpreadsheetApp.getUi().alert('✅ Başarılı', `✅ ${sheetName} renklendirme tamamlandı!\n\n📊 İşlenen satır: ${processedCount}`, SpreadsheetApp.getUi().ButtonSet.OK);
     
   } catch (error) {
     console.error('❌ Function failed:', error);
@@ -12424,9 +13600,10 @@ function fixRandevularimColumnStructure(parameters) {
         
         // Date objesi ise, HH:mm formatına çevir
         if (saatValue instanceof Date) {
-          const hours = saatValue.getHours().toString().padStart(2, '0');
-          const minutes = saatValue.getMinutes().toString().padStart(2, '0');
-          newRow[saatColIndex] = `${hours}:${minutes}`;
+          const hours = saatValue.getHours();
+          const minutes = saatValue.getMinutes();
+          // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+          newRow[saatColIndex] = `${hours}:${String(minutes).padStart(2, '0')}`;
         } else if (typeof saatValue === 'string' && saatValue.includes('.')) {
           // Yanlış format (tarih gibi), temizle
           console.warn(`⚠️ Satır ${rowIdx + 2}: Saat formatı yanlış: "${saatValue}", temizleniyor...`);
@@ -12435,9 +13612,12 @@ function fixRandevularimColumnStructure(parameters) {
           // HH:mm formatında mı kontrol et
           const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
           if (timeMatch) {
-            const hours = timeMatch[1].padStart(2, '0');
-            const minutes = timeMatch[2].padStart(2, '0');
-            newRow[saatColIndex] = `${hours}:${minutes}`;
+            const hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+              // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+              newRow[saatColIndex] = `${hours}:${String(minutes).padStart(2, '0')}`;
+            }
           }
         }
       }
@@ -12498,16 +13678,22 @@ function fixRandevularimColumnStructure(parameters) {
         if (saatValue) {
           // Date objesi ise
           if (saatValue instanceof Date) {
-            const hours = saatValue.getHours().toString().padStart(2, '0');
-            const minutes = saatValue.getMinutes().toString().padStart(2, '0');
-            saatFormatted = `${hours}:${minutes}`;
+            const hours = saatValue.getHours();
+            const minutes = saatValue.getMinutes();
+            // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+            saatFormatted = `${hours}:${String(minutes).padStart(2, '0')}`;
           } else if (typeof saatValue === 'string') {
             // HH:mm formatında mı kontrol et
             const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
             if (timeMatch) {
-              const hours = timeMatch[1].padStart(2, '0');
-              const minutes = timeMatch[2].padStart(2, '0');
-              saatFormatted = `${hours}:${minutes}`;
+              const hours = parseInt(timeMatch[1], 10);
+              const minutes = parseInt(timeMatch[2], 10);
+              if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+                // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+                saatFormatted = `${hours}:${String(minutes).padStart(2, '0')}`;
+              } else {
+                saatFormatted = '';
+              }
             } else if (saatValue.includes('.')) {
               // Yanlış format (tarih gibi), temizle
               saatFormatted = '';
@@ -12546,7 +13732,7 @@ function fixRandevularimColumnStructure(parameters) {
       const randevuDurumuIndex = newColumns.indexOf('Randevu durumu');
       
       // Status değerlerini oku (batch - tek seferde!)
-      const statusValues = [];
+      let statusValues = [];
       if (randevuDurumuIndex !== -1) {
         const statusRange = sheet.getRange(2, randevuDurumuIndex + 1, newDataRows.length, 1);
         statusValues = statusRange.getDisplayValues().map(row => String(row[0] || '').trim());
@@ -12683,7 +13869,19 @@ function fixFirsatlarimColumnOrder(parameters) {
       const oldRow = currentDataRows[rowIdx];
       const newRow = new Array(newColumns.length).fill('');
       
-      // Mevcut verileri yeni sıraya göre taşı
+      // Helper: Kolon adını normalize et (typo toleranslı eşleştirme için)
+      const normalizeColName = (name) => {
+        return String(name || '').toLowerCase().trim()
+          .replace(/\s+/g, ' ')
+          .replace(/[ıi]/g, 'i')
+          .replace(/[şs]/g, 's')
+          .replace(/[ğg]/g, 'g')
+          .replace(/[üu]/g, 'u')
+          .replace(/[öo]/g, 'o')
+          .replace(/[çc]/g, 'c');
+      };
+      
+      // Mevcut verileri yeni sıraya göre taşı (TYPO TOLERANSLI!)
       for (let oldColIdx = 0; oldColIdx < oldRow.length; oldColIdx++) {
         const oldColName = String(currentHeaders[oldColIdx] || '').trim();
         
@@ -12694,10 +13892,41 @@ function fixFirsatlarimColumnOrder(parameters) {
           continue;
         }
         
-        // Yeni kolon index'ini bul
-        const newColIndex = newColumns.indexOf(oldColName);
+        // Yeni kolon index'ini bul (ÖNCE TAM EŞLEŞME, SONRA FUZZY MATCH)
+        let newColIndex = newColumns.indexOf(oldColName);
+        
+        // Eğer tam eşleşme yoksa, fuzzy match dene (typo toleranslı)
+        if (newColIndex === -1) {
+          const normalizedOld = normalizeColName(oldColName);
+          
+          // Her yeni kolon için fuzzy match dene
+          for (let i = 0; i < newColumns.length; i++) {
+            const normalizedNew = normalizeColName(newColumns[i]);
+            
+            // Tam eşleşme veya içeriyor mu kontrol et
+            if (normalizedOld === normalizedNew || 
+                (normalizedOld.includes(normalizedNew) && normalizedNew.length > 3) ||
+                (normalizedNew.includes(normalizedOld) && normalizedOld.length > 3)) {
+              newColIndex = i;
+              console.log(`🔍 Fuzzy match: "${oldColName}" -> "${newColumns[i]}"`);
+              break;
+            }
+          }
+        }
+        
+        // Veriyi taşı
         if (newColIndex !== -1) {
           newRow[newColIndex] = oldRow[oldColIdx];
+        } else {
+          // Eşleşme bulunamadı - uyarı ver (kritik kolonlar için)
+          const criticalColumns = ['Fırsat Durumu', 'Fırsat Tarihi', 'Company name', 'Phone', 'Mail'];
+          const normalizedOld = normalizeColName(oldColName);
+          if (criticalColumns.some(crit => {
+            const normalizedCrit = normalizeColName(crit);
+            return normalizedOld.includes(normalizedCrit) || normalizedCrit.includes(normalizedOld);
+          })) {
+            console.warn(`⚠️ KRİTİK: "${oldColName}" kolonu eşleştirilemedi! Veri kaybı riski!`);
+          }
         }
       }
       
@@ -12721,9 +13950,10 @@ function fixFirsatlarimColumnOrder(parameters) {
         
         // Date objesi ise, HH:mm formatına çevir
         if (saatValue instanceof Date) {
-          const hours = saatValue.getHours().toString().padStart(2, '0');
-          const minutes = saatValue.getMinutes().toString().padStart(2, '0');
-          newRow[saatColIndex] = `${hours}:${minutes}`;
+          const hours = saatValue.getHours();
+          const minutes = saatValue.getMinutes();
+          // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+          newRow[saatColIndex] = `${hours}:${String(minutes).padStart(2, '0')}`;
         } else if (typeof saatValue === 'string' && saatValue.includes('.')) {
           // Yanlış format (tarih gibi), temizle
           console.warn(`⚠️ Satır ${rowIdx + 2}: Saat formatı yanlış: "${saatValue}", temizleniyor...`);
@@ -12732,9 +13962,12 @@ function fixFirsatlarimColumnOrder(parameters) {
           // HH:mm formatında mı kontrol et
           const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
           if (timeMatch) {
-            const hours = timeMatch[1].padStart(2, '0');
-            const minutes = timeMatch[2].padStart(2, '0');
-            newRow[saatColIndex] = `${hours}:${minutes}`;
+            const hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+              // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+              newRow[saatColIndex] = `${hours}:${String(minutes).padStart(2, '0')}`;
+            }
           }
         }
       }

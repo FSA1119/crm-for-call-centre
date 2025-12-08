@@ -255,17 +255,6 @@
       background: #f8d7da;
       color: #721c24;
     }
-    
-    .performance-warning {
-      background-color: #fff3cd;
-      border: 1px solid #ffc107;
-      border-radius: 6px;
-      padding: 10px 15px;
-      margin: 15px 20px;
-      font-size: 13px;
-      color: #856404;
-      display: none;
-    }
   </style>
 </head>
 <body>
@@ -274,9 +263,6 @@
       <h1>📅 Toplantı Penceresi</h1>
       <p>Seçilen randevu için toplantı detaylarını girin</p>
     </div>
-    
-    <!-- Performance Warning -->
-    <div id="performanceWarning" class="performance-warning"></div>
     
     <div class="appointment-info">
       <h3>📋 Randevu Bilgileri</h3>
@@ -1196,15 +1182,6 @@
           .withSuccessHandler(function(result) {
             isSubmitting = false; // Reset flag
             if (result.success) {
-              // Show performance warning if exists
-              if (result.performanceWarning) {
-                const warningDiv = document.getElementById('performanceWarning');
-                if (warningDiv) {
-                  warningDiv.textContent = result.performanceWarning;
-                  warningDiv.style.display = 'block';
-                }
-              }
-              
               // Dialog'u kapat (Çalışıyor mesajı sorununu önlemek için daha uzun setTimeout)
               // Google Sheets'in loading indicator'ının kaybolması için yeterli süre ver
               // Script'in tamamlanması için 1 saniye bekle

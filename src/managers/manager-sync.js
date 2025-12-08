@@ -99,6 +99,43 @@ const CRM_CONFIG = {
 
 var FAST_SYNC = false; // Hızlı mod: ağır adımları atla (renk/validation/auto-resize)
 
+// ========================================
+// 🚀 PERFORMANCE OPTIMIZATION HELPERS
+// ========================================
+
+/**
+ * Cache helper - Header'ları cache'le (Amazon pattern)
+ * @param {string} cacheKey - Unique cache key (e.g., 'headers_Firsatlarim')
+ * @param {Function} fetchFunction - Function that returns the data
+ * @param {number} ttlSeconds - Time to live in seconds (default: 3600 = 1 hour)
+ * @returns {*} - Cached or fresh data
+ */
+function getCachedData(cacheKey, fetchFunction, ttlSeconds = 3600) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(cacheKey);
+    
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    
+    // Cache miss - fetch fresh data
+    const freshData = fetchFunction();
+    
+    // Store in cache
+    try {
+      cache.put(cacheKey, JSON.stringify(freshData), ttlSeconds);
+    } catch (cacheError) {
+      // Cache write failed - continue with fresh data
+    }
+    
+    return freshData;
+  } catch (error) {
+    // Cache error - return fresh data
+    return fetchFunction();
+  }
+}
+
 // 🔧 UTILITY FUNCTIONS - FOUNDATION LAYER
 // ========================================
 
@@ -395,6 +432,12 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
       console.error('Invalid parameters for color coding');
       return;
     }
+    
+    // Personel sheet'i için renklendirme yapma (yönetim sheet'i)
+    if (sheetName === 'Personel') {
+      console.log('🎨 Personel sheet atlandı (renklendirme gerektirmez)');
+      return;
+    }
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     let statusColumnIndex = -1;
     const lowerName = String(sheetName || '').toLowerCase();
@@ -446,9 +489,27 @@ function applyColorCodingToManagerData(sheet, sheetName, startRow, rowCount) {
     }
     
     console.log(`🎨 applyColorCodingToManagerData: Sheet=${sheetName}, StatusCol=${statusColumnIndex}, EmployeeCol=${employeeCodeColumnIndex}, Rows=${rowCount}`);
+    const lastCol = sheet.getLastColumn();
     for (let i = 0; i < rowCount; i++) {
       const rowNumber = startRow + i;
       console.log(`🎨 Processing row ${rowNumber} for ${sheetName}`);
+      
+      // Boş satır kontrolü: TÜM kolonları kontrol et
+      let isRowEmpty = true;
+      const rowData = sheet.getRange(rowNumber, 1, 1, lastCol).getDisplayValues()[0];
+      for (let c = 0; c < lastCol; c++) {
+        const cellValue = String(rowData[c] || '').trim();
+        if (cellValue !== '') {
+          isRowEmpty = false;
+          break;
+        }
+      }
+      
+      if (isRowEmpty) {
+        // Tamamen boş satır - beyaz bırak (renk uygulama)
+        console.log(`🎨 Row ${rowNumber}: Empty row, skipping color coding`);
+        continue;
+      }
       
       // T Aktivite Özet için status kontrolü yapma
       let status = '';
@@ -1181,8 +1242,8 @@ function updateManagerSheet(managerFile, sheetName, data, employeeCode, mode) {
     if (effectiveMode !== 'append') {
       // Tüm sayfalar için çalışan bazında temizleme yap (duplicate önleme)
       if (employeeCode === 'ALL') {
-        // Tüm çalışan verilerini temizle
-        const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+        // Tüm çalışan verilerini temizle (Personel sheet'inden)
+        const codes = getAllEmployeeCodes();
         for (const code of codes) {
           clearEmployeeData(sheet, code);
         }
@@ -1690,18 +1751,20 @@ function formatTimeValue(value) {
     
     // Handle Date objects
     if (value instanceof Date) {
-      const hours = value.getHours().toString().padStart(2, '0');
-      const minutes = value.getMinutes().toString().padStart(2, '0');
-      return `${hours}:${minutes}`;
+      const hours = value.getHours();
+      const minutes = value.getMinutes();
+      // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+      return `${hours}:${String(minutes).padStart(2, '0')}`;
     }
     
     // Handle string dates (like "30.12.1899")
     if (typeof value === 'string') {
       const date = new Date(value);
       if (!isNaN(date.getTime()) && date.getFullYear() !== 1899) {
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+        // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+        return `${hours}:${String(minutes).padStart(2, '0')}`;
       }
     }
     
@@ -2615,9 +2678,18 @@ function createManagerMenu() {
     // "Tüm Verileri Senkronize Et" kaldırıldı - artık gerekli değil
     // Dashboard sistemi direkt temsilci dosyalarından veri çekiyor
 
-    // Sırayla (Üstüne Ekle) - Kullanılıyor
+    // Sırayla (Üstüne Ekle) - Kullanılıyor (Personel sheet'inden dinamik)
     const appendSubmenu = ui.createMenu('➕ Sırayla (Üstüne Ekle)');
-    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
+    const allEmployees = getPersonelFromSheet();
+    const employeesToShow = allEmployees && allEmployees.length > 0 
+      ? allEmployees.filter(p => p.durum === 'Aktif')
+      : Object.entries(CRM_CONFIG.EMPLOYEE_CODES).map(([code, name]) => ({
+          code, name, durum: 'Aktif'
+        }));
+    
+    for (const emp of employeesToShow) {
+      const employeeCode = emp.code;
+      const employeeName = emp.name || CRM_CONFIG.EMPLOYEE_CODES[employeeCode] || employeeCode;
       const functionName = `syncSingleEmployeeAppend_${employeeCode.replace(/\s+/g, '_')}`;
       appendSubmenu.addItem(`${employeeCode} - ${employeeName}`, functionName);
     }
@@ -2630,14 +2702,25 @@ function createManagerMenu() {
     menu.addSubMenu(appendSubmenu)
         .addSeparator();
 
-    // 📊 Log Özeti - Sadece log analizi
+    // 📊 Log Özeti - Sadece log analizi (Dinamik - Personel sheet'inden)
     const logAnalysisSubmenu = ui.createMenu('📊 Log Özeti');
     logAnalysisSubmenu.addItem('🌐 Genel Log Analizi - Tüm Temsilciler', 'showGeneralLogAnalysis');
     logAnalysisSubmenu.addSeparator();
     logAnalysisSubmenu.addItem('📊 Funnel Raporu', 'showFunnelReportDialog');
     logAnalysisSubmenu.addItem('💾 Funnel Raporu Excel Export', 'exportFunnelReportToExcel');
     logAnalysisSubmenu.addSeparator();
-    for (const [employeeCode, employeeName] of Object.entries(CRM_CONFIG.EMPLOYEE_CODES)) {
+    
+    // Personel sheet'inden dinamik oku (aktif olanlar)
+    const allEmployeesForLog = getPersonelFromSheet();
+    const employeesToShowForLog = allEmployeesForLog && allEmployeesForLog.length > 0 
+      ? allEmployeesForLog.filter(p => p.durum === 'Aktif')
+      : Object.entries(CRM_CONFIG.EMPLOYEE_CODES).map(([code, name]) => ({
+          code, name, durum: 'Aktif'
+        }));
+    
+    for (const emp of employeesToShowForLog) {
+      const employeeCode = emp.code;
+      const employeeName = emp.name || CRM_CONFIG.EMPLOYEE_CODES[employeeCode] || employeeCode;
       // Boşlukları alt çizgi ile değiştir ve doğru fonksiyon ismini oluştur
       const functionName = `logAnalysis_${employeeCode.replace(/\s+/g, '_')}`;
       logAnalysisSubmenu.addItem(`📊 ${employeeCode} - ${employeeName}`, functionName);
@@ -2650,21 +2733,6 @@ function createManagerMenu() {
     const onlyTouched = getOnlyColorTouchedRowsFlag();
     perfSubmenu.addItem(`Renkleme: Yalnızca Yeni/Güncellenen (Şu an: ${onlyTouched ? 'Açık' : 'Kapalı'})`, 'toggleOnlyColorTouchedRows');
     menu.addSubMenu(perfSubmenu)
-        .addSeparator();
-
-    // Raporlar (Genel)
-    const reportsGeneral = ui.createMenu('Raporlar (Genel)');
-    reportsGeneral.addItem('Günlük', 'generateReportsGeneralDaily')
-                  .addItem('Haftalık', 'generateReportsGeneralWeekly')
-                  .addItem('Aylık', 'generateReportsGeneralMonthly');
-    menu.addSubMenu(reportsGeneral);
-
-    // Raporlar (Seçili Temsilci)
-    const reportsPerEmployee = ui.createMenu('Raporlar (Seçili Temsilci)');
-    reportsPerEmployee.addItem('Günlük', 'generateReportsForEmployeeDailyPrompt')
-                      .addItem('Haftalık', 'generateReportsForEmployeeWeeklyPrompt')
-                      .addItem('Aylık', 'generateReportsForEmployeeMonthlyPrompt');
-    menu.addSubMenu(reportsPerEmployee)
         .addSeparator();
 
     // Bakım
@@ -2690,6 +2758,8 @@ function createManagerMenu() {
                .addItem('🔧 T Randevular Sütun Sıralamasını Düzenle', 'fixTRandevularColumnOrder')
                .addItem('🔧 T Toplantılar Sütun Sıralamasını Düzenle', 'fixTToplantilarColumnOrder')
                .addItem('🔧 T Fırsatlar Sütun Sıralamasını Düzenle', 'fixTFirsatlarColumnOrder')
+               .addSeparator()
+               .addItem('👥 Personel Sheet Oluştur/Güncelle', 'createOrUpdatePersonelSheet');
     menu.addSubMenu(maintenance)
         .addSeparator();
 
@@ -3672,24 +3742,72 @@ function collectSingleEmployeeData(employeeCode) {
  * 🔍 Find Employee File - File Discovery
  * @param {string} employeeCode - Employee code
  * @returns {Spreadsheet|null} - Employee file or null
+ * @performance Fast lookup via EMPLOYEE_FILES mapping (no DriveApp.getFilesByName)
+ * @note Spreadsheet objects cannot be cached (not serializable), but fileId lookup is already fast
+ * @update Now also reads from Personel sheet (dynamic employee management)
  */
 function findEmployeeFile(employeeCode) { 
   try {
-    // Check if employee code exists in the EMPLOYEE_FILES mapping
+    let fileId = null;
+    
+    // 1. Önce EMPLOYEE_FILES mapping'inden bak (hızlı)
     if (EMPLOYEE_FILES[employeeCode]) {
-      const fileId = EMPLOYEE_FILES[employeeCode];
-      
+      fileId = EMPLOYEE_FILES[employeeCode];
+    } else {
+      // 2. Personel sheet'inden oku (dinamik - yeni personeller için)
+      try {
+        const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+        const personelSheet = managerFile.getSheetByName('Personel');
+        
+        if (personelSheet && personelSheet.getLastRow() > 1) {
+          // Personel sheet'inden batch oku
+          const lastRow = personelSheet.getLastRow();
+          const lastCol = personelSheet.getLastColumn();
+          const data = personelSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+          
+          // Header mapping (esnek)
+          const headers = personelSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+          const kodIndex = headers.findIndex(h => String(h).trim().toLowerCase() === 'kod');
+          const dosyaIdIndex = headers.findIndex(h => String(h).trim().toLowerCase().includes('dosya') || String(h).trim().toLowerCase().includes('file'));
+          const durumIndex = headers.findIndex(h => String(h).trim().toLowerCase() === 'durum');
+          
+          if (kodIndex !== -1 && dosyaIdIndex !== -1) {
+            // Temsilci kodunu bul
+            for (const row of data) {
+              const code = String(row[kodIndex] || '').trim();
+              const durum = durumIndex !== -1 ? String(row[durumIndex] || '').trim() : 'Aktif';
+              
+              if (code === employeeCode && durum === 'Aktif') {
+                fileId = String(row[dosyaIdIndex] || '').trim();
+                if (fileId) {
+                  console.log(`✅ ${employeeCode}: Personel sheet'inden fileId bulundu: ${fileId.substring(0, 20)}...`);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch (personelError) {
+        console.warn(`⚠️ Personel sheet okuma hatası (${employeeCode}):`, personelError);
+      }
+    }
+    
+    // 3. FileId bulunduysa dosyayı aç
+    if (fileId) {
       try {
         const employeeFile = SpreadsheetApp.openById(fileId);
         return employeeFile;
       } catch (openError) {
+        console.error(`❌ ${employeeCode}: Dosya açılamadı (fileId: ${fileId.substring(0, 20)}...):`, openError);
         return null;
       }
     } else {
+      console.warn(`⚠️ ${employeeCode}: FileId bulunamadı (EMPLOYEE_FILES ve Personel sheet'inde yok)`);
       return null;
     }
     
   } catch (error) {
+    console.error(`❌ findEmployeeFile hatası (${employeeCode}):`, error);
     return null;
   }
 }
@@ -4102,6 +4220,137 @@ const EMPLOYEE_FILES = {
 };
 
 const MANAGER_FILE_ID = '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A';
+
+/**
+ * 📊 Dataset Raporunu Yönetici Dosyasına Ekle
+ * Format Tablo arşivlendikten sonra bu fonksiyon yönetici dosyasındaki "Dataset Raporları" sayfasına ekler
+ * 
+ * @param {string} uzmanKodu - Uzman kodu (örn: 'SB 004')
+ * @param {string} sheetName - Format Tablo sayfa adı
+ * @param {string} tarih - Tarih (YYYY-MM-DD formatında)
+ * @param {Object} analysisResult - Analiz sonuçları (analyzeFormatTableForArchive'den gelir)
+ * @param {string} archiveFileId - Arşivlenen dosyanın Google Drive ID'si
+ * @param {string} archiveFileName - Arşivlenen dosya adı
+ * @returns {Object} İşlem sonucu
+ */
+function addDatasetReportToManagerSync(uzmanKodu, sheetName, tarih, analysisResult, archiveFileId, archiveFileName) {
+  const startTime = Date.now();
+  console.log(`📊 Dataset Raporu yönetici dosyasına ekleniyor: ${uzmanKodu} - ${sheetName}`);
+  
+  try {
+    // Yönetici dosyasını aç
+    const managerFile = SpreadsheetApp.openById(MANAGER_FILE_ID);
+    
+    // "Dataset Raporları" sayfasını al veya oluştur
+    let reportSheet = managerFile.getSheetByName('Dataset Raporları');
+    if (!reportSheet) {
+      reportSheet = managerFile.insertSheet('Dataset Raporları');
+      
+      // Header'ları oluştur
+      const headers = [
+        'Tarih',
+        'Uzman Kodu',
+        'Sayfa İsmi',
+        'Toplam Kontak',
+        'Arama Yapılan',
+        'Randevu Alındı',
+        'Toplantı Yapıldı',
+        'Satış Yapıldı',
+        'Başarı Puanı (%)',
+        'Tümü Arandı',
+        'Arşiv Dosya ID',
+        'Arşiv Dosya Adı'
+      ];
+      
+      reportSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      
+      // Header stillerini uygula
+      const headerRange = reportSheet.getRange(1, 1, 1, headers.length);
+      headerRange.setBackground('#4285f4');
+      headerRange.setFontColor('#ffffff');
+      headerRange.setFontWeight('bold');
+      headerRange.setFontSize(11);
+      
+      // Kolon genişliklerini ayarla
+      reportSheet.setColumnWidth(1, 100); // Tarih
+      reportSheet.setColumnWidth(2, 100); // Uzman Kodu
+      reportSheet.setColumnWidth(3, 150); // Sayfa İsmi
+      reportSheet.setColumnWidth(4, 100); // Toplam Kontak
+      reportSheet.setColumnWidth(5, 120); // Arama Yapılan
+      reportSheet.setColumnWidth(6, 100); // Randevu Alındı
+      reportSheet.setColumnWidth(7, 120); // Toplantı Yapıldı
+      reportSheet.setColumnWidth(8, 100); // Satış Yapıldı
+      reportSheet.setColumnWidth(9, 100); // Başarı Puanı
+      reportSheet.setColumnWidth(10, 100); // Tümü Arandı
+      reportSheet.setColumnWidth(11, 200); // Arşiv Dosya ID
+      reportSheet.setColumnWidth(12, 200); // Arşiv Dosya Adı
+      
+      console.log('✅ "Dataset Raporları" sayfası oluşturuldu');
+    }
+    
+    // Yeni satır ekle (header'dan sonra)
+    const newRow = reportSheet.getLastRow() + 1;
+    
+    // Veriyi hazırla
+    const rowData = [
+      tarih, // Tarih
+      uzmanKodu, // Uzman Kodu
+      sheetName, // Sayfa İsmi
+      analysisResult.totalContacts, // Toplam Kontak
+      analysisResult.aramaYapilan, // Arama Yapılan
+      analysisResult.randevuAlindi, // Randevu Alındı
+      analysisResult.toplantiYapildi, // Toplantı Yapıldı
+      analysisResult.satisYapildi, // Satış Yapıldı
+      analysisResult.basariPuani, // Başarı Puanı (%)
+      analysisResult.tumuAranmis ? 'Evet' : 'Hayır', // Tümü Arandı
+      archiveFileId, // Arşiv Dosya ID
+      archiveFileName // Arşiv Dosya Adı
+    ];
+    
+    // Satırı yaz (batch write)
+    reportSheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+    
+    // Başarı puanına göre renklendirme (opsiyonel)
+    try {
+      const basariPuaniRange = reportSheet.getRange(newRow, 9); // Başarı Puanı kolonu
+      if (analysisResult.basariPuani >= 20) {
+        basariPuaniRange.setBackground('#c8e6c9'); // Yeşil - İyi
+      } else if (analysisResult.basariPuani >= 10) {
+        basariPuaniRange.setBackground('#fff9c4'); // Sarı - Orta
+      } else {
+        basariPuaniRange.setBackground('#ffcdd2'); // Kırmızı - Düşük
+      }
+    } catch (colorError) {
+      console.warn('⚠️ Renklendirme hatası (devam ediliyor):', colorError.message);
+    }
+    
+    // Tümü arandı kolonunu renklendir
+    try {
+      const tumuAranmisRange = reportSheet.getRange(newRow, 10); // Tümü Arandı kolonu
+      if (analysisResult.tumuAranmis) {
+        tumuAranmisRange.setBackground('#c8e6c9'); // Yeşil
+      } else {
+        tumuAranmisRange.setBackground('#ffcdd2'); // Kırmızı
+      }
+    } catch (colorError) {
+      console.warn('⚠️ Renklendirme hatası (devam ediliyor):', colorError.message);
+    }
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Dataset Raporu yönetici dosyasına eklendi (${duration}ms)`);
+    
+    return {
+      success: true,
+      sheetName: 'Dataset Raporları',
+      rowNumber: newRow,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error(`❌ Dataset Raporu ekleme hatası: ${error.message}`);
+    throw error;
+  }
+}
 
 // ========================================
 // 🎨 SYSTEM INITIALIZATION - MASTERPIECE COMPLETE
@@ -5636,9 +5885,10 @@ function fixTRandevularColumnOrder() {
         
         // Date objesi ise, HH:mm formatına çevir
         if (saatValue instanceof Date) {
-          const hours = saatValue.getHours().toString().padStart(2, '0');
-          const minutes = saatValue.getMinutes().toString().padStart(2, '0');
-          newRow[saatColIndex] = `${hours}:${minutes}`;
+          const hours = saatValue.getHours();
+          const minutes = saatValue.getMinutes();
+          // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+          newRow[saatColIndex] = `${hours}:${String(minutes).padStart(2, '0')}`;
         } else if (typeof saatValue === 'string' && saatValue.includes('.')) {
           // Yanlış format (tarih gibi), temizle
           console.warn(`⚠️ Satır ${rowIdx + 2}: Saat formatı yanlış: "${saatValue}", temizleniyor...`);
@@ -5647,9 +5897,12 @@ function fixTRandevularColumnOrder() {
           // HH:mm formatında mı kontrol et
           const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
           if (timeMatch) {
-            const hours = timeMatch[1].padStart(2, '0');
-            const minutes = timeMatch[2].padStart(2, '0');
-            newRow[saatColIndex] = `${hours}:${minutes}`;
+            const hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+              // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+              newRow[saatColIndex] = `${hours}:${String(minutes).padStart(2, '0')}`;
+            }
           }
         }
       }
@@ -5875,9 +6128,10 @@ function fixTFirsatlarColumnOrder() {
         
         // Date objesi ise, HH:mm formatına çevir
         if (saatValue instanceof Date) {
-          const hours = saatValue.getHours().toString().padStart(2, '0');
-          const minutes = saatValue.getMinutes().toString().padStart(2, '0');
-          newRow[saatColIndex] = `${hours}:${minutes}`;
+          const hours = saatValue.getHours();
+          const minutes = saatValue.getMinutes();
+          // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+          newRow[saatColIndex] = `${hours}:${String(minutes).padStart(2, '0')}`;
         } else if (typeof saatValue === 'string' && saatValue.includes('.')) {
           // Yanlış format (tarih gibi), temizle
           console.warn(`⚠️ Satır ${rowIdx + 2}: Saat formatı yanlış: "${saatValue}", temizleniyor...`);
@@ -5886,9 +6140,12 @@ function fixTFirsatlarColumnOrder() {
           // HH:mm formatında mı kontrol et
           const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
           if (timeMatch) {
-            const hours = timeMatch[1].padStart(2, '0');
-            const minutes = timeMatch[2].padStart(2, '0');
-            newRow[saatColIndex] = `${hours}:${minutes}`;
+            const hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+              // ✅ DÜZELTME 21.6.1: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+              newRow[saatColIndex] = `${hours}:${String(minutes).padStart(2, '0')}`;
+            }
           }
         }
       }
@@ -9830,6 +10087,45 @@ function logAnalysis_NT_012() {
 }
 
 /**
+ * 📊 SS 014 - Seçil Sayan Log Özeti
+ */
+function logAnalysis_SS_014() {
+  console.log('📊 SS 014 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('SS 014', 'Seçil Sayan');
+  } catch (error) {
+    console.error('❌ SS 014 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `SS 014 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 NK 015 - Neslihan Kaya Log Özeti
+ */
+function logAnalysis_NK_015() {
+  console.log('📊 NK 015 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('NK 015', 'Neslihan Kaya');
+  } catch (error) {
+    console.error('❌ NK 015 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `NK 015 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 AD 016 - Aslı Doğan Log Özeti
+ */
+function logAnalysis_AD_016() {
+  console.log('📊 AD 016 log analizi çağrıldı!');
+  try {
+    getAllEmployeeLogsByDate('AD 016', 'Aslı Doğan');
+  } catch (error) {
+    console.error('❌ AD 016 log analizi hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `AD 016 log analizi hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
  * 🌐 Genel Log Analizi - Tüm Temsilciler
  * Tüm temsilcilerin loglarını tek sayfada gösterir
  */
@@ -9842,129 +10138,369 @@ function showGeneralLogAnalysis() {
       throw new Error('UI erişilemiyor. Lütfen Google Sheets içinden çalıştırın.');
     }
     
-    // Tarih seçimi için HTML dialog oluştur
+    // Tarih seçimi için HTML dialog oluştur (Funnel Report'taki gibi)
     const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
   <base target="_top">
+  <meta charset="UTF-8">
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Roboto', Arial, sans-serif;
+      background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
       padding: 20px;
-      background-color: #f5f5f5;
     }
     .container {
+      max-width: 600px;
+      margin: 0 auto;
       background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
     }
-    h2 {
-      margin-top: 0;
-      color: #1976D2;
+    .header {
+      background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }
+    .header h2 {
+      font-size: 24px;
+      font-weight: 500;
+      margin: 0;
+    }
+    .content {
+      padding: 24px;
     }
     .form-group {
-      margin-bottom: 15px;
+      margin-bottom: 20px;
     }
     label {
       display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-      color: #333;
-    }
-    input[type="date"] {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
       font-size: 14px;
-      box-sizing: border-box;
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    select, input[type="date"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    select:focus, input[type="date"]:focus {
+      outline: none;
+      border-color: #1976D2;
+    }
+    .radio-group {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .radio-item {
+      flex: 1;
+      min-width: 120px;
+    }
+    .radio-item input[type="radio"] {
+      display: none;
+    }
+    .radio-item label {
+      display: block;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 500;
+    }
+    .radio-item input[type="radio"]:checked + label {
+      background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+      color: white;
+      border-color: #1976D2;
     }
     .button-group {
-      margin-top: 20px;
-      text-align: right;
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
     }
     button {
-      padding: 10px 20px;
-      margin-left: 10px;
+      flex: 1;
+      padding: 14px 24px;
       border: none;
-      border-radius: 4px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
       cursor: pointer;
-      font-size: 14px;
-      font-weight: bold;
+      transition: all 0.3s;
     }
     .btn-primary {
-      background-color: #1976D2;
+      background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
       color: white;
     }
-    .btn-primary:hover {
-      background-color: #1565C0;
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4);
     }
     .btn-secondary {
-      background-color: #757575;
-      color: white;
+      background: #f5f5f5;
+      color: #666;
     }
     .btn-secondary:hover {
-      background-color: #616161;
+      background: #e0e0e0;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>📅 Tarih Aralığı Seçin</h2>
-    
-    <div class="form-group">
-      <label for="startDate">Başlangıç Tarihi:</label>
-      <input type="date" id="startDate" required>
+    <div class="header">
+      <h2>🌐 Genel Log Analizi</h2>
+      <p>Tüm Temsilciler - Tarih Seçimi</p>
     </div>
-    
-    <div class="form-group">
-      <label for="endDate">Bitiş Tarihi:</label>
-      <input type="date" id="endDate" required>
-    </div>
-    
-    <div class="button-group">
-      <button class="btn-secondary" onclick="cancel()">İptal</button>
-      <button class="btn-primary" onclick="submit()">Tamam</button>
+    <div class="content">
+      <div class="form-group">
+        <label>⏰ Zaman Filtresi:</label>
+        <div class="radio-group">
+          <div class="radio-item">
+            <input type="radio" id="daily" name="timeFilter" value="daily" checked>
+            <label for="daily">📅 Günlük</label>
+          </div>
+          <div class="radio-item">
+            <input type="radio" id="weekly" name="timeFilter" value="weekly">
+            <label for="weekly">📆 Haftalık</label>
+          </div>
+          <div class="radio-item">
+            <input type="radio" id="monthly" name="timeFilter" value="monthly">
+            <label for="monthly">📊 Aylık</label>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Günlük seçenekleri -->
+      <div class="form-group" id="dailyOptions" style="display: block;">
+        <label for="dailyFilter">📅 Günlük Seçenek:</label>
+        <select id="dailyFilter">
+          <option value="today">Bugün</option>
+          <option value="yesterday">Dün</option>
+          <option value="dateRange">Tarih Aralığı</option>
+        </select>
+      </div>
+      
+      <!-- Haftalık seçenekleri -->
+      <div class="form-group" id="weeklyOptions" style="display: none;">
+        <label for="weeklyFilter">📆 Haftalık Seçenek:</label>
+        <select id="weeklyFilter">
+          <option value="thisWeek">Bu Hafta</option>
+          <option value="lastWeek">Geçen Hafta</option>
+          <option value="weekList">Hafta Listesi</option>
+        </select>
+      </div>
+      
+      <!-- Aylık seçenekleri -->
+      <div class="form-group" id="monthlyOptions" style="display: none;">
+        <label for="monthlyFilter">📊 Aylık Seçenek:</label>
+        <select id="monthlyFilter">
+          <option value="thisMonth">Bu Ay</option>
+          <option value="lastMonth">Geçen Ay</option>
+          <option value="monthList">Ay Listesi</option>
+        </select>
+      </div>
+      
+      <!-- Tarih aralığı (Günlük için) -->
+      <div class="form-group" id="dateRangeGroup" style="display: none;">
+        <label for="startDate">Başlangıç Tarihi:</label>
+        <input type="date" id="startDate">
+        <label for="endDate" style="margin-top: 10px;">Bitiş Tarihi:</label>
+        <input type="date" id="endDate">
+      </div>
+      
+      <!-- Hafta listesi (Haftalık için) -->
+      <div class="form-group" id="weekListGroup" style="display: none;">
+        <label for="weekSelect">Hafta Seçin:</label>
+        <select id="weekSelect">
+          <option value="">Hafta Seçin</option>
+        </select>
+      </div>
+      
+      <!-- Ay listesi (Aylık için) -->
+      <div class="form-group" id="monthListGroup" style="display: none;">
+        <label for="monthSelect">Ay Seçin:</label>
+        <select id="monthSelect">
+          <option value="">Ay Seçin</option>
+        </select>
+      </div>
+      
+      <div class="button-group">
+        <button class="btn-secondary" onclick="cancel()">İptal</button>
+        <button class="btn-primary" onclick="submit()">Tamam</button>
+      </div>
     </div>
   </div>
 
   <script>
-    // Varsayılan tarihleri ayarla (son 30 gün)
-    (function() {
-      const today = new Date();
-      const endDate = new Date(today);
-      const startDate = new Date(today);
-      startDate.setDate(startDate.getDate() - 30);
+    // Zaman filtresi değiştiğinde seçenekleri göster/gizle
+    document.querySelectorAll('input[name="timeFilter"]').forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        const timeFilter = this.value;
+        document.getElementById('dailyOptions').style.display = timeFilter === 'daily' ? 'block' : 'none';
+        document.getElementById('weeklyOptions').style.display = timeFilter === 'weekly' ? 'block' : 'none';
+        document.getElementById('monthlyOptions').style.display = timeFilter === 'monthly' ? 'block' : 'none';
+        
+        // Tüm alt seçenekleri gizle
+        document.getElementById('dateRangeGroup').style.display = 'none';
+        document.getElementById('weekListGroup').style.display = 'none';
+        document.getElementById('monthListGroup').style.display = 'none';
+      });
+    });
+    
+    // Günlük seçenekleri güncelle
+    function updateDailyOptions() {
+      const dailyFilter = document.getElementById('dailyFilter');
+      const dateRangeGroup = document.getElementById('dateRangeGroup');
       
-      // Format: YYYY-MM-DD
-      function formatDate(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return year + '-' + month + '-' + day;
+      if (dailyFilter.value === 'dateRange') {
+        dateRangeGroup.style.display = 'block';
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+      } else {
+        dateRangeGroup.style.display = 'none';
       }
+    }
+    
+    document.getElementById('dailyFilter').addEventListener('change', updateDailyOptions);
+    
+    // Haftalık seçenekleri güncelle
+    function updateWeeklyOptions() {
+      const weeklyFilter = document.getElementById('weeklyFilter');
+      const weekListGroup = document.getElementById('weekListGroup');
       
-      document.getElementById('endDate').value = formatDate(endDate);
-      document.getElementById('startDate').value = formatDate(startDate);
-    })();
+      if (weeklyFilter.value === 'weekList') {
+        weekListGroup.style.display = 'block';
+        loadWeekList();
+      } else {
+        weekListGroup.style.display = 'none';
+      }
+    }
+    
+    document.getElementById('weeklyFilter').addEventListener('change', updateWeeklyOptions);
+    
+    // Aylık seçenekleri güncelle
+    function updateMonthlyOptions() {
+      const monthlyFilter = document.getElementById('monthlyFilter');
+      const monthListGroup = document.getElementById('monthListGroup');
+      
+      if (monthlyFilter.value === 'monthList') {
+        monthListGroup.style.display = 'block';
+        loadMonthList();
+      } else {
+        monthListGroup.style.display = 'none';
+      }
+    }
+    
+    document.getElementById('monthlyFilter').addEventListener('change', updateMonthlyOptions);
+    
+    // Hafta listesini yükle
+    function loadWeekList() {
+      google.script.run
+        .withSuccessHandler(function(weeks) {
+          const select = document.getElementById('weekSelect');
+          select.innerHTML = '<option value="">Hafta Seçin</option>';
+          weeks.forEach(function(week) {
+            const option = document.createElement('option');
+            option.value = week.value;
+            option.textContent = week.label;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Hafta listesi yüklenemedi:', error);
+        })
+        .getWeekListForFunnel();
+    }
+    
+    // Ay listesini yükle
+    function loadMonthList() {
+      google.script.run
+        .withSuccessHandler(function(months) {
+          const select = document.getElementById('monthSelect');
+          select.innerHTML = '<option value="">Ay Seçin</option>';
+          months.forEach(function(month) {
+            const option = document.createElement('option');
+            option.value = month.value;
+            option.textContent = month.label;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Ay listesi yüklenemedi:', error);
+        })
+        .getMonthListForFunnel();
+    }
+    
+    // İlk yüklemede günlük seçeneklerini göster
+    updateDailyOptions();
 
     function submit() {
-      const startDate = document.getElementById('startDate').value;
-      const endDate = document.getElementById('endDate').value;
+      const timeFilter = document.querySelector('input[name="timeFilter"]:checked').value;
+      let timeFilterValue = timeFilter;
+      let startDate = null;
+      let endDate = null;
       
-      if (!startDate || !endDate) {
-        alert('Lütfen başlangıç ve bitiş tarihlerini seçin.');
-        return;
+      if (timeFilter === 'daily') {
+        const dailyFilter = document.getElementById('dailyFilter').value;
+        if (dailyFilter === 'today') {
+          timeFilterValue = 'daily_today';
+        } else if (dailyFilter === 'yesterday') {
+          timeFilterValue = 'daily_yesterday';
+        } else if (dailyFilter === 'dateRange') {
+          timeFilterValue = 'daily_range';
+          startDate = document.getElementById('startDate').value;
+          endDate = document.getElementById('endDate').value;
+          if (!startDate || !endDate) {
+            alert('Lütfen başlangıç ve bitiş tarihlerini seçin.');
+            return;
+          }
+        }
+      } else if (timeFilter === 'weekly') {
+        const weeklyFilter = document.getElementById('weeklyFilter').value;
+        if (weeklyFilter === 'thisWeek') {
+          timeFilterValue = 'weekly_thisWeek';
+        } else if (weeklyFilter === 'lastWeek') {
+          timeFilterValue = 'weekly_lastWeek';
+        } else if (weeklyFilter === 'weekList') {
+          const weekSelect = document.getElementById('weekSelect').value;
+          if (!weekSelect) {
+            alert('Lütfen bir hafta seçin.');
+            return;
+          }
+          timeFilterValue = 'weekly_' + weekSelect;
+        }
+      } else if (timeFilter === 'monthly') {
+        const monthlyFilter = document.getElementById('monthlyFilter').value;
+        if (monthlyFilter === 'thisMonth') {
+          timeFilterValue = 'monthly_thisMonth';
+        } else if (monthlyFilter === 'lastMonth') {
+          timeFilterValue = 'monthly_lastMonth';
+        } else if (monthlyFilter === 'monthList') {
+          const monthSelect = document.getElementById('monthSelect').value;
+          if (!monthSelect) {
+            alert('Lütfen bir ay seçin.');
+            return;
+          }
+          timeFilterValue = 'monthly_' + monthSelect;
+        }
       }
       
-      if (new Date(startDate) > new Date(endDate)) {
-        alert('Başlangıç tarihi bitiş tarihinden sonra olamaz.');
-        return;
-      }
-      
-      // Butonu devre dışı bırak (çift tıklamayı önle)
+      // Butonu devre dışı bırak
       const submitBtn = document.querySelector('.btn-primary');
       if (submitBtn) {
         submitBtn.disabled = true;
@@ -9982,7 +10518,7 @@ function showGeneralLogAnalysis() {
             submitBtn.textContent = 'Tamam';
           }
         })
-        .continueGeneralLogAnalysis(startDate, endDate);
+        .continueGeneralLogAnalysis(timeFilterValue, startDate, endDate);
     }
 
     function cancel() {
@@ -9993,11 +10529,11 @@ function showGeneralLogAnalysis() {
 </html>`;
     
     const html = HtmlService.createHtmlOutput(htmlContent)
-      .setWidth(450)
-      .setHeight(350);
+      .setWidth(600)
+      .setHeight(600);
     
     console.log('📋 Dialog HTML oluşturuldu, gösteriliyor...');
-    ui.showModalDialog(html, '📅 Tarih Aralığı Seçin');
+    ui.showModalDialog(html, '🌐 Genel Log Analizi - Tarih Seçimi');
     console.log('✅ Dialog gösterildi');
   } catch (error) {
     console.error('❌ Genel Log Analizi hatası:', error);
@@ -10009,15 +10545,26 @@ function showGeneralLogAnalysis() {
  * 🌐 Genel Log Analizi - Devam
  * Tarih aralığı seçildikten sonra çağrılır
  */
-function continueGeneralLogAnalysis(startDateStr, endDateStr) {
-  console.log('🔍 continueGeneralLogAnalysis çağrıldı:', { startDateStr, endDateStr });
+function continueGeneralLogAnalysis(timeFilter, startDateStr, endDateStr) {
+  console.log('🔍 continueGeneralLogAnalysis çağrıldı:', { timeFilter, startDateStr, endDateStr });
   try {
     const managerFile = SpreadsheetApp.getActiveSpreadsheet();
     
-    // Tarihleri parse et
-    const startDate = new Date(startDateStr);
-    const endDate = new Date(endDateStr);
-    endDate.setHours(23, 59, 59, 999); // Günün sonuna ayarla
+    // Tarihleri parse et (calculateDateRange helper kullan)
+    let dateRange;
+    if (timeFilter === 'daily_range' && startDateStr && endDateStr) {
+      // Manuel tarih aralığı
+      const startDate = new Date(startDateStr);
+      const endDate = new Date(endDateStr);
+      endDate.setHours(23, 59, 59, 999);
+      dateRange = { start: startDate, end: endDate };
+    } else {
+      // calculateDateRange helper kullan
+      dateRange = calculateDateRange(timeFilter);
+    }
+    
+    const startDate = dateRange.start;
+    const endDate = dateRange.end;
     
     console.log('📅 Tarih filtresi:', Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy'), '-', Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy'));
     
@@ -10028,23 +10575,40 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
     console.log(`📊 ${employeeCodes.length} temsilci kontrol edilecek...`);
     console.log(`👥 Temsilci kodları:`, employeeCodes);
     
-    for (let i = 0; i < employeeCodes.length; i++) {
-      const employeeCode = employeeCodes[i];
-      const employeeName = CRM_CONFIG.EMPLOYEE_CODES[employeeCode];
-      console.log(`📊 ${employeeCode} işleniyor... (${i + 1}/${employeeCodes.length})`);
+    // PARALLEL PROCESSING: Chunk'lara böl (Google Apps Script limiti: 6 paralel max)
+    // Not: Google Apps Script single-threaded, ama chunk yapısı gelecekte parallel processing için hazır
+    const CHUNK_SIZE = 6; // Google Apps Script paralel işlem limiti
+    const chunks = [];
+    for (let i = 0; i < employeeCodes.length; i += CHUNK_SIZE) {
+      chunks.push(employeeCodes.slice(i, i + CHUNK_SIZE));
+    }
+    
+    console.log(`📦 ${chunks.length} chunk oluşturuldu (${CHUNK_SIZE}'şar temsilci)`);
+    
+    // Her chunk'ı işle (şimdilik sıralı, gelecekte parallel yapılabilir)
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      const chunk = chunks[chunkIndex];
+      console.log(`📦 Chunk ${chunkIndex + 1}/${chunks.length} işleniyor (${chunk.length} temsilci)...`);
       
-      try {
-        const employeeFile = findEmployeeFile(employeeCode);
-        if (!employeeFile) {
-          console.log(`⚠️ ${employeeCode} dosyası bulunamadı (EMPLOYEE_FILES mapping'inde yok olabilir)`);
-          continue;
-        }
+      // Chunk içindeki her temsilciyi işle
+      for (let i = 0; i < chunk.length; i++) {
+        const employeeCode = chunk[i];
+        const employeeName = CRM_CONFIG.EMPLOYEE_CODES[employeeCode];
+        const globalIndex = chunkIndex * CHUNK_SIZE + i + 1;
+        console.log(`📊 ${employeeCode} işleniyor... (${globalIndex}/${employeeCodes.length})`);
         
-        console.log(`✅ ${employeeCode} dosyası açıldı`);
-        
-        // HİBRİT YAKLAŞIM: Önce Log Arşivi'nden, yoksa Format Tablo'lardan çek
-        let logsFromArchive = [];
-        let logsFromFormatTables = [];
+        try {
+          const employeeFile = findEmployeeFile(employeeCode);
+          if (!employeeFile) {
+            console.log(`⚠️ ${employeeCode} dosyası bulunamadı (EMPLOYEE_FILES mapping'inde yok olabilir)`);
+            continue;
+          }
+          
+          console.log(`✅ ${employeeCode} dosyası açıldı`);
+          
+          // HİBRİT YAKLAŞIM: Önce Log Arşivi'nden, yoksa Format Tablo'lardan çek
+          let logsFromArchive = [];
+          let logsFromFormatTables = [];
         
         // 1. Log Arşivi'nden veri çek (Gizli sayfalar dahil)
         let logArchiveSheet = employeeFile.getSheetByName('Log Arşivi');
@@ -10065,10 +10629,23 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
         
         if (logArchiveSheet && logArchiveSheet.getLastRow() > 1) {
           console.log(`📊 ${employeeCode}: Log Arşivi'nden veri okunuyor...`);
-          const allData = logArchiveSheet.getDataRange().getValues();
           
-          if (allData.length >= 2) {
+          // INCREMENTAL SYNC: Sadece yeni satırları oku (100x hızlı!)
+          const lastRow = logArchiveSheet.getLastRow();
+          const cacheKey = `lastProcessedRow_LogArchive_${employeeCode}`;
+          const lastProcessedRow = getCachedData(cacheKey, () => 1, 3600); // Default: 1 (header'dan sonra başla)
+          
+          // Yeni satır sayısını hesapla
+          const newRowCount = lastRow - lastProcessedRow;
+          
+          if (newRowCount > 0) {
+            console.log(`📊 ${employeeCode}: Log Arşivi'nden ${newRowCount} yeni satır okunuyor (${lastRow} toplam, ${lastProcessedRow} zaten işlenmiş)`);
+            
+            // Header + Yeni satırları oku (incremental sync)
+            const lastCol = logArchiveSheet.getLastColumn();
+            const allData = logArchiveSheet.getRange(1, 1, lastRow, lastCol).getValues();
             const headers = allData[0];
+            
             // STANDART LOG ARŞİVİ KOLONLARI (backend.js ile aynı)
             const tarihIndex = headers.indexOf('Tarih');
             const saatIndex = headers.indexOf('Saat');
@@ -10080,7 +10657,9 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
             
             // Tüm zorunlu kolonlar mevcut mu kontrol et
             if (tarihIndex !== -1 && saatIndex !== -1 && aktiviteIndex !== -1 && logDetayIndex !== -1) {
-              for (let row = 1; row < allData.length; row++) {
+              // Sadece yeni satırları işle (incremental sync)
+              const startRow = lastProcessedRow + 1; // Header'dan sonra başla
+              for (let row = startRow; row < allData.length; row++) {
                 const tarih = allData[row][tarihIndex];
                 const saat = allData[row][saatIndex];
                 const aktivite = allData[row][aktiviteIndex];
@@ -10147,7 +10726,16 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
                   });
                 }
               }
+              
+              // Son işlenen satır numarasını cache'e kaydet
+              const cache = CacheService.getScriptCache();
+              cache.put(cacheKey, lastRow.toString(), 3600);
+              console.log(`💾 ${employeeCode}: Log Arşivi için son işlenen satır güncellendi: ${lastRow}`);
+            } else {
+              console.log(`⚠️ ${employeeCode}: Log Arşivi'nde gerekli kolonlar bulunamadı`);
             }
+          } else {
+            console.log(`⏭️ ${employeeCode}: Log Arşivi'nde yeni satır yok (${lastRow} toplam, ${lastProcessedRow} zaten işlenmiş)`);
           }
         }
         
@@ -10199,9 +10787,12 @@ function continueGeneralLogAnalysis(startDateStr, endDateStr) {
         } else {
           console.log(`⚠️ ${employeeCode}: Tarih aralığında log bulunamadı`);
         }
-      } catch (error) {
-        console.error(`❌ ${employeeCode} işleme hatası:`, error);
+        } catch (error) {
+          console.error(`❌ ${employeeCode} işleme hatası:`, error);
+        }
       }
+      
+      console.log(`✅ Chunk ${chunkIndex + 1}/${chunks.length} tamamlandı`);
     }
     
     console.log(`📊 Toplam ${allEmployeeLogs.size} temsilcide log bulundu`);
@@ -10229,12 +10820,23 @@ function createGeneralLogAnalysisSheet(managerFile, allEmployeeLogs, startDate, 
   try {
     const sheetName = 'GENEL LOG ANALİZİ - TÜM TEMSİLCİLER';
     
-    // Eski sayfayı sil veya temizle
+    // Eski sayfayı SİLME; varsa sadece içeriğini temizle (veri kaybını önle!)
     let sheet = managerFile.getSheetByName(sheetName);
-    if (sheet) {
-      managerFile.deleteSheet(sheet);
+    if (!sheet) {
+      sheet = managerFile.insertSheet(sheetName);
+    } else {
+      // Sayfayı silmek yerine sadece içeriği temizle (veri korunur)
+      try {
+        const lr = sheet.getLastRow();
+        const lc = sheet.getLastColumn();
+        if (lr > 0 && lc > 0) {
+          sheet.getRange(1, 1, lr, lc).clearContent();
+          sheet.getRange(1, 1, lr, lc).clearFormat();
+        }
+      } catch (clearError) {
+        console.warn('⚠️ Sayfa temizleme hatası (devam ediliyor):', clearError);
+      }
     }
-    sheet = managerFile.insertSheet(sheetName);
     
     // Tarih aralığını analiz et
     const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
@@ -10269,184 +10871,13 @@ function createGeneralLogAnalysisSheet(managerFile, allEmployeeLogs, startDate, 
     currentRow += 2;
     
     // ========================================
-    // ALARM SİSTEMİ (30 SN VE 5 DK)
-    // ========================================
-    const alarms = detectAlarms(allEmployeeLogs);
-    if (alarms.length > 0) {
-      sheet.getRange(currentRow, 1).setValue('🚨 ZORUNLU ALARM SİSTEMİ');
-      sheet.getRange(currentRow, 1, 1, 15).merge();
-      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FF5252').setFontColor('#FFFFFF');
-      currentRow++;
-      
-      // Alarm başlıkları
-      sheet.getRange(currentRow, 1).setValue('Temsilci');
-      sheet.getRange(currentRow, 2).setValue('Tarih');
-      sheet.getRange(currentRow, 3).setValue('Saat');
-      sheet.getRange(currentRow, 4).setValue('Alarm Tipi');
-      sheet.getRange(currentRow, 5).setValue('Detay');
-      sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#FFCDD2');
-      currentRow++;
-      
-      // Alarmları yaz (Farklı renkler, simgeler ve bold süreler)
-      for (const alarm of alarms) {
-        sheet.getRange(currentRow, 1).setValue(alarm.employeeCode);
-        sheet.getRange(currentRow, 2).setValue(alarm.date);
-        sheet.getRange(currentRow, 3).setValue(alarm.time);
-        
-        // Alarm tipi (zaten simge içeriyor)
-        sheet.getRange(currentRow, 4).setValue(alarm.type);
-        
-        // Detay metnini bold süre ile oluştur
-        let detailText = alarm.detail;
-        let boldText = '';
-        let boldStart = 0;
-        
-        if (alarm.alarmType === '15sn' && alarm.seconds) {
-          // 15 saniye alarmı: "X saniye içinde arandı" - saniyeyi bold yap
-          boldText = `${alarm.seconds} saniye`;
-          detailText = `${boldText} içinde arandı`;
-          boldStart = 0;
-        } else if (alarm.alarmType === '5dk' && alarm.minutes !== undefined) {
-          // 5 dakika alarmı: ">X dakika arama yapılmadı" - dakikayı bold yap
-          boldText = `${alarm.minutes} dakika`;
-          detailText = `>${boldText} arama yapılmadı`;
-          boldStart = 1; // ">" karakterinden sonra
-        }
-        
-        // RichTextValue ile bold süre ekle
-        if (boldText && detailText.includes(boldText)) {
-          const richText = SpreadsheetApp.newRichTextValue()
-            .setText(detailText)
-            .setTextStyle(boldStart, boldStart + boldText.length, SpreadsheetApp.newTextStyle().setBold(true).build())
-            .build();
-          sheet.getRange(currentRow, 5).setRichTextValue(richText);
-        } else {
-          sheet.getRange(currentRow, 5).setValue(detailText);
-        }
-        
-        // Farklı renkler: 15sn için sarı, 5dk için mor (daha belirgin)
-        if (alarm.alarmType === '15sn') {
-          sheet.getRange(currentRow, 1, 1, 5).setBackground('#FFEB3B'); // Sarı (daha belirgin)
-        } else if (alarm.alarmType === '5dk') {
-          sheet.getRange(currentRow, 1, 1, 5).setBackground('#E1BEE7'); // Açık mor (daha belirgin)
-        } else {
-          sheet.getRange(currentRow, 1, 1, 5).setBackground('#FFEBEE'); // Varsayılan kırmızı
-        }
-        
-        currentRow++;
-      }
-      currentRow += 2;
-    }
-    
-    // ========================================
-    // PERİYODİK AKTİVİTE ANALİZİ (GÜNLÜK/HAFTALIK/AYLIK)
-    // ========================================
-    let activityAnalysisData;
-    let analysisTitle;
-    
-    if (periodType === 'Günlük') {
-      activityAnalysisData = calculateDailyActivityAnalysis(allEmployeeLogs);
-      analysisTitle = '📈 GÜNLÜK AKTİVİTE ANALİZİ';
-    } else if (periodType === 'Haftalık') {
-      activityAnalysisData = calculateWeeklyActivityAnalysis(allEmployeeLogs, startDate, endDate);
-      analysisTitle = '📈 HAFTALIK AKTİVİTE ANALİZİ';
-    } else {
-      activityAnalysisData = calculateMonthlyActivityAnalysis(allEmployeeLogs, startDate, endDate);
-      analysisTitle = '📈 AYLIK AKTİVİTE ANALİZİ';
-    }
-    
-    if (activityAnalysisData && activityAnalysisData.length > 0) {
-      sheet.getRange(currentRow, 1).setValue(analysisTitle);
-      sheet.getRange(currentRow, 1, 1, 10).merge();
-      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(16).setBackground('#4CAF50').setFontColor('#FFFFFF');
-      currentRow += 2;
-      
-      // Her periyot için analiz
-      for (const periodData of activityAnalysisData) {
-        // Periyot başlığı
-        const periodHeader = periodType === 'Günlük' 
-          ? `📅 ${periodData.period} (${periodData.totalLogs} log)`
-          : periodType === 'Haftalık'
-          ? `📅 ${periodData.period} (${periodData.totalLogs} log)`
-          : `📅 ${periodData.period} (${periodData.totalLogs} log)`;
-        
-        sheet.getRange(currentRow, 1).setValue(periodHeader);
-        sheet.getRange(currentRow, 1, 1, 10).merge();
-        sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(13).setBackground('#81C784').setFontColor('#FFFFFF');
-        currentRow++;
-        
-        // İlk ve son log saatleri
-        sheet.getRange(currentRow, 1).setValue(`İlk Log Saati (${periodType})`);
-        sheet.getRange(currentRow, 2).setValue(periodData.firstLogTime);
-        sheet.getRange(currentRow, 1, 1, 2).setFontWeight('bold').setBackground('#C8E6C9');
-        currentRow++;
-        
-        sheet.getRange(currentRow, 1).setValue(`Son Log Saati (${periodType})`);
-        sheet.getRange(currentRow, 2).setValue(periodData.lastLogTime);
-        sheet.getRange(currentRow, 1, 1, 2).setFontWeight('bold').setBackground('#C8E6C9');
-        currentRow += 2;
-        
-        // Aktivite analizi başlığı
-        sheet.getRange(currentRow, 1).setValue(`📊 ${periodType.toUpperCase()} AKTİVİTE ANALİZİ`);
-        sheet.getRange(currentRow, 1, 1, 7).merge();
-        sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(12).setBackground('#A5D6A7');
-        currentRow++;
-        
-        // Tablo başlıkları - Daha geniş ve okunur
-        const headers = ['Aktivite', 'Sayı', 'Toplam Süre', 'Ortalama Süre', 'Yüzdelik', 'Dağılım'];
-        for (let i = 0; i < headers.length; i++) {
-          sheet.getRange(currentRow, i + 1).setValue(headers[i]);
-        }
-        sheet.getRange(currentRow, 1, 1, headers.length)
-          .setFontWeight('bold')
-          .setFontSize(11)
-          .setBackground('#66BB6A')
-          .setFontColor('#FFFFFF')
-          .setHorizontalAlignment('center')
-          .setVerticalAlignment('middle');
-        currentRow++;
-        
-        // Aktivite verilerini yaz - Daha okunur format
-        for (let i = 0; i < periodData.activities.length; i++) {
-          const activity = periodData.activities[i];
-          
-          sheet.getRange(currentRow, 1).setValue(activity.type);
-          sheet.getRange(currentRow, 2).setValue(activity.count);
-          sheet.getRange(currentRow, 3).setValue(activity.totalDurationFormatted);
-          sheet.getRange(currentRow, 4).setValue(activity.avgDurationFormatted);
-          sheet.getRange(currentRow, 5).setValue(activity.percentageFormatted);
-          sheet.getRange(currentRow, 6).setValue(activity.distributionFormatted);
-          
-          // Sayıları sağa hizala, metinleri sola
-          sheet.getRange(currentRow, 2).setHorizontalAlignment('right');
-          sheet.getRange(currentRow, 3).setHorizontalAlignment('right');
-          sheet.getRange(currentRow, 4).setHorizontalAlignment('right');
-          sheet.getRange(currentRow, 5).setHorizontalAlignment('right');
-          sheet.getRange(currentRow, 6).setHorizontalAlignment('right');
-          
-          // Çift satırlar için alternatif renk
-          if (i % 2 === 0) {
-            sheet.getRange(currentRow, 1, 1, headers.length).setBackground('#F1F8E9');
-          } else {
-            sheet.getRange(currentRow, 1, 1, headers.length).setBackground('#FFFFFF');
-          }
-          
-          currentRow++;
-        }
-        
-        currentRow += 3; // Periyotlar arası boşluk
-      }
-      currentRow += 1;
-    }
-    
-    // ========================================
-    // KARŞILAŞTIRMA RAPORU (TÜM DURUMLAR)
+    // EXECUTIVE SUMMARY - ÖZET SONUÇLAR (YUKARIYA TAŞINDI - Section 23.4)
     // ========================================
     const comparisonData = calculateComparisonData(allEmployeeLogs);
     if (comparisonData.length > 0) {
-      sheet.getRange(currentRow, 1).setValue('📊 TEMSİLCİ KARŞILAŞTIRMA RAPORU');
+      sheet.getRange(currentRow, 1).setValue('📊 EXECUTIVE SUMMARY - TEMSİLCİ KARŞILAŞTIRMA RAPORU');
       sheet.getRange(currentRow, 1, 1, 20).merge();
-      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FF9800').setFontColor('#FFFFFF');
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(16).setBackground('#FF9800').setFontColor('#FFFFFF');
       currentRow++;
       
       // Standart sıralama ile başlıklar
@@ -10484,6 +10915,456 @@ function createGeneralLogAnalysisSheet(managerFile, allEmployeeLogs, startDate, 
       }
       currentRow += 2;
     }
+    
+    // ========================================
+    // ALARM SİSTEMİ (30 SN VE 5 DK)
+    // ========================================
+    const alarms = detectAlarms(allEmployeeLogs);
+    if (alarms.length > 0) {
+      sheet.getRange(currentRow, 1).setValue('🚨 ZORUNLU ALARM SİSTEMİ');
+      sheet.getRange(currentRow, 1, 1, 15).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#FF5252').setFontColor('#FFFFFF');
+      currentRow++;
+      
+      // Alarm başlıkları
+      sheet.getRange(currentRow, 1).setValue('Temsilci');
+      sheet.getRange(currentRow, 2).setValue('Tarih');
+      sheet.getRange(currentRow, 3).setValue('Saat');
+      sheet.getRange(currentRow, 4).setValue('Alarm Tipi');
+      sheet.getRange(currentRow, 5).setValue('Detay');
+      sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold').setBackground('#FFCDD2');
+      currentRow++;
+      
+      // ✅ DÜZELTME 21.6.2: Alarmları batch yaz (önce hafızada, sonra tek API call)
+      const alarmRows = [];
+      const alarmColors = [];
+      const richTextData = [];
+      
+      for (const alarm of alarms) {
+        // Veriyi hazırla
+        alarmRows.push([
+          alarm.employeeCode,
+          alarm.date,
+          alarm.time,
+          alarm.type,
+          alarm.detail // RichTextValue sonra uygulanacak
+        ]);
+        
+        // Renk belirle (21.6.2: Önce hafızada hesapla)
+        let rowColor = '#FFEBEE'; // Varsayılan kırmızı
+        if (alarm.alarmType === '15sn') {
+          rowColor = '#FFEB3B'; // Sarı
+        } else if (alarm.alarmType === '5dk') {
+          rowColor = '#E1BEE7'; // Açık mor
+        }
+        alarmColors.push(Array(5).fill(rowColor)); // 5 kolon için aynı renk
+        
+        // RichTextValue için veri hazırla
+        let detailText = alarm.detail;
+        let boldText = '';
+        let boldStart = 0;
+        
+        if (alarm.alarmType === '15sn' && alarm.seconds) {
+          boldText = `${alarm.seconds} saniye`;
+          detailText = `${boldText} içinde arandı`;
+          boldStart = 0;
+        } else if (alarm.alarmType === '5dk' && alarm.minutes !== undefined) {
+          boldText = `${alarm.minutes} dakika`;
+          detailText = `>${boldText} arama yapılmadı`;
+          boldStart = 1;
+        }
+        
+        if (boldText && detailText.includes(boldText)) {
+          richTextData.push({
+            row: currentRow + alarmRows.length - 1,
+            col: 5,
+            text: detailText,
+            boldText: boldText,
+            boldStart: boldStart
+          });
+        }
+      }
+      
+      // Batch yaz: Veri + Renk (21.6.2: Tek API call!)
+      if (alarmRows.length > 0) {
+        const startRow = currentRow;
+        const numRows = alarmRows.length;
+        const numCols = 5;
+        
+        // Veriyi yaz (batch)
+        sheet.getRange(startRow, 1, numRows, numCols).setValues(alarmRows);
+        
+        // Renkleri yaz (batch - 1 API call!)
+        sheet.getRange(startRow, 1, numRows, numCols).setBackgrounds(alarmColors);
+        
+        // RichTextValue'ları uygula (her biri ayrı ama az sayıda)
+        for (const rtv of richTextData) {
+          const richText = SpreadsheetApp.newRichTextValue()
+            .setText(rtv.text)
+            .setTextStyle(rtv.boldStart, rtv.boldStart + rtv.boldText.length, SpreadsheetApp.newTextStyle().setBold(true).build())
+            .build();
+          sheet.getRange(rtv.row, rtv.col).setRichTextValue(richText);
+        }
+        
+        currentRow += numRows;
+      }
+      currentRow += 2;
+    }
+    
+    // ========================================
+    // PERİYODİK AKTİVİTE ANALİZİ (GÜNLÜK/HAFTALIK/AYLIK)
+    // ========================================
+    let activityAnalysisData;
+    let analysisTitle;
+    
+    if (periodType === 'Günlük') {
+      activityAnalysisData = calculateDailyActivityAnalysis(allEmployeeLogs);
+      analysisTitle = '📈 GÜNLÜK AKTİVİTE ANALİZİ';
+    } else if (periodType === 'Haftalık') {
+      activityAnalysisData = calculateWeeklyActivityAnalysis(allEmployeeLogs, startDate, endDate);
+      analysisTitle = '📈 HAFTALIK AKTİVİTE ANALİZİ';
+    } else {
+      activityAnalysisData = calculateMonthlyActivityAnalysis(allEmployeeLogs, startDate, endDate);
+      analysisTitle = '📈 AYLIK AKTİVİTE ANALİZİ';
+    }
+    
+    if (activityAnalysisData && activityAnalysisData.length > 0) {
+      sheet.getRange(currentRow, 1).setValue(analysisTitle);
+      sheet.getRange(currentRow, 1, 1, 10).merge();
+      sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(16).setBackground('#4CAF50').setFontColor('#FFFFFF');
+      currentRow += 2;
+      
+      // GÜNLÜK: Tek tek loglar gösterilir
+      // HAFTALIK/AYLIK: Sadece kümülatif özet gösterilir (tek tek loglar değil)
+      if (periodType === 'Günlük') {
+        // Her gün için detaylı analiz
+        for (const periodData of activityAnalysisData) {
+          const periodHeader = `📅 ${periodData.period} (${periodData.totalLogs} log)`;
+          
+          sheet.getRange(currentRow, 1).setValue(periodHeader);
+          sheet.getRange(currentRow, 1, 1, 10).merge();
+          sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(13).setBackground('#81C784').setFontColor('#FFFFFF');
+          currentRow++;
+          
+          // İlk ve son log saatleri
+          sheet.getRange(currentRow, 1).setValue(`İlk Log Saati`);
+          sheet.getRange(currentRow, 2).setValue(periodData.firstLogTime);
+          sheet.getRange(currentRow, 1, 1, 2).setFontWeight('bold').setBackground('#C8E6C9');
+          currentRow++;
+          
+          sheet.getRange(currentRow, 1).setValue(`Son Log Saati`);
+          sheet.getRange(currentRow, 2).setValue(periodData.lastLogTime);
+          sheet.getRange(currentRow, 1, 1, 2).setFontWeight('bold').setBackground('#C8E6C9');
+          currentRow += 2;
+          
+          // Aktivite analizi başlığı
+          sheet.getRange(currentRow, 1).setValue(`📊 GÜNLÜK AKTİVİTE ANALİZİ`);
+          sheet.getRange(currentRow, 1, 1, 7).merge();
+          sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(12).setBackground('#A5D6A7');
+          currentRow++;
+          
+          // Tablo başlıkları
+          const headers = ['Aktivite', 'Sayı', 'Toplam Süre', 'Ortalama Süre', 'Yüzdelik', 'Dağılım'];
+          for (let i = 0; i < headers.length; i++) {
+            sheet.getRange(currentRow, i + 1).setValue(headers[i]);
+          }
+          sheet.getRange(currentRow, 1, 1, headers.length)
+            .setFontWeight('bold')
+            .setFontSize(11)
+            .setBackground('#66BB6A')
+            .setFontColor('#FFFFFF')
+            .setHorizontalAlignment('center')
+            .setVerticalAlignment('middle');
+          currentRow++;
+          
+          // ✅ DÜZELTME 21.6.2: Aktivite verilerini batch yaz (önce hafızada, sonra tek API call)
+          const activityRows = [];
+          const activityColors = [];
+          
+          for (let i = 0; i < periodData.activities.length; i++) {
+            const activity = periodData.activities[i];
+            
+            // Veriyi hazırla
+            activityRows.push([
+              activity.type,
+              activity.count,
+              activity.totalDurationFormatted,
+              activity.avgDurationFormatted,
+              activity.percentageFormatted,
+              activity.distributionFormatted
+            ]);
+            
+            // Renk belirle (21.6.2: Önce hafızada hesapla)
+            const rowColor = (i % 2 === 0) ? '#F1F8E9' : '#FFFFFF';
+            activityColors.push(Array(headers.length).fill(rowColor));
+          }
+          
+          // Batch yaz: Veri + Renk (21.6.2: Tek API call!)
+          if (activityRows.length > 0) {
+            const startRow = currentRow;
+            const numRows = activityRows.length;
+            const numCols = headers.length;
+            
+            // Veriyi yaz (batch)
+            sheet.getRange(startRow, 1, numRows, numCols).setValues(activityRows);
+            
+            // Renkleri yaz (batch - 1 API call!)
+            sheet.getRange(startRow, 1, numRows, numCols).setBackgrounds(activityColors);
+            
+            // Sayıları sağa hizala (batch - tek seferde)
+            const rightAlignCols = [2, 3, 4, 5, 6]; // B, C, D, E, F kolonları
+            for (const col of rightAlignCols) {
+              if (col <= numCols) {
+                sheet.getRange(startRow, col, numRows, 1).setHorizontalAlignment('right');
+              }
+            }
+            
+            currentRow += numRows;
+          }
+          
+          currentRow += 3; // Periyotlar arası boşluk
+        }
+      } else {
+        // HAFTALIK/AYLIK: Sadece kümülatif özet (tek tek loglar değil)
+        // Trend analizi ile birlikte göster
+        
+        // Toplam özet tablosu
+        sheet.getRange(currentRow, 1).setValue(`📊 ${periodType.toUpperCase()} KÜMÜLATİF ÖZET`);
+        sheet.getRange(currentRow, 1, 1, 7).merge();
+        sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#4CAF50').setFontColor('#FFFFFF');
+        currentRow++;
+        
+        // Tüm periyotların toplamını hesapla
+        const totalSummary = {
+          totalLogs: 0,
+          activities: new Map()
+        };
+        
+        for (const periodData of activityAnalysisData) {
+          totalSummary.totalLogs += periodData.totalLogs;
+          for (const activity of periodData.activities) {
+            if (!totalSummary.activities.has(activity.type)) {
+              totalSummary.activities.set(activity.type, {
+                type: activity.type,
+                count: 0,
+                totalDuration: 0,
+                durations: []
+              });
+            }
+            const summary = totalSummary.activities.get(activity.type);
+            summary.count += activity.count;
+            // Süre bilgisi varsa ekle
+            if (activity.totalDurationFormatted) {
+              summary.totalDuration += parseFloat(activity.totalDurationFormatted.replace(/[^\d.]/g, '')) || 0;
+            }
+          }
+        }
+        
+        // Tablo başlıkları
+        const headers = ['Aktivite', 'Toplam Sayı', 'Toplam Süre', 'Ortalama Süre', 'Yüzdelik'];
+        for (let i = 0; i < headers.length; i++) {
+          sheet.getRange(currentRow, i + 1).setValue(headers[i]);
+        }
+        sheet.getRange(currentRow, 1, 1, headers.length)
+          .setFontWeight('bold')
+          .setFontSize(11)
+          .setBackground('#66BB6A')
+          .setFontColor('#FFFFFF')
+          .setHorizontalAlignment('center');
+        currentRow++;
+        
+        // ✅ DÜZELTME 21.6.2: Kümülatif aktivite verilerini batch yaz
+        const sortedActivities = Array.from(totalSummary.activities.values())
+          .sort((a, b) => b.count - a.count);
+        
+        const summaryRows = [];
+        const summaryColors = [];
+        
+        for (let i = 0; i < sortedActivities.length; i++) {
+          const activity = sortedActivities[i];
+          const percentage = totalSummary.totalLogs > 0 ? (activity.count / totalSummary.totalLogs * 100).toFixed(1) : '0.0';
+          const avgDuration = activity.count > 0 ? (activity.totalDuration / activity.count).toFixed(1) + ' dk' : '-';
+          const totalDurationFormatted = activity.totalDuration > 0 ? activity.totalDuration.toFixed(1) + ' dk' : '-';
+          
+          // Veriyi hazırla
+          summaryRows.push([
+            activity.type,
+            activity.count,
+            totalDurationFormatted,
+            avgDuration,
+            `%${percentage}`
+          ]);
+          
+          // Renk belirle (21.6.2: Önce hafızada hesapla)
+          const rowColor = (i % 2 === 0) ? '#F1F8E9' : '#FFFFFF';
+          summaryColors.push(Array(headers.length).fill(rowColor));
+        }
+        
+        // Batch yaz: Veri + Renk (21.6.2: Tek API call!)
+        if (summaryRows.length > 0) {
+          const startRow = currentRow;
+          const numRows = summaryRows.length;
+          const numCols = headers.length;
+          
+          // Veriyi yaz (batch)
+          sheet.getRange(startRow, 1, numRows, numCols).setValues(summaryRows);
+          
+          // Renkleri yaz (batch - 1 API call!)
+          sheet.getRange(startRow, 1, numRows, numCols).setBackgrounds(summaryColors);
+          
+          // Sayıları sağa hizala (batch - tek seferde)
+          const rightAlignCols = [2, 3, 4, 5]; // B, C, D, E kolonları
+          for (const col of rightAlignCols) {
+            if (col <= numCols) {
+              sheet.getRange(startRow, col, numRows, 1).setHorizontalAlignment('right');
+            }
+          }
+          
+          currentRow += numRows;
+        }
+        
+        currentRow += 2;
+        
+        // TREND ANALİZİ: Periyotlar arası karşılaştırma
+        if (activityAnalysisData.length > 1) {
+          sheet.getRange(currentRow, 1).setValue(`📈 ${periodType.toUpperCase()} TREND ANALİZİ`);
+          sheet.getRange(currentRow, 1, 1, 10).merge();
+          sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#9C27B0').setFontColor('#FFFFFF');
+          currentRow++;
+          
+          // Trend tablosu: Her periyot için toplam log sayısı
+          sheet.getRange(currentRow, 1).setValue('Periyot');
+          sheet.getRange(currentRow, 2).setValue('Toplam Log');
+          sheet.getRange(currentRow, 3).setValue('Değişim');
+          sheet.getRange(currentRow, 4).setValue('Trend');
+          sheet.getRange(currentRow, 1, 1, 4).setFontWeight('bold').setBackground('#CE93D8');
+          currentRow++;
+          
+          let previousTotal = null;
+          for (let i = 0; i < activityAnalysisData.length; i++) {
+            const periodData = activityAnalysisData[i];
+            const currentTotal = periodData.totalLogs;
+            
+            sheet.getRange(currentRow, 1).setValue(periodData.period);
+            sheet.getRange(currentRow, 2).setValue(currentTotal);
+            
+            if (previousTotal !== null) {
+              const change = currentTotal - previousTotal;
+              const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100).toFixed(1) : '0.0';
+              sheet.getRange(currentRow, 3).setValue(`${change > 0 ? '+' : ''}${change} (${changePercent > 0 ? '+' : ''}${changePercent}%)`);
+              
+              // Trend okunu göster
+              if (change > 0) {
+                sheet.getRange(currentRow, 4).setValue('↑ Artış');
+                sheet.getRange(currentRow, 4).setFontColor('#4CAF50');
+              } else if (change < 0) {
+                sheet.getRange(currentRow, 4).setValue('↓ Azalış');
+                sheet.getRange(currentRow, 4).setFontColor('#F44336');
+              } else {
+                sheet.getRange(currentRow, 4).setValue('→ Sabit');
+                sheet.getRange(currentRow, 4).setFontColor('#FF9800');
+              }
+            } else {
+              sheet.getRange(currentRow, 3).setValue('-');
+              sheet.getRange(currentRow, 4).setValue('-');
+            }
+            
+            // Sayıları sağa hizala
+            sheet.getRange(currentRow, 2).setHorizontalAlignment('right');
+            sheet.getRange(currentRow, 3).setHorizontalAlignment('right');
+            
+            previousTotal = currentTotal;
+            currentRow++;
+          }
+          
+          currentRow += 2;
+        }
+        
+        // AYLIK İÇİN: Günlük trend grafiği (ay içindeki günlük dağılım)
+        if (periodType === 'Aylık' && activityAnalysisData.length > 0) {
+          // Ay içindeki günlük logları hesapla
+          const dailyLogsInMonth = new Map(); // date -> totalLogs
+          
+          for (const [employeeCode, logs] of allEmployeeLogs) {
+            for (const log of logs) {
+              const logDate = parseDdMmYyyy(log.date) || new Date(log.date);
+              if (!logDate || isNaN(logDate.getTime())) continue;
+              
+              // Ay içinde mi kontrol et
+              if (logDate >= startDate && logDate <= endDate) {
+                const dateKey = Utilities.formatDate(logDate, 'Europe/Istanbul', 'dd.MM.yyyy');
+                if (!dailyLogsInMonth.has(dateKey)) {
+                  dailyLogsInMonth.set(dateKey, 0);
+                }
+                dailyLogsInMonth.set(dateKey, dailyLogsInMonth.get(dateKey) + 1);
+              }
+            }
+          }
+          
+          if (dailyLogsInMonth.size > 0) {
+            sheet.getRange(currentRow, 1).setValue(`📈 AY İÇİNDE GÜNLÜK TREND`);
+            sheet.getRange(currentRow, 1, 1, 5).merge();
+            sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14).setBackground('#2196F3').setFontColor('#FFFFFF');
+            currentRow++;
+            
+            // Günlük trend tablosu
+            sheet.getRange(currentRow, 1).setValue('Tarih');
+            sheet.getRange(currentRow, 2).setValue('Toplam Log');
+            sheet.getRange(currentRow, 3).setValue('Değişim');
+            sheet.getRange(currentRow, 4).setValue('Trend');
+            sheet.getRange(currentRow, 1, 1, 4).setFontWeight('bold').setBackground('#90CAF9');
+            currentRow++;
+            
+            // Tarihe göre sırala
+            const sortedDailyLogs = Array.from(dailyLogsInMonth.entries())
+              .sort((a, b) => {
+                const dateA = parseDdMmYyyy(a[0]) || new Date(a[0]);
+                const dateB = parseDdMmYyyy(b[0]) || new Date(b[0]);
+                return dateA.getTime() - dateB.getTime();
+              });
+            
+            let previousDailyTotal = null;
+            for (const [dateKey, totalLogs] of sortedDailyLogs) {
+              sheet.getRange(currentRow, 1).setValue(dateKey);
+              sheet.getRange(currentRow, 2).setValue(totalLogs);
+              
+              if (previousDailyTotal !== null) {
+                const change = totalLogs - previousDailyTotal;
+                const changePercent = previousDailyTotal > 0 ? ((change / previousDailyTotal) * 100).toFixed(1) : '0.0';
+                sheet.getRange(currentRow, 3).setValue(`${change > 0 ? '+' : ''}${change} (${changePercent > 0 ? '+' : ''}${changePercent}%)`);
+                
+                // Trend okunu göster
+                if (change > 0) {
+                  sheet.getRange(currentRow, 4).setValue('↑ Artış');
+                  sheet.getRange(currentRow, 4).setFontColor('#4CAF50');
+                } else if (change < 0) {
+                  sheet.getRange(currentRow, 4).setValue('↓ Azalış');
+                  sheet.getRange(currentRow, 4).setFontColor('#F44336');
+                } else {
+                  sheet.getRange(currentRow, 4).setValue('→ Sabit');
+                  sheet.getRange(currentRow, 4).setFontColor('#FF9800');
+                }
+              } else {
+                sheet.getRange(currentRow, 3).setValue('-');
+                sheet.getRange(currentRow, 4).setValue('-');
+              }
+              
+              // Sayıları sağa hizala
+              sheet.getRange(currentRow, 2).setHorizontalAlignment('right');
+              sheet.getRange(currentRow, 3).setHorizontalAlignment('right');
+              
+              previousDailyTotal = totalLogs;
+              currentRow++;
+            }
+            
+            currentRow += 2;
+          }
+        }
+      }
+      currentRow += 1;
+    }
+    
+    // NOT: Karşılaştırma raporu artık yukarıda (Executive Summary) gösteriliyor
     
     // Kolon genişliklerini ayarla - Daha okunur
     sheet.setColumnWidth(1, 180); // Aktivite
@@ -11362,13 +12243,22 @@ function extractTimeFromLog(logStr) {
  */
 function extractTimeString(logStr) {
   try {
+    // ✅ DÜZELTME: Saat formatı - Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
     const match = String(logStr).match(/(\d{1,2}):(\d{2}):(\d{2})/);
     if (match) {
-      return `${match[1]}:${match[2]}`;
+      const hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+        return `${hours}:${String(minutes).padStart(2, '0')}`;
+      }
     }
     const match2 = String(logStr).match(/(\d{1,2}):(\d{2})/);
     if (match2) {
-      return `${match2[1]}:${match2[2]}`;
+      const hours = parseInt(match2[1], 10);
+      const minutes = parseInt(match2[2], 10);
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+        return `${hours}:${String(minutes).padStart(2, '0')}`;
+      }
     }
   } catch (error) {
     return '';
@@ -11463,23 +12353,43 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     
     console.log(`📊 ${formatTableSheets.length} adet Format Tablo sayfası bulundu`);
     
-    // Tüm sayfalardan veri topla
+    // ✅ DÜZELTME: Cache kontrolünü KALDIR - Tarih filtresi sonradan uygulanacak!
+    // ❌ SORUN: Cache kontrolü tarih filtresinden ÖNCE yapılıyordu
+    // ✅ ÇÖZÜM: Tüm satırları oku, sonra tarih filtresini uygula (21.6 kuralları: Cache kaldır, basit tut!)
     let allData = [];
     for (const formatSheet of formatTableSheets) {
       const sheet = formatSheet.sheet;
+      const sheetName = sheet.getName();
       const lastRow = sheet.getLastRow();
-      console.log(`📊 "${sheet.getName()}" sayfasından veri okunuyor (${lastRow} satır)`);
       
+      // Tüm satırları oku (cache kontrolü YOK - tarih filtresi sonradan uygulanacak)
       if (lastRow > 1) {
-        const data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getDisplayValues();
-        console.log(`📊 "${sheet.getName()}" sayfasından ${data.length} satır veri alındı`);
+        const dataRowCount = lastRow - 1; // Header hariç
+        console.log(`📊 "${sheetName}" sayfasından ${dataRowCount} satır okunuyor (${lastRow} toplam, header hariç)`);
+        
+        // BATCH OPERATIONS: Tüm satırları tek seferde oku (Google best practice)
+        const data = sheet.getRange(2, 1, dataRowCount, sheet.getLastColumn()).getDisplayValues();
+        console.log(`📊 "${sheetName}" sayfasından ${data.length} satır veri alındı`);
+        
+        // DEBUG: İlk 5 satırın tarih kolonunu göster
+        if (data.length > 0) {
+          const tarihIndex = formatSheet.tarihIndex;
+          console.log(`🔍 DEBUG "${sheetName}": İlk 5 satırın Tarih kolonu (index ${tarihIndex}):`);
+          for (let i = 0; i < Math.min(5, data.length); i++) {
+            const tarihValue = data[i][tarihIndex];
+            console.log(`  Satır ${i + 2}: "${tarihValue}" (tip: ${typeof tarihValue})`);
+          }
+        }
+        
         allData.push(...data.map(row => ({
           ...row,
-          _sheetName: sheet.getName(),
+          _sheetName: sheetName,
           _aktiviteIndex: formatSheet.aktiviteIndex,
           _tarihIndex: formatSheet.tarihIndex,
           _logIndex: formatSheet.logIndex // Log kolonu varsa index, yoksa null
         })));
+      } else {
+        console.log(`⏭️ "${sheetName}" sayfası boş (sadece header var)`);
       }
     }
     
@@ -11497,6 +12407,10 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     const logsByDate = new Map();
     let skippedOlderThanCutoff = 0;
     
+    // DUPLICATE KONTROLÜ: Aynı log birden fazla kez sayılmamalı
+    // Key: "aktivite|log|tarih" formatında unique identifier
+    const seenLogs = new Set();
+    
     console.log(`📊 Toplam ${allData.length} satır okunacak (Son 30 gün filtresi ile)`);
     
     // GEÇİCİ: Mevcut log özeti sayfasından eski verileri alma işlemini devre dışı bırak
@@ -11508,6 +12422,7 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     let newLogsCount = 0;
     let hamVeriSkippedCount = 0;
     let invalidLogsCount = 0;
+    let duplicateLogsCount = 0;
     console.log(`🚀 LOG İŞLEME BAŞLIYOR: ${allData.length} satır işlenecek`);
     
     for (let i = 0; i < allData.length; i++) {
@@ -11523,7 +12438,7 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
         logValue = String(row[row._logIndex] || '').trim();
       }
       
-      // Eğer Log kolonu yoksa veya boşsa, standart format oluştur (Log Arşivi ile aynı)
+      // Eğer Log kolonu yoksa veya boşsa, standart format oluştur (Log Arşivi ile aynı - DETAYLI)
       if (!logValue || logValue === '') {
         // İsim Soyisim kolonunu bul (standart format oluşturmak için)
         const sheet = formatTableSheets.find(ft => ft.sheet.getName() === row._sheetName)?.sheet;
@@ -11536,11 +12451,84 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
           }
         }
         
-        // Standart format: Aktivite - İsim Soyisim - Tarih (Log Arşivi ile aynı)
-        const parts = [aktivite];
-        if (isimSoyisim) parts.push(isimSoyisim);
-        parts.push(aktiviteTarihi);
-        logValue = parts.join(' - ');
+        // Aktivite Tarihi'nden saat bilgisini çıkar (eğer varsa)
+        let aktiviteTarihiWithTime = String(aktiviteTarihi || '').trim();
+        // Format: "08.12.2025 15:51:51" veya "08.12.2025" veya Date object
+        let extractedTime = '';
+        try {
+          // Önce string olarak kontrol et
+          const tarihStr = String(aktiviteTarihi || '');
+          // "08.12.2025 15:51:51" formatı
+          const timeMatch = tarihStr.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+          if (timeMatch) {
+            extractedTime = `${timeMatch[1]}:${timeMatch[2]}:${timeMatch[3]}`;
+          } else {
+            // Date object ise, saat bilgisini çıkar
+            if (aktiviteTarihi instanceof Date) {
+              const h = aktiviteTarihi.getHours();
+              const m = aktiviteTarihi.getMinutes();
+              const s = aktiviteTarihi.getSeconds();
+              if (h !== undefined && m !== undefined) {
+                // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05:23, 13:09:45)
+                extractedTime = `${h}:${String(m).padStart(2, '0')}:${String(s || 0).padStart(2, '0')}`;
+              }
+            }
+          }
+        } catch (e) {
+          // Hata durumunda devam et
+        }
+        
+        // ✅ DÜZELTME 4: Log formatı - ESKİ FORMATA DÖN (21.6 kuralları: Mevcut formatı değiştirme!)
+        // DOĞRU FORMAT: "Aktivite - DD.MM.YYYY HH:MM:SS"
+        // ÖRNEK: "Randevu Alındı - 09.12.2024 13:05:42"
+        // İsim Soyisim YOK! ISO 8601 (2025-12-10) KULLANMA! DD.MM.YYYY kullan!
+        
+        // Tarih formatını düzelt (DD.MM.YYYY)
+        let tarihStr = '';
+        if (aktiviteTarihi instanceof Date) {
+          // Date object ise DD.MM.YYYY formatına çevir
+          const day = aktiviteTarihi.getDate();
+          const month = aktiviteTarihi.getMonth() + 1;
+          const year = aktiviteTarihi.getFullYear();
+          tarihStr = `${day}.${String(month).padStart(2, '0')}.${year}`;
+        } else {
+          // String ise, zaten DD.MM.YYYY formatında olmalı
+          const tarihMatch = String(aktiviteTarihi || '').match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+          if (tarihMatch) {
+            tarihStr = `${tarihMatch[1]}.${tarihMatch[2].padStart(2, '0')}.${tarihMatch[3]}`;
+          } else {
+            // ISO 8601 formatı (2025-12-10) ise DD.MM.YYYY'ye çevir
+            const isoMatch = String(aktiviteTarihi || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) {
+              tarihStr = `${parseInt(isoMatch[3], 10)}.${isoMatch[2]}.${isoMatch[1]}`;
+            } else {
+              tarihStr = String(aktiviteTarihi || '');
+            }
+          }
+        }
+        
+        // Saat formatını düzelt (HH:MM:SS)
+        let saatStr = '';
+        if (extractedTime) {
+          // extractedTime zaten "H:MM:SS" formatında (21.6.1 kuralına uygun)
+          saatStr = extractedTime;
+        } else {
+          // Saat yoksa, aktiviteTarihi'nden çıkar
+          if (aktiviteTarihi instanceof Date) {
+            const h = aktiviteTarihi.getHours();
+            const m = aktiviteTarihi.getMinutes();
+            const s = aktiviteTarihi.getSeconds();
+            // ✅ 21.6.1: Saat padStart YOK, Dakika/Saniye padStart VAR
+            saatStr = `${h}:${String(m).padStart(2, '0')}:${String(s || 0).padStart(2, '0')}`;
+          }
+        }
+        
+        // ✅ DOĞRU FORMAT: "Aktivite - DD.MM.YYYY HH:MM:SS" (İsim Soyisim YOK!)
+        if (saatStr) {
+          logValue = `${aktivite} - ${tarihStr} ${saatStr}`;
+        } else {
+          logValue = `${aktivite} - ${tarihStr}`;
+        }
       }
       
       // "Ham veri'den aktarıldı" kontrolü - bunları atla
@@ -11557,8 +12545,26 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
 
       // Son 30 gün filtresi (Aktivite Tarihi üzerinden)
       if (hasAktiviteTarihi) {
-        const dt = parseDdMmYyyy(aktiviteTarihi) || new Date(String(aktiviteTarihi));
+        // DEBUG: Tarih parse etme
+        let dt = null;
+        try {
+          dt = parseDdMmYyyy(aktiviteTarihi);
+          if (!dt || isNaN(dt.getTime())) {
+            dt = new Date(String(aktiviteTarihi));
+          }
+        } catch (e) {
+          dt = new Date(String(aktiviteTarihi));
+        }
+        
         const valid = dt instanceof Date && !isNaN(dt.getTime());
+        
+        // DEBUG: İlk 5 satır için detaylı log
+        if (i < 5) {
+          const dtOnly = valid ? new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()) : null;
+          const cutoffOnly = new Date(cutoffDate.getFullYear(), cutoffDate.getMonth(), cutoffDate.getDate());
+          console.log(`🔍 DEBUG Satır ${i + 1}: Tarih="${aktiviteTarihi}" → Parse="${valid ? Utilities.formatDate(dt, 'Europe/Istanbul', 'dd.MM.yyyy') : 'GEÇERSİZ'}" | Eşik="${Utilities.formatDate(cutoffDate, 'Europe/Istanbul', 'dd.MM.yyyy')}" | Geçerli=${valid && dtOnly >= cutoffOnly}`);
+        }
+        
         if (!valid || dt < cutoffDate) {
           skippedOlderThanCutoff++;
           continue;
@@ -11569,36 +12575,145 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
         // GEÇİCİ: Tüm log'ları al (tarih karşılaştırmasını devre dışı bırak)
         // TODO: Tarih karşılaştırması daha sonra aktif edilecek
         
-        if (!logsByDate.has(aktiviteTarihi)) {
-          logsByDate.set(aktiviteTarihi, []);
+        // KRİTİK: Tarih key'ini normalize et (saat kısmını çıkar)
+        // Aynı gün için farklı formatlar ("08.12.2025" vs "08.12.2025 15:51:51") aynı key olmalı
+        let normalizedDateKey = String(aktiviteTarihi || '').trim();
+        
+        // Saat kısmını çıkar (eğer varsa)
+        // Format: "08.12.2025 15:51:51" -> "08.12.2025"
+        normalizedDateKey = normalizedDateKey.replace(/\s+\d{1,2}:\d{2}(:\d{2})?/g, '').trim();
+        
+        // Date object ise, dd.MM.yyyy formatına çevir
+        if (aktiviteTarihi instanceof Date && !isNaN(aktiviteTarihi.getTime())) {
+          const d = String(aktiviteTarihi.getDate()).padStart(2, '0');
+          const m = String(aktiviteTarihi.getMonth() + 1).padStart(2, '0');
+          const y = aktiviteTarihi.getFullYear();
+          normalizedDateKey = `${d}.${m}.${y}`;
+        }
+        
+        // Eğer hala geçerli bir tarih formatı değilse, parse et
+        if (!normalizedDateKey.match(/^\d{2}\.\d{2}\.\d{4}$/)) {
+          const parsedDate = parseDdMmYyyy(aktiviteTarihi);
+          if (parsedDate && !isNaN(parsedDate.getTime())) {
+            const d = String(parsedDate.getDate()).padStart(2, '0');
+            const m = String(parsedDate.getMonth() + 1).padStart(2, '0');
+            const y = parsedDate.getFullYear();
+            normalizedDateKey = `${d}.${m}.${y}`;
+          } else {
+            // Parse edilemezse, orijinal değeri kullan (ama saat kısmını çıkar)
+            normalizedDateKey = normalizedDateKey.replace(/\s+\d{1,2}:\d{2}(:\d{2})?/g, '').trim();
+          }
+        }
+        
+        // DUPLICATE KONTROLÜ: Aynı log birden fazla kez eklenmemeli
+        // Key: "aktivite|log|tarih" formatında unique identifier
+        const duplicateKey = `${aktivite}|${logValue}|${normalizedDateKey}`;
+        if (seenLogs.has(duplicateKey)) {
+          duplicateLogsCount++;
+          console.log(`⚠️ Duplicate log atlandı: ${duplicateKey.substring(0, 50)}...`);
+          continue; // Bu log zaten eklenmiş, atla
+        }
+        seenLogs.add(duplicateKey);
+        
+        // Normalize edilmiş tarih key'i ile grupla
+        if (!logsByDate.has(normalizedDateKey)) {
+          logsByDate.set(normalizedDateKey, []);
         }
         
         // Log'dan zaman bilgisini çıkar (sıralama için)
-        const timeFromLog = extractTimeFromLog(logValue);
-        // extractTimeStr fonksiyonu createEmployeeLogSummarySheet içinde tanımlı, burada basit bir versiyon kullan
+        // ÖNCE aktiviteTarihi'nden saat bilgisini çıkar (eğer varsa)
+        let timeFromTarih = 0;
         let timeStr = '';
         try {
-          const s = String(logValue || '');
-          const m = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-          if (m) {
-            timeStr = `${String(m[1]).padStart(2, '0')}:${m[2]}`;
+          const tarihStr = String(aktiviteTarihi || '');
+          // "08.12.2025 15:51:51" formatı
+          const timeMatch = tarihStr.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+          if (timeMatch) {
+            const h = parseInt(timeMatch[1]);
+            const m = parseInt(timeMatch[2]);
+            if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+              timeFromTarih = h * 60 + m;
+              // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+              timeStr = `${h}:${String(m).padStart(2, '0')}`;
+            }
           } else {
-            const m2 = s.match(/(\d{1,2}):(\d{2})/);
-            if (m2) {
-              timeStr = `${String(m2[1]).padStart(2, '0')}:${m2[2]}`;
+            // Date object ise
+            if (aktiviteTarihi instanceof Date && !isNaN(aktiviteTarihi.getTime())) {
+              const h = aktiviteTarihi.getHours();
+              const m = aktiviteTarihi.getMinutes();
+              if (h !== undefined && m !== undefined) {
+                timeFromTarih = h * 60 + m;
+                // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+                timeStr = `${h}:${String(m).padStart(2, '0')}`;
+              }
             }
           }
         } catch (e) {
-          timeStr = '';
+          // Hata durumunda log'dan çıkarmaya çalış
         }
         
-        logsByDate.get(aktiviteTarihi).push({
+        // Eğer aktiviteTarihi'nden saat bulunamadıysa, logValue'dan çıkar
+        if (!timeStr || timeFromTarih === 0) {
+          const timeFromLog = extractTimeFromLog(logValue);
+          if (timeFromLog && timeFromLog > 0 && timeFromLog < 1440) {
+            timeFromTarih = timeFromLog;
+            const h = Math.floor(timeFromLog / 60);
+            const m = timeFromLog % 60;
+            // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+            timeStr = `${h}:${String(m).padStart(2, '0')}`;
+          } else {
+            // Log string'inden manuel çıkar
+            try {
+              const s = String(logValue || '');
+              const m = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+              if (m) {
+                const h = parseInt(m[1]);
+                const min = parseInt(m[2]);
+                if (h >= 0 && h < 24 && min >= 0 && min < 60) {
+                  timeFromTarih = h * 60 + min;
+                  // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+                  timeStr = `${h}:${String(min).padStart(2, '0')}`;
+                }
+              } else {
+                const m2 = s.match(/(\d{1,2}):(\d{2})(?!\d)/);
+                if (m2) {
+                  const h = parseInt(m2[1]);
+                  const min = parseInt(m2[2]);
+                  if (h >= 0 && h < 24 && min >= 0 && min < 60) {
+                    timeFromTarih = h * 60 + min;
+                    // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+                    timeStr = `${h}:${String(min).padStart(2, '0')}`;
+                  }
+                }
+              }
+            } catch (e) {
+              // Hata durumunda boş bırak
+            }
+          }
+        }
+        
+        // ✅ DÜZELTME 2: Format kodunu çıkar (kaynak için)
+        let formatCode = '';
+        if (row._sheetName) {
+          const sheetName = String(row._sheetName);
+          // Sheet adından format kodunu çıkar
+          // Örnek: "Format Tablo - TeksBH" → "TeksBH"
+          const formatMatch = sheetName.match(/[-–—]\s*([^-–—]+)$/);
+          if (formatMatch) {
+            formatCode = formatMatch[1].trim();
+          } else if (!sheetName.toLowerCase().includes('format tablo')) {
+            formatCode = sheetName; // Zaten format kodu gibi görünüyor
+          }
+        }
+        
+        logsByDate.get(normalizedDateKey).push({
           rowIndex: i + 2,
           log: logValue,
           aktivite: aktivite,
-          aktiviteTarihi: aktiviteTarihi,
+          aktiviteTarihi: normalizedDateKey, // Normalize edilmiş tarih key'i kullan
           sourceSheet: row._sheetName,
-          timeMinutes: timeFromLog || 0, // Sıralama için zaman (dakika cinsinden)
+          kaynakSayfa: formatCode, // ✅ DÜZELTME: Format kodu (TeksBH, otoanadolu)
+          timeMinutes: timeFromTarih || 0, // Sıralama için zaman (dakika cinsinden)
           timeStr: timeStr // Görüntüleme için zaman string'i
         });
         
@@ -11625,6 +12740,7 @@ function getAllEmployeeLogsByDate(employeeCode, employeeName) {
     console.log(`🎯 LOG İŞLEME TAMAMLANDI:`);
     console.log(`   Toplam satır: ${allData.length}`);
     console.log(`   İşlenen log: ${newLogsCount}`);
+    console.log(`   Duplicate (atlanan): ${duplicateLogsCount}`);
     console.log(`   30+ gün eski (atlanan): ${skippedOlderThanCutoff}`);
     console.log(`   Tarih sayısı: ${logsByDate.size}`);
     console.log(`   Tarihler: ${Array.from(logsByDate.keys()).join(', ')}`);
@@ -11683,17 +12799,53 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
   try {
     const sheetName = `📊 ${employeeCode} Log Özeti`;
 
+    // ÖNCE VERİ KONTROLÜ: Eğer veri yoksa sayfayı temizleme ve mesaj yaz
+    const hasData = logsByDate && logsByDate.size > 0 && Array.from(logsByDate.values()).some(logs => logs && logs.length > 0);
+    
     // Eski sayfayı SİLME; varsa sadece içeriğini temizle (başlıkları yeniden yazacağız)
     let sheet = managerFile.getSheetByName(sheetName);
     if (!sheet) {
       sheet = managerFile.insertSheet(sheetName);
-    } else {
+    }
+
+    // Eğer veri yoksa, bilgilendirici mesaj yaz ve çık (SAYFAYI TEMİZLEME!)
+    if (!hasData) {
+      // Önce sayfayı temizle (sadece veri yokken)
       try {
         const lr = sheet.getLastRow();
         const lc = sheet.getLastColumn();
-        if (lr > 0 && lc > 0) sheet.getRange(1, 1, lr, lc).clearContent();
+        if (lr > 0 && lc > 0) {
+          sheet.getRange(1, 1, lr, lc).clearContent();
+          sheet.getRange(1, 1, lr, lc).clearFormat();
+        }
       } catch (_) {}
+      
+      const columns = ['Saat', 'Aktivite', 'Log Detayı', 'Kaynak', 'Satır No'];
+      sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
+      sheet.getRange(1, 1, 1, columns.length).setFontWeight('bold').setBackground('#E3F2FD');
+      
+      // Bilgilendirici mesaj
+      sheet.getRange(2, 1).setValue('📭 Son 30 gün içinde log bulunamadı');
+      sheet.getRange(2, 1, 1, columns.length).merge();
+      sheet.getRange(2, 1).setFontStyle('italic').setBackground('#FFF9C4');
+      
+      // Formatting
+      try { sheet.autoResizeColumns(1, columns.length); } catch (_) {}
+      try { SpreadsheetApp.flush(); } catch (_) {}
+      
+      console.log(`⚠️ ${employeeCode} için log verisi bulunamadı`);
+      return sheet;
     }
+    
+    // VERİ VARSA: Sayfayı temizle
+    try {
+      const lr = sheet.getLastRow();
+      const lc = sheet.getLastColumn();
+      if (lr > 0 && lc > 0) {
+        sheet.getRange(1, 1, lr, lc).clearContent();
+        sheet.getRange(1, 1, lr, lc).clearFormat();
+      }
+    } catch (_) {}
 
     // Gruplu görünüm: Gün → Kaynak → Başlık satırı → Kayıtlar
     const columns = ['Saat', 'Aktivite', 'Log Detayı', 'Kaynak', 'Satır No'];
@@ -11715,14 +12867,43 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
 
     function extractTimeStr(logStr) {
       const s = String(logStr || '');
+      // ✅ DÜZELTME: Saat formatı - Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
       const m = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-      if (m) return `${String(m[1]).padStart(2, '0')}:${m[2]}`;
-      const m2 = s.match(/(\d{1,2}):(\d{2})/);
-      if (m2) return `${String(m2[1]).padStart(2, '0')}:${m2[2]}`;
+      if (m) {
+        const hours = parseInt(m[1], 10);
+        const minutes = parseInt(m[2], 10);
+        if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+          return `${hours}:${String(minutes).padStart(2, '0')}`;
+        }
+      }
+      const m2 = s.match(/(\d{1,2}):(\d{2})(?!\d)/);
+      if (m2) {
+        const hours = parseInt(m2[1], 10);
+        const minutes = parseInt(m2[2], 10);
+        if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+          return `${hours}:${String(minutes).padStart(2, '0')}`;
+        }
+      }
       return '';
     }
 
-    const sortedDates = Array.from(logsByDate.keys()).sort((a, b) => parseKeyToDate(b) - parseKeyToDate(a));
+    // ✅ DÜZELTME 1: Gelecek tarihleri filtrele (21.1 + 21.6 kuralları)
+    // Bugünün tarihini al (sadece tarih, saat yok)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Gelecek tarihleri filtrele
+    const validDates = Array.from(logsByDate.keys()).filter(dateKey => {
+      const date = parseKeyToDate(dateKey);
+      // Bugünden sonraki tarihleri filtrele
+      if (date > today) {
+        console.warn(`⚠️ Gelecek tarih filtrelendi: ${dateKey} (Bugün: ${Utilities.formatDate(today, 'Europe/Istanbul', 'dd.MM.yyyy')})`);
+        return false;
+      }
+      return true;
+    });
+    
+    const sortedDates = validDates.sort((a, b) => parseKeyToDate(b) - parseKeyToDate(a));
     
     // Tüm alarm satırlarını tut (RichTextValue için)
     const alarmRows = [];
@@ -11846,16 +13027,22 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
       let pauseCount = 0; // Mola sayısı
       
       if (logsWithTime.length > 0) {
-        // İlk log'un zamanını al
-        const firstLog = logsWithTime[0];
-        firstLogTime = firstLog.timeMinutes || extractTimeFromLog(firstLog.log);
-        
-        // Son log'un zamanını al
-        const lastLog = logsWithTime[logsWithTime.length - 1];
-        lastLogTime = lastLog.timeMinutes || extractTimeFromLog(lastLog.log);
+        // İlk log'un zamanını al (geçerli zamanları bul)
+        for (const log of logsWithTime) {
+          const time = log.timeMinutes || extractTimeFromLog(log.log);
+          // Geçerli zaman kontrolü: 0-1440 arası olmalı (9999 değil!)
+          if (time && time > 0 && time < 1440 && time !== 9999) {
+            if (firstLogTime === null || time < firstLogTime) {
+              firstLogTime = time;
+            }
+            if (lastLogTime === null || time > lastLogTime) {
+              lastLogTime = time;
+            }
+          }
+        }
         
         // Gecikme hesapla (11:00'dan sonra başladıysa - 11:05 değil, 11:00)
-        if (firstLogTime && firstLogTime > 0 && firstLogTime > WORK_START_MINUTES) {
+        if (firstLogTime && firstLogTime > 0 && firstLogTime < 1440 && firstLogTime > WORK_START_MINUTES) {
           totalDelayMinutes = firstLogTime - WORK_START_MINUTES;
         }
         
@@ -11872,6 +13059,7 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
         if (logsWithTime.length >= 2) {
           const log0Time = logsWithTime[0].timeMinutes || extractTimeFromLog(logsWithTime[0].log) || 0;
           const log1Time = logsWithTime[1].timeMinutes || extractTimeFromLog(logsWithTime[1].log) || 0;
+          // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
           const log0TimeStr = logsWithTime[0].timeStr || `${Math.floor(log0Time/60)}:${String(log0Time%60).padStart(2,'0')}`;
           const log1TimeStr = logsWithTime[1].timeStr || `${Math.floor(log1Time/60)}:${String(log1Time%60).padStart(2,'0')}`;
           console.log(`🔍 ${dateKey} - İlk iki log: ${log0TimeStr} → ${log1TimeStr} = ${log1Time - log0Time}min (ATLANACAK - mola değil, işe başlama)`);
@@ -11885,17 +13073,30 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
           const nextItem = logsWithTime[i + 1];
           
           // Zaman farkını hesapla (dakika cinsinden)
-          const currentTime = currentItem.timeMinutes || extractTimeFromLog(currentItem.log) || 0;
-          const nextTime = nextItem.timeMinutes || extractTimeFromLog(nextItem.log) || 0;
+          let currentTime = currentItem.timeMinutes || extractTimeFromLog(currentItem.log) || 0;
+          let nextTime = nextItem.timeMinutes || extractTimeFromLog(nextItem.log) || 0;
           
-          if (currentTime > 0 && nextTime > 0 && nextTime > currentTime) {
+          // Geçerli zaman kontrolü: 0-1440 arası olmalı (9999 değil!)
+          if (currentTime >= 1440 || currentTime === 9999) currentTime = 0;
+          if (nextTime >= 1440 || nextTime === 9999) nextTime = 0;
+          
+          // Her iki zaman da geçerli olmalı
+          if (currentTime > 0 && currentTime < 1440 && nextTime > 0 && nextTime < 1440 && nextTime > currentTime) {
             // Negatif zaman farkları sıralama hatası gösterebilir, bunları atla
             const timeDiffMinutes = nextTime - currentTime;
             
+            // Farklı günler arasındaki farkı atla (gece yarısını geçiyorsa - maksimum 12 saat = 720 dakika)
+            // Eğer fark çok büyükse (> 720 dakika), bu muhtemelen farklı günler arasındaki farktır, atla
+            if (timeDiffMinutes > 720) {
+              console.log(`⚠️ ${dateKey} - Çok büyük zaman farkı atlandı: ${timeDiffMinutes} dakika (muhtemelen farklı günler)`);
+              continue;
+            }
+            
             // 5 dakika veya daha fazla mola (ikinci log'dan itibaren)
             // ÖNEMLİ: timeDiffMinutes pozitif olmalı (nextTime > currentTime kontrolü yapıldı)
-            if (timeDiffMinutes >= 5) {
+            if (timeDiffMinutes >= 5 && timeDiffMinutes <= 720) {
               // Debug: Tüm molaları detaylı göster
+              // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
               const currentTimeStr = currentItem.timeStr || `${Math.floor(currentTime/60)}:${String(currentTime%60).padStart(2,'0')}`;
               const nextTimeStr = nextItem.timeStr || `${Math.floor(nextTime/60)}:${String(nextTime%60).padStart(2,'0')}`;
               console.log(`⏸️ ${dateKey} - Mola #${pauseCount + 1}: ${currentTimeStr} → ${nextTimeStr} = ${timeDiffMinutes} dakika (Log[${i}] → Log[${i+1}])`);
@@ -11905,6 +13106,7 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
             }
           } else {
             // Zaman bilgisi yoksa, calculateTimeDifferenceSeconds kullan
+            // ÖNEMLİ: Sadece aynı gün içindeki loglar arasındaki farkı hesapla
             const log1 = {
               date: dateKey,
               log: currentItem.log,
@@ -11918,10 +13120,14 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
             
             const timeDiff = calculateTimeDifferenceSeconds(log1, log2);
             
-            if (timeDiff >= 300) { // 5 dakika = 300 saniye
+            // Farklı günler arasındaki farkı atla (maksimum 12 saat = 43200 saniye)
+            // Eğer fark çok büyükse (> 43200 saniye = 720 dakika), bu muhtemelen farklı günler arasındaki farktır, atla
+            if (timeDiff >= 300 && timeDiff <= 43200) { // 5 dakika - 12 saat arası
               const minutes = Math.floor(timeDiff / 60);
               totalPauseMinutes += minutes;
               pauseCount++;
+            } else if (timeDiff > 43200) {
+              console.log(`⚠️ ${dateKey} - Çok büyük zaman farkı atlandı: ${Math.floor(timeDiff / 60)} dakika (muhtemelen farklı günler)`);
             }
           }
         }
@@ -11935,15 +13141,18 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
       rows.push([`📊 ${dayList.length} log`, '', '', '', '']); // Log sayısı
       
       // Gün özeti bilgileri (her biri ayrı satır)
-      if (firstLogTime && firstLogTime > 0) {
+      // KRİTİK: firstLogTime ve lastLogTime geçerli olmalı (0-1440 arası, 9999 değil!)
+      if (firstLogTime && firstLogTime > 0 && firstLogTime < 1440 && firstLogTime !== 9999) {
         const startHours = Math.floor(firstLogTime / 60);
         const startMins = firstLogTime % 60;
-        const startTimeStr = `${String(startHours).padStart(2, '0')}:${String(startMins).padStart(2, '0')}`;
+        // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+        const startTimeStr = `${startHours}:${String(startMins).padStart(2, '0')}`;
         
-        if (lastLogTime && lastLogTime > 0) {
+        if (lastLogTime && lastLogTime > 0 && lastLogTime < 1440 && lastLogTime !== 9999) {
           const endHours = Math.floor(lastLogTime / 60);
           const endMins = lastLogTime % 60;
-          const endTimeStr = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
+          // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+          const endTimeStr = `${endHours}:${String(endMins).padStart(2, '0')}`;
           
           rows.push([`⏰ ${startTimeStr} - ${endTimeStr}`, '', '', '', '']); // Başlama - Bitiş
         } else {
@@ -11976,13 +13185,81 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
           continue;
         }
         
-        const timeStr = item.timeStr || extractTimeStr(item.log);
+        // ✅ DÜZELTME 3: Saat parse - Daha agresif, her satırda saat olmalı!
+        let finalTimeStr = item.timeStr || '';
         
-        // Normal log satırı - Hizalama düzeltmesi: timeStr her zaman dolu olmalı
-        // Eğer timeStr boşsa, log'dan tekrar çıkar
-        let finalTimeStr = timeStr || '';
+        // 1. Önce item.timeStr'den al
         if (!finalTimeStr && item.log) {
           finalTimeStr = extractTimeStr(item.log);
+        }
+        
+        // 2. Hala boşsa, aktiviteTarihi'nden çıkar
+        if (!finalTimeStr && item.aktiviteTarihi) {
+          try {
+            if (item.aktiviteTarihi instanceof Date) {
+              const h = item.aktiviteTarihi.getHours();
+              const m = item.aktiviteTarihi.getMinutes();
+              // ✅ 21.6.1: Saat padStart YOK, Dakika padStart VAR
+              finalTimeStr = `${h}:${String(m).padStart(2, '0')}`;
+            } else {
+              // String ise parse et
+              const timeMatch = String(item.aktiviteTarihi).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+              if (timeMatch) {
+                const h = parseInt(timeMatch[1], 10);
+                const m = parseInt(timeMatch[2], 10);
+                if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+                  finalTimeStr = `${h}:${String(m).padStart(2, '0')}`;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn(`⚠️ aktiviteTarihi'nden saat çıkarılamadı: ${e.message}`);
+          }
+        }
+        
+        // 3. Hala boşsa, log string'inden daha agresif parse et
+        if (!finalTimeStr && item.log) {
+          const logStr = String(item.log || '');
+          // "09.12.2024 13:05:42" formatından saat çıkar
+          const timeMatch = logStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+          if (timeMatch) {
+            const h = parseInt(timeMatch[1], 10);
+            const m = parseInt(timeMatch[2], 10);
+            if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+              finalTimeStr = `${h}:${String(m).padStart(2, '0')}`;
+            }
+          }
+        }
+        
+        // ✅ KRİTİK: Saat formatını doğrula ve düzelt (01:9 → 01:09)
+        if (finalTimeStr) {
+          // ✅ DÜZELTME: Saat formatı - Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
+          const timeMatch = finalTimeStr.match(/^(\d{1,2}):(\d{1,2})$/);
+          if (timeMatch) {
+            const hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+              // Format: Saat padStart YOK, Dakika padStart VAR
+              finalTimeStr = `${hours}:${String(minutes).padStart(2, '0')}`;
+            } else {
+              // Geçersiz saat formatı, boş bırak
+              console.warn(`⚠️ Geçersiz saat formatı: "${finalTimeStr}" → boş bırakıldı`);
+              finalTimeStr = '';
+            }
+          } else {
+            // Format uyumsuz, tekrar parse et
+            const reExtracted = extractTimeStr(item.log || '');
+            if (reExtracted) {
+              finalTimeStr = reExtracted;
+            } else {
+              finalTimeStr = '';
+            }
+          }
+        }
+        
+        // ✅ DEBUG: Saat parse sonucu
+        if (!finalTimeStr) {
+          console.warn(`⚠️ Saat parse edilemedi: log="${item.log?.substring(0, 50)}", aktiviteTarihi="${item.aktiviteTarihi}", timeStr="${item.timeStr}"`);
         }
         
         // Aktivite ve log kontrolü - eksik veri varsa uyar ama satırı ekle
@@ -11998,12 +13275,44 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
           console.log(`⚠️ Log detayı boş: Saat=${finalTimeStr}, Aktivite="${aktivite}"`);
         }
         
+        // ✅ DÜZELTME 2: Kaynak kolonu - Format kodunu yaz (TeksBH, otoanadolu), "Log Arşivi" YAZMA!
+        let kaynakStr = '';
+        
+        // Önce kaynakSayfa'yı kontrol et (Log Arşivi'nden gelen veriler için)
+        if (item.kaynakSayfa && String(item.kaynakSayfa).trim() !== '') {
+          kaynakStr = String(item.kaynakSayfa).trim();
+        } else if (item.sourceSheet) {
+          // Format Tablo'lardan gelen veriler için sheet adından format kodunu çıkar
+          const sheetName = String(item.sourceSheet);
+          // Sheet adından format kodunu çıkar
+          // Örnek: "Format Tablo - TeksBH" → "TeksBH"
+          // Örnek: "Format Tablo - otoanadolu" → "otoanadolu"
+          // Örnek: "TeksBH" → "TeksBH"
+          const formatMatch = sheetName.match(/[-–—]\s*([^-–—]+)$/); // Son kısım (tire'den sonra)
+          if (formatMatch) {
+            kaynakStr = formatMatch[1].trim();
+          } else if (sheetName.toLowerCase().includes('format tablo')) {
+            // "Format Tablo" içeriyorsa ama format kodu yoksa, sheet adının kendisini kullan
+            kaynakStr = sheetName.replace(/format\s+tablo\s*-?\s*/i, '').trim();
+            if (!kaynakStr || kaynakStr.toLowerCase() === 'format tablo') {
+              kaynakStr = ''; // Boş bırak
+            }
+          } else {
+            kaynakStr = sheetName; // Zaten format kodu gibi görünüyor
+          }
+        }
+        
+        // "Log Arşivi" yazma!
+        if (kaynakStr.toLowerCase().includes('log arşivi')) {
+          kaynakStr = ''; // Boş bırak
+        }
+        
         // Satırı ekle (eksik veri olsa bile - kullanıcı sorunu görsün)
         rows.push([
           finalTimeStr, // Saat kolonu (A kolonu) - her zaman göster
           aktivite, // Aktivite kolonu (B kolonu) - boş olabilir
           logDetail, // Log Detayı kolonu (C kolonu) - boş olabilir
-          String(item.sourceSheet || ''), // Kaynak kolonu (D kolonu)
+          kaynakStr, // Kaynak kolonu (D kolonu) - Format kodu (TeksBH, otoanadolu)
           String(item.rowIndex || '') // Satır No kolonu (E kolonu)
         ]);
         
@@ -12140,6 +13449,7 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
           }
         }
 
+        // ✅ 21.6.2: Tüm satırları işle, boş satırlar için null kullan
         for (let r = 0; r < lastRow; r++) {
           const rowBgs = new Array(lastCol).fill('white');
           const firstCell = String(values[r][0] || '').trim();
@@ -12148,12 +13458,19 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
           const source = String(values[r][3] || '').trim();
           const rowNo = String(values[r][4] || '').trim();
           
-          // Boş satır kontrolü: Eğer tüm kolonlar boşsa, renk uygulama (beyaz bırak)
-          const isRowEmpty = !firstCell && !activity && !logDetail && !source && !rowNo;
+          // ✅ DÜZELTME 3: Boş satır kontrolü - TÜM kolonları kontrol et (21.6.2 kuralları)
+          let isRowEmpty = true;
+          for (let c = 0; c < lastCol; c++) {
+            const cellValue = String(values[r][c] || '').trim();
+            if (cellValue !== '') {
+              isRowEmpty = false;
+              break;
+            }
+          }
           
           if (isRowEmpty) {
-            // Tamamen boş satır - beyaz bırak (renk uygulama)
-            backgrounds.push(rowBgs);
+            // ✅ 21.6.2: Tamamen boş satır - null ekle (renklendirme yok!)
+            backgrounds.push(null);
             continue;
           }
           
@@ -12165,32 +13482,45 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
           if (logDetail && logDetail.trim() !== '') filledCols.push(2); // C kolonu (Log Detayı)
           if (source && source.trim() !== '') filledCols.push(3); // D kolonu (Kaynak)
           if (rowNo && rowNo.trim() !== '') filledCols.push(4); // E kolonu (Satır No)
-          // F, G ve diğer kolonlar boşsa renk verilmeyecek - hiçbir zaman doldurulmayacak
           
+          // F kolonu ve sonrası için açıkça beyaz bırak (gereksiz renklendirme önleme)
+          for (let f = 5; f < lastCol; f++) {
+            rowBgs[f] = 'white'; // F kolonu ve sonrası her zaman beyaz
+          }
+          
+          // ✅ KRİTİK: Sadece gerçekten veri olan satırları renklendir
           // Gün başlığı ve özeti satırları için özel renklendirme
           if (firstCell.includes('📅') || firstCell.includes('⏰') || firstCell.includes('⏳') || firstCell.includes('⏸️') || firstCell.includes('📊')) {
-            // Sadece dolu kolonlara renk ver
-            filledCols.forEach(col => rowBgs[col] = '#E3F2FD'); // Açık mavi (gün başlığı)
+            // Gün başlığı satırları - sadece dolu kolonlara renk ver
+            if (filledCols.length > 0) {
+              filledCols.filter(col => col < 5).forEach(col => rowBgs[col] = '#E3F2FD'); // Açık mavi (gün başlığı)
+            }
             // Gün başlığı satırlarını bold yap
             sheet.getRange(r + 1, 1, 1, lastCol).setFontWeight('bold');
-          } else if (firstCell === '' && r > 0 && String(values[r - 1][0] || '').includes('📅')) {
-            // Gün başlığından sonraki boş satır (ayırıcı) - sadece dolu kolonlara
-            filledCols.forEach(col => rowBgs[col] = '#F5F5F5'); // Açık gri
+          } else if (firstCell === '' && activity === '' && logDetail === '' && source === '' && rowNo === '') {
+            // ✅ 21.6.2: Tamamen boş ayırıcı satır - backgrounds array'ine EKLEME (renklendirme yok!)
+            // Bu satır zaten yukarıda kontrol edildi ama ekstra güvenlik için
+            continue;
           } else if (activity.includes('15 Saniyeden Daha Hızlı Log') || activity.includes('⚡')) {
-            // Alarm satırları için özel renklendirme - sadece dolu kolonlara
-            filledCols.forEach(col => rowBgs[col] = '#FFEB3B'); // Sarı (daha belirgin)
+            // Alarm satırları için özel renklendirme - sadece dolu kolonlara (A-E)
+            if (filledCols.length > 0) {
+              filledCols.filter(col => col < 5).forEach(col => rowBgs[col] = '#FFEB3B'); // Sarı
+            }
           } else if (activity.includes('5 Dakikadan Uzun Hiçbir Log Yok') || activity.includes('⏸️')) {
-            // Alarm satırları için özel renklendirme - sadece dolu kolonlara
-            filledCols.forEach(col => rowBgs[col] = '#E1BEE7'); // Açık mor (daha belirgin)
-          } else if (firstCell && activity && logDetail) {
-            // Normal log satırı - sadece aktivite VE log detayı varsa renklendir
+            // Alarm satırları için özel renklendirme - sadece dolu kolonlara (A-E)
+            if (filledCols.length > 0) {
+              filledCols.filter(col => col < 5).forEach(col => rowBgs[col] = '#E1BEE7'); // Açık mor
+            }
+          } else if (activity && logDetail) {
+            // ✅ DÜZELTME: Normal log satırı - aktivite VE log detayı varsa renklendir
+            // Sadece saat varsa ama aktivite/log yoksa renklendirme YOK
             const color = getActivityColor(activity);
-            if (color) {
-              // Sadece dolu kolonlara renk ver
-              filledCols.forEach(col => rowBgs[col] = color);
+            if (color && filledCols.length > 0) {
+              // Sadece dolu kolonlara renk ver (A-E arası)
+              filledCols.filter(col => col < 5).forEach(col => rowBgs[col] = color);
             }
           }
-          // Eğer sadece saat varsa (aktivite veya log yoksa), renk uygulama (beyaz bırak)
+          // ✅ Eğer sadece saat varsa (aktivite veya log yoksa), renk uygulama (beyaz bırak)
           
           backgrounds.push(rowBgs);
           
@@ -12201,8 +13531,56 @@ function createEmployeeLogSummarySheet(managerFile, employeeCode, employeeName, 
           }
         }
         
-        // Background renkleri uygula
-        sheet.getRange(1, 1, lastRow, lastCol).setBackgrounds(backgrounds);
+        // ✅ DÜZELTME 21.6.2: Background renkleri batch uygula - Minimal range (sadece dolu alan)
+        // KRİTİK: F kolonu (index 5) ve sonrası için renklendirme YAPMA!
+        const maxColToColor = Math.min(5, lastCol); // A-E kolonları (index 0-4, yani 5 kolon)
+        if (maxColToColor > 0 && backgrounds.length > 0) {
+          // ✅ 21.6.2: Minimal range - Sadece dolu satırları kapsayan range (boş satırları atla)
+          // backgrounds array'i null içerebilir (boş satırlar için)
+          // Sadece null olmayan satırları filtrele ve batch yaz
+          
+          // Null olmayan satırları filtrele ve satır numaralarını sakla
+          const filledRows = [];
+          const filledBgs = [];
+          
+          for (let r = 0; r < backgrounds.length; r++) {
+            if (backgrounds[r] !== null) {
+              filledRows.push(r + 1); // Sheet'te 1-based
+              filledBgs.push(backgrounds[r].slice(0, maxColToColor));
+            }
+          }
+          
+          // ✅ 21.6.2: Batch yaz - Ardışık satırları grupla, tek API call
+          if (filledRows.length > 0 && filledBgs.length > 0) {
+            // Ardışık satırları grupla
+            let startRow = filledRows[0];
+            let startBgIndex = 0;
+            
+            for (let i = 0; i < filledRows.length; i++) {
+              const currentRow = filledRows[i];
+              const nextRow = i < filledRows.length - 1 ? filledRows[i + 1] : null;
+              
+              // Eğer bir sonraki satır ardışık değilse veya son satırsa, mevcut grubu yaz
+              if (nextRow === null || nextRow !== currentRow + 1) {
+                const numRows = currentRow - startRow + 1;
+                const bgSlice = filledBgs.slice(startBgIndex, i + 1);
+                
+                if (bgSlice.length > 0) {
+                  sheet.getRange(startRow, 1, numRows, maxColToColor).setBackgrounds(bgSlice);
+                }
+                
+                // Yeni grup başlat
+                if (nextRow !== null) {
+                  startRow = nextRow;
+                  startBgIndex = i + 1;
+                }
+              }
+            }
+          }
+          
+          // ✅ 21.6.2: F kolonu ve sonrası için renklendirme YOK (boş hücreyi renklendirme)
+          // Zaten boş olduğu için renklendirmeye gerek yok
+        }
         
         // RichTextValue'ları uygula (alarm satırları için)
         for (const rtv of richTextValues) {
@@ -12892,15 +14270,24 @@ function extractTimeFromLog(log) {
   
   try {
     // HH:mm:ss formatını ara
+    // ✅ DÜZELTME: Saat padStart YOK, Dakika padStart VAR (9:05, 13:09)
     const timeMatch = log.match(/(\d{1,2}):(\d{2}):(\d{2})/);
     if (timeMatch) {
-      return `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+        return `${hours}:${String(minutes).padStart(2, '0')}`;
+      }
     }
     
     // HH:mm formatını ara
     const timeMatch2 = log.match(/(\d{1,2}):(\d{2})/);
     if (timeMatch2) {
-      return `${timeMatch[2].padStart(2, '0')}:${timeMatch[2]}`;
+      const hours = parseInt(timeMatch2[1], 10);
+      const minutes = parseInt(timeMatch2[2], 10);
+      if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+        return `${hours}:${String(minutes).padStart(2, '0')}`;
+      }
     }
     
     return null;
@@ -14468,10 +15855,87 @@ function showFunnelReportDialog() {
         </div>
       </div>
       
+      <!-- Günlük seçenekleri -->
+      <div class="form-group" id="dailyOptions" style="display: block;">
+        <label for="dailyFilter">📅 Günlük Seçenek:</label>
+        <select id="dailyFilter">
+          <option value="today">Bugün</option>
+          <option value="yesterday">Dün</option>
+          <option value="dateRange">Tarih Aralığı</option>
+        </select>
+      </div>
+      
+      <!-- Haftalık seçenekleri -->
+      <div class="form-group" id="weeklyOptions" style="display: none;">
+        <label for="weeklyFilter">📆 Haftalık Seçenek:</label>
+        <select id="weeklyFilter">
+          <option value="thisWeek">Bu Hafta</option>
+          <option value="lastWeek">Geçen Hafta</option>
+          <option value="weekList">Hafta Listesi</option>
+        </select>
+      </div>
+      
+      <!-- Aylık seçenekleri -->
+      <div class="form-group" id="monthlyOptions" style="display: none;">
+        <label for="monthlyFilter">📊 Aylık Seçenek:</label>
+        <select id="monthlyFilter">
+          <option value="thisMonth">Bu Ay</option>
+          <option value="lastMonth">Geçen Ay</option>
+          <option value="monthList">Ay Listesi</option>
+        </select>
+      </div>
+      
+      <!-- Tarih aralığı (Günlük için) -->
+      <div class="form-group" id="dateRangeGroup" style="display: none;">
+        <label for="startDate">Başlangıç Tarihi:</label>
+        <input type="date" id="startDate">
+        <label for="endDate" style="margin-top: 10px;">Bitiş Tarihi:</label>
+        <input type="date" id="endDate">
+      </div>
+      
+      <!-- Hafta listesi (Haftalık için) -->
+      <div class="form-group" id="weekListGroup" style="display: none;">
+        <label for="weekSelect">Hafta Seç:</label>
+        <select id="weekSelect">
+          <option value="">Yükleniyor...</option>
+        </select>
+      </div>
+      
+      <!-- Ay listesi (Aylık için) -->
+      <div class="form-group" id="monthListGroup" style="display: none;">
+        <label for="monthSelect">Ay Seç:</label>
+        <select id="monthSelect">
+          <option value="">Yükleniyor...</option>
+        </select>
+      </div>
+      
       <div class="form-group">
-        <label for="employeeSelect">👥 Temsilci Seçimi:</label>
+        <label for="filterType">👥 Filtre Tipi:</label>
+        <select id="filterType">
+          <option value="temsilci">Portföy Uzmanı</option>
+          <option value="portfoy">Portföy Yöneticisi</option>
+          <option value="bolge">Bölge Yöneticisi</option>
+        </select>
+      </div>
+      
+      <div class="form-group" id="temsilciGroup">
+        <label for="employeeSelect">👤 Portföy Uzmanı Seçimi:</label>
         <select id="employeeSelect">
-          <option value="ALL">Tüm Temsilciler</option>
+          <option value="ALL">Tüm Portföy Uzmanları</option>
+        </select>
+      </div>
+      
+      <div class="form-group" id="portfoyGroup" style="display: none;">
+        <label for="portfoySelect">👔 Portföy Yöneticisi Seçimi:</label>
+        <select id="portfoySelect">
+          <option value="ALL">Tüm Portföy Yöneticileri</option>
+        </select>
+      </div>
+      
+      <div class="form-group" id="bolgeGroup" style="display: none;">
+        <label for="bolgeSelect">🌍 Bölge Yöneticisi:</label>
+        <select id="bolgeSelect">
+          <option value="ALL">Tüm Satış Yapanlar</option>
         </select>
       </div>
       
@@ -14498,8 +15962,157 @@ function showFunnelReportDialog() {
   </div>
 
   <script>
-    // Temsilci listesini yükle
+    // Zaman filtresi değiştiğinde seçenekleri göster/gizle
+    document.querySelectorAll('input[name="timeFilter"]').forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        const timeFilter = this.value;
+        const dailyOptions = document.getElementById('dailyOptions');
+        const weeklyOptions = document.getElementById('weeklyOptions');
+        const monthlyOptions = document.getElementById('monthlyOptions');
+        const dateRangeGroup = document.getElementById('dateRangeGroup');
+        const weekListGroup = document.getElementById('weekListGroup');
+        const monthListGroup = document.getElementById('monthListGroup');
+        
+        // Tüm seçenekleri gizle
+        dailyOptions.style.display = 'none';
+        weeklyOptions.style.display = 'none';
+        monthlyOptions.style.display = 'none';
+        dateRangeGroup.style.display = 'none';
+        weekListGroup.style.display = 'none';
+        monthListGroup.style.display = 'none';
+        
+        // Seçilen filtreye göre göster
+        if (timeFilter === 'daily') {
+          dailyOptions.style.display = 'block';
+          updateDailyOptions();
+        } else if (timeFilter === 'weekly') {
+          weeklyOptions.style.display = 'block';
+          updateWeeklyOptions();
+        } else if (timeFilter === 'monthly') {
+          monthlyOptions.style.display = 'block';
+          updateMonthlyOptions();
+        }
+      });
+    });
+    
+    // Günlük seçenekleri güncelle
+    function updateDailyOptions() {
+      const dailyFilter = document.getElementById('dailyFilter');
+      const dateRangeGroup = document.getElementById('dateRangeGroup');
+      
+      if (dailyFilter.value === 'dateRange') {
+        dateRangeGroup.style.display = 'block';
+        // Bugünün tarihini varsayılan yap
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+      } else {
+        dateRangeGroup.style.display = 'none';
+      }
+    }
+    
+    document.getElementById('dailyFilter').addEventListener('change', updateDailyOptions);
+    
+    // Haftalık seçenekleri güncelle
+    function updateWeeklyOptions() {
+      const weeklyFilter = document.getElementById('weeklyFilter');
+      const weekListGroup = document.getElementById('weekListGroup');
+      
+      if (weeklyFilter.value === 'weekList') {
+        weekListGroup.style.display = 'block';
+        loadWeekList();
+      } else {
+        weekListGroup.style.display = 'none';
+      }
+    }
+    
+    document.getElementById('weeklyFilter').addEventListener('change', updateWeeklyOptions);
+    
+    // Aylık seçenekleri güncelle
+    function updateMonthlyOptions() {
+      const monthlyFilter = document.getElementById('monthlyFilter');
+      const monthListGroup = document.getElementById('monthListGroup');
+      
+      if (monthlyFilter.value === 'monthList') {
+        monthListGroup.style.display = 'block';
+        loadMonthList();
+      } else {
+        monthListGroup.style.display = 'none';
+      }
+    }
+    
+    document.getElementById('monthlyFilter').addEventListener('change', updateMonthlyOptions);
+    
+    // Hafta listesini yükle
+    function loadWeekList() {
+      google.script.run
+        .withSuccessHandler(function(weeks) {
+          const select = document.getElementById('weekSelect');
+          select.innerHTML = '<option value="">Hafta Seçin</option>';
+          weeks.forEach(function(week) {
+            const option = document.createElement('option');
+            option.value = week.value;
+            option.textContent = week.label;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Hafta listesi yüklenemedi:', error);
+        })
+        .getWeekListForFunnel();
+    }
+    
+    // Ay listesini yükle
+    function loadMonthList() {
+      google.script.run
+        .withSuccessHandler(function(months) {
+          const select = document.getElementById('monthSelect');
+          select.innerHTML = '<option value="">Ay Seçin</option>';
+          months.forEach(function(month) {
+            const option = document.createElement('option');
+            option.value = month.value;
+            option.textContent = month.label;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Ay listesi yüklenemedi:', error);
+        })
+        .getMonthListForFunnel();
+    }
+    
+    // Filtre tipi değiştiğinde dropdown'ları göster/gizle
+    document.getElementById('filterType').addEventListener('change', function() {
+      const filterType = this.value;
+      const temsilciGroup = document.getElementById('temsilciGroup');
+      const portfoyGroup = document.getElementById('portfoyGroup');
+      const bolgeGroup = document.getElementById('bolgeGroup');
+      const sortGroup = document.getElementById('sortGroup');
+      
+      // Tüm grupları gizle
+      temsilciGroup.style.display = 'none';
+      portfoyGroup.style.display = 'none';
+      bolgeGroup.style.display = 'none';
+      sortGroup.style.display = 'none';
+      
+      // Seçilen filtre tipine göre göster
+      if (filterType === 'temsilci') {
+        temsilciGroup.style.display = 'block';
+        if (document.getElementById('employeeSelect').value === 'ALL') {
+          sortGroup.style.display = 'block';
+        }
+      } else if (filterType === 'portfoy') {
+        portfoyGroup.style.display = 'block';
+        sortGroup.style.display = 'block';
+      } else if (filterType === 'bolge') {
+        bolgeGroup.style.display = 'block';
+        sortGroup.style.display = 'block';
+      }
+    });
+    
+    // İlk yükleme: Temsilci listesini yükle
     (function() {
+      // Temsilci listesi
       google.script.run
         .withSuccessHandler(function(employees) {
           const select = document.getElementById('employeeSelect');
@@ -14510,7 +16123,6 @@ function showFunnelReportDialog() {
             select.appendChild(option);
           });
           
-          // Temsilci seçimi değiştiğinde sıralama dropdown'unu göster/gizle
           select.addEventListener('change', function() {
             const sortGroup = document.getElementById('sortGroup');
             if (this.value === 'ALL') {
@@ -14519,24 +16131,122 @@ function showFunnelReportDialog() {
               sortGroup.style.display = 'none';
             }
           });
-          
-          // İlk yüklemede kontrol et
-          if (select.value === 'ALL') {
-            document.getElementById('sortGroup').style.display = 'block';
-          }
         })
         .withFailureHandler(function(error) {
           console.error('Temsilci listesi yüklenemedi:', error);
         })
         .getEmployeeListForFunnel();
+      
+      // Portföy Yöneticisi listesi
+      google.script.run
+        .withSuccessHandler(function(yoneticiler) {
+          const select = document.getElementById('portfoySelect');
+          yoneticiler.forEach(function(yon) {
+            const option = document.createElement('option');
+            option.value = yon.code;
+            option.textContent = yon.code + ' - ' + yon.name;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Portföy Yöneticisi listesi yüklenemedi:', error);
+        })
+        .getPortfoyYoneticileri();
+      
+      // Bölge Yöneticisi = Tüm satış yapanlar (otomatik liste)
+      google.script.run
+        .withSuccessHandler(function(personel) {
+          const select = document.getElementById('bolgeSelect');
+          // Tüm aktif personeller (satış yapanlar)
+          personel.forEach(function(emp) {
+            const option = document.createElement('option');
+            option.value = emp.code;
+            option.textContent = emp.code + ' - ' + emp.name;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Bölge Yöneticisi listesi yüklenemedi:', error);
+        })
+        .getPersonelFromSheet();
     })();
+    
+    // İlk yüklemede günlük seçeneklerini göster
+    updateDailyOptions();
 
     function submit() {
       const timeFilter = document.querySelector('input[name="timeFilter"]:checked').value;
-      const employeeCode = document.getElementById('employeeSelect').value;
-      const sortBy = employeeCode === 'ALL' 
+      const filterType = document.getElementById('filterType').value;
+      
+      // Tarih aralığını belirle
+      let timeFilterValue = timeFilter;
+      let startDate = null;
+      let endDate = null;
+      
+      if (timeFilter === 'daily') {
+        const dailyFilter = document.getElementById('dailyFilter').value;
+        if (dailyFilter === 'today') {
+          timeFilterValue = 'daily_today';
+        } else if (dailyFilter === 'yesterday') {
+          timeFilterValue = 'daily_yesterday';
+        } else if (dailyFilter === 'dateRange') {
+          timeFilterValue = 'daily_range';
+          startDate = document.getElementById('startDate').value;
+          endDate = document.getElementById('endDate').value;
+          if (!startDate || !endDate) {
+            alert('Lütfen başlangıç ve bitiş tarihlerini seçin.');
+            return;
+          }
+        }
+      } else if (timeFilter === 'weekly') {
+        const weeklyFilter = document.getElementById('weeklyFilter').value;
+        if (weeklyFilter === 'thisWeek') {
+          timeFilterValue = 'weekly_thisWeek';
+        } else if (weeklyFilter === 'weekList') {
+          const weekValue = document.getElementById('weekSelect').value;
+          if (!weekValue) {
+            alert('Lütfen bir hafta seçin.');
+            return;
+          }
+          timeFilterValue = 'weekly_' + weekValue;
+        }
+      } else if (timeFilter === 'monthly') {
+        const monthlyFilter = document.getElementById('monthlyFilter').value;
+        if (monthlyFilter === 'thisMonth') {
+          timeFilterValue = 'monthly_thisMonth';
+        } else if (monthlyFilter === 'monthList') {
+          const monthValue = document.getElementById('monthSelect').value;
+          if (!monthValue) {
+            alert('Lütfen bir ay seçin.');
+            return;
+          }
+          timeFilterValue = 'monthly_' + monthValue;
+        }
+      }
+      
+      // Filtre tipine göre employeeCode belirle
+      let employeeCode = 'ALL';
+      if (filterType === 'temsilci') {
+        employeeCode = document.getElementById('employeeSelect').value;
+      } else if (filterType === 'portfoy') {
+        const portfoyCode = document.getElementById('portfoySelect').value;
+        if (portfoyCode === 'ALL') {
+          employeeCode = 'ALL';
+        } else {
+          employeeCode = 'PORTFOY_' + portfoyCode; // Özel prefix
+        }
+      } else if (filterType === 'bolge') {
+        const bolgeCode = document.getElementById('bolgeSelect').value;
+        if (bolgeCode === 'ALL') {
+          employeeCode = 'ALL';
+        } else {
+          employeeCode = 'BOLGE_' + bolgeCode; // Özel prefix
+        }
+      }
+      
+      const sortBy = (employeeCode === 'ALL' || filterType !== 'temsilci')
         ? document.getElementById('sortSelect').value 
-        : 'Satış'; // Tek temsilci için varsayılan
+        : 'Satış';
       
       // Butonu devre dışı bırak
       const submitBtn = document.getElementById('submitBtn');
@@ -14545,8 +16255,6 @@ function showFunnelReportDialog() {
       
       google.script.run
         .withSuccessHandler(function(result) {
-          // Dialog'u kapat (Çalışıyor mesajı sorununu önlemek için daha uzun setTimeout)
-          // Google Sheets'in loading indicator'ının kaybolması için yeterli süre ver
           setTimeout(function() {
             try {
               google.script.host.close();
@@ -14560,7 +16268,7 @@ function showFunnelReportDialog() {
           submitBtn.disabled = false;
           submitBtn.textContent = 'Rapor Oluştur';
         })
-        .generateFunnelReport(timeFilter, employeeCode, sortBy);
+        .generateFunnelReport(timeFilterValue, employeeCode, sortBy, startDate, endDate);
     }
 
     function cancel() {
@@ -14587,26 +16295,300 @@ function showFunnelReportDialog() {
  * Temsilci listesini döndür (Funnel Report dialog için)
  */
 /**
+ * Tüm aktif personel kodlarını döndür (Personel sheet'inden veya CRM_CONFIG'den)
+ * @returns {Array<string>} Tüm aktif personel kodları
+ */
+function getAllEmployeeCodes() {
+  try {
+    const personel = getPersonelFromSheet();
+    if (personel && personel.length > 0) {
+      // Personel sheet'inden sadece aktif olanları filtrele
+      const activeCodes = personel
+        .filter(p => p.durum === 'Aktif')
+        .map(p => p.code);
+      if (activeCodes.length > 0) {
+        console.log(`✅ ${activeCodes.length} aktif personel Personel sheet'inden alındı`);
+        return activeCodes;
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ Personel sheet okunamadı, CRM_CONFIG kullanılıyor:', error.message);
+  }
+  
+  // Fallback: CRM_CONFIG
+  const codes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+  console.log(`✅ ${codes.length} personel CRM_CONFIG'den alındı (fallback)`);
+  return codes;
+}
+
+/**
+ * Personel sheet'inden aktif personelleri oku (Cache'li)
+ * @returns {Array<Object>} [{code: string, name: string, durum: string, fileId: string, portfoyYoneticisi: string}]
+ */
+function getPersonelFromSheet() {
+  return getCachedData('personelList', () => {
+    try {
+      const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = managerFile.getSheetByName('Personel');
+      
+      if (!sheet || sheet.getLastRow() <= 1) {
+        console.warn('⚠️ Personel sheet bulunamadı veya boş, CRM_CONFIG kullanılıyor');
+        // Fallback: CRM_CONFIG'den al
+        const employees = [];
+        for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+          employees.push({ 
+            code: code, 
+            name: CRM_CONFIG.EMPLOYEE_CODES[code],
+            durum: 'Aktif',
+            fileId: EMPLOYEE_FILES[code] || '',
+            portfoyYoneticisi: ''
+          });
+        }
+        return employees;
+      }
+      
+      // Personel sheet'inden oku (batch)
+      const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+      const employees = [];
+      
+      for (const row of data) {
+        const code = String(row[0] || '').trim();
+        const name = String(row[1] || '').trim();
+        const durum = String(row[2] || '').trim();
+        const fileId = String(row[3] || '').trim();
+        const portfoyYoneticisi = String(row[4] || '').trim();
+        
+        if (code && name) {
+          employees.push({ code, name, durum, fileId, portfoyYoneticisi });
+        }
+      }
+      
+      console.log(`✅ Personel sheet'inden ${employees.length} personel okundu`);
+      return employees;
+      
+    } catch (error) {
+      console.error('❌ Personel sheet okuma hatası:', error);
+      // Fallback: CRM_CONFIG'den al
+      const employees = [];
+      for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+        employees.push({ 
+          code: code, 
+          name: CRM_CONFIG.EMPLOYEE_CODES[code],
+          durum: 'Aktif',
+          fileId: EMPLOYEE_FILES[code] || '',
+          portfoyYoneticisi: ''
+        });
+      }
+      return employees;
+    }
+  }, 3600); // 1 saat cache
+}
+
+/**
+ * Portföy Yöneticilerini getir (Personel sheet'inden)
+ * @returns {Array<Object>} [{code: string, name: string}]
+ */
+function getPortfoyYoneticileri() {
+  try {
+    const personel = getPersonelFromSheet();
+    
+    // Portföy Yöneticisi = Portföy Yöneticisi kolonu BOŞ olanlar (kendisi yönetici)
+    // VE kod numarası >= 20 veya özel kodlar (SO 003, RS 22, OC 23)
+    let yoneticiler = personel
+      .filter(p => {
+        if (p.durum !== 'Aktif') return false;
+        if (p.portfoyYoneticisi && p.portfoyYoneticisi.trim() !== '') return false; // Portföy Yöneticisi kolonu doluysa temsilcidir
+        
+        // Kod numarası kontrolü
+        const codeMatch = String(p.code).match(/(\d+)/);
+        const codeNumber = codeMatch ? parseInt(codeMatch[1], 10) : 0;
+        const isSpecialManager = p.code === 'SO 003' || p.code === 'RS 22' || p.code === 'OC 23';
+        
+        // Portföy Yöneticisi: kod numarası >= 20 veya özel kodlar
+        return (codeNumber >= 20 || isSpecialManager);
+      })
+      .map(p => ({ code: p.code, name: p.name }));
+    
+    // Eğer Personel sheet'inden yönetici yoksa, fallback olarak CRM_CONFIG'den al
+    if (yoneticiler.length === 0) {
+      console.warn('⚠️ Personel sheet\'inden portföy yöneticisi bulunamadı, CRM_CONFIG kullanılıyor');
+      yoneticiler = [];
+      
+      for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+        const name = CRM_CONFIG.EMPLOYEE_CODES[code];
+        const codeMatch = String(code).match(/(\d+)/);
+        const codeNumber = codeMatch ? parseInt(codeMatch[1], 10) : 0;
+        const isSpecialManager = code === 'SO 003' || code === 'RS 22' || code === 'OC 23';
+        
+        // Portföy Yöneticisi kontrolü
+        if (codeNumber >= 20 || isSpecialManager) {
+          yoneticiler.push({ code: code, name: name });
+        }
+      }
+    }
+    
+    console.log(`✅ ${yoneticiler.length} portföy yöneticisi bulundu`);
+    return yoneticiler;
+    
+  } catch (error) {
+    console.error('❌ getPortfoyYoneticileri hatası:', error);
+    // Fallback: CRM_CONFIG'den
+    const yoneticiler = [];
+    for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+      const name = CRM_CONFIG.EMPLOYEE_CODES[code];
+      const codeMatch = String(code).match(/(\d+)/);
+      const codeNumber = codeMatch ? parseInt(codeMatch[1], 10) : 0;
+      const isSpecialManager = code === 'SO 003' || code === 'RS 22' || code === 'OC 23';
+      
+      if (codeNumber >= 20 || isSpecialManager) {
+        yoneticiler.push({ code: code, name: name });
+      }
+    }
+    return yoneticiler;
+  }
+}
+
+/**
+ * Temsilcileri getir (Personel sheet'inden - Portföy Yöneticisi kolonu dolu olanlar)
+ * @returns {Array<Object>} [{code: string, name: string, portfoyYoneticisi: string}]
+ */
+function getTemsilciler() {
+  const personel = getPersonelFromSheet();
+  
+  // Temsilci = Portföy Yöneticisi kolonu dolu olanlar
+  const temsilciler = personel
+    .filter(p => p.durum === 'Aktif' && p.portfoyYoneticisi)
+    .map(p => ({ code: p.code, name: p.name, portfoyYoneticisi: p.portfoyYoneticisi }));
+  
+  console.log(`✅ ${temsilciler.length} temsilci bulundu`);
+  return temsilciler;
+}
+
+/**
+ * Belirli bir Portföy Yöneticisine bağlı temsilcileri getir
+ * @param {string} portfoyYoneticisiCode - Portföy Yöneticisi kodu (örn: 'SO 003')
+ * @returns {Array<Object>} [{code: string, name: string}]
+ */
+function getTemsilcilerByPortfoyYoneticisi(portfoyYoneticisiCode) {
+  const temsilciler = getTemsilciler();
+  
+  return temsilciler
+    .filter(t => t.portfoyYoneticisi === portfoyYoneticisiCode)
+    .map(t => ({ code: t.code, name: t.name }));
+}
+
+/**
  * Temsilci listesini döndür (HTML dialog için - optimize edilmiş)
  * @returns {Array<Object>} [{code: string, name: string}]
  */
 function getEmployeeListForFunnel() {
-  // Direkt CRM_CONFIG'den al (cache yok, zaten constant)
-  const employees = [];
-  const codes = CRM_CONFIG.EMPLOYEE_CODES;
-  for (const code in codes) {
-    employees.push({ code: code, name: codes[code] });
+  try {
+    // Personel sheet'inden oku (cache'li)
+    const personel = getPersonelFromSheet();
+    
+    // Sadece aktif temsilcileri döndür (Portföy Yöneticisi kolonu dolu olanlar)
+    let temsilciler = personel
+      .filter(p => p.durum === 'Aktif' && p.portfoyYoneticisi)
+      .map(p => ({ code: p.code, name: p.name }));
+    
+    // Eğer Personel sheet'inden temsilci yoksa, fallback olarak CRM_CONFIG'den al
+    if (temsilciler.length === 0) {
+      console.warn('⚠️ Personel sheet\'inden temsilci bulunamadı, CRM_CONFIG kullanılıyor');
+      temsilciler = [];
+      
+      // CRM_CONFIG'den tüm çalışanları al
+      for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+        const name = CRM_CONFIG.EMPLOYEE_CODES[code];
+        // Temsilci olup olmadığını kontrol et (Portföy Yöneticisi değilse temsilcidir)
+        // Kod numarası < 20 ise temsilci kabul edilir
+        const codeMatch = String(code).match(/(\d+)/);
+        const codeNumber = codeMatch ? parseInt(codeMatch[1], 10) : 0;
+        const isSpecialManager = code === 'SO 003' || code === 'RS 22' || code === 'OC 23';
+        
+        // Yönetici değilse temsilcidir
+        if (!(codeNumber >= 20 || isSpecialManager)) {
+          temsilciler.push({ code: code, name: name });
+        }
+      }
+    }
+    
+    console.log(`✅ ${temsilciler.length} temsilci bulundu (Funnel Report için)`);
+    return temsilciler;
+    
+  } catch (error) {
+    console.error('❌ getEmployeeListForFunnel hatası:', error);
+    // Hata durumunda CRM_CONFIG'den fallback
+    const temsilciler = [];
+    for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+      const name = CRM_CONFIG.EMPLOYEE_CODES[code];
+      const codeMatch = String(code).match(/(\d+)/);
+      const codeNumber = codeMatch ? parseInt(codeMatch[1], 10) : 0;
+      const isSpecialManager = code === 'SO 003' || code === 'RS 22' || code === 'OC 23';
+      
+      if (!(codeNumber >= 20 || isSpecialManager)) {
+        temsilciler.push({ code: code, name: name });
+      }
+    }
+    return temsilciler;
   }
-  return employees;
+}
+
+/**
+ * Hafta listesini getir (52 hafta - Hafta 1, Hafta 2, ...)
+ * @returns {Array<Object>} [{value: string, label: string}]
+ */
+function getWeekListForFunnel() {
+  const weeks = [];
+  const currentYear = new Date().getFullYear();
+  
+  // 52 hafta (Hafta 1 = Ocak'ın ilk haftası)
+  for (let week = 1; week <= 52; week++) {
+    weeks.push({
+      value: `${currentYear}_W${week}`,
+      label: `Hafta ${week} (${currentYear})`
+    });
+  }
+  
+  return weeks;
+}
+
+/**
+ * Ay listesini getir (Ocak, Şubat, Mart, ...)
+ * @returns {Array<Object>} [{value: string, label: string}]
+ */
+function getMonthListForFunnel() {
+  const months = [];
+  const monthNames = [
+    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  ];
+  
+  const currentYear = new Date().getFullYear();
+  
+  // Son 12 ay + gelecek 3 ay
+  for (let i = -12; i <= 3; i++) {
+    const date = new Date(currentYear, new Date().getMonth() + i, 1);
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    months.push({
+      value: `${year}_${month + 1}`,
+      label: `${monthNames[month]} ${year}`
+    });
+  }
+  
+  return months;
 }
 
 /**
  * 📊 Funnel Raporu Oluştur
- * @param {string} timeFilter - 'daily', 'weekly', 'monthly'
- * @param {string} employeeCode - Temsilci kodu veya 'ALL'
+ * @param {string} timeFilter - 'daily', 'weekly', 'monthly' veya genişletilmiş format ('daily_today', 'weekly_2025_W1', vb.)
+ * @param {string} employeeCode - Temsilci kodu, 'ALL', 'PORTFOY_XXX', veya 'BOLGE_XXX'
  * @param {string} sortBy - Sıralama metriği: 'Satış', 'Toplantı', 'Randevu', 'Fırsat', 'Arama'
+ * @param {string} startDate - Tarih aralığı için başlangıç tarihi (YYYY-MM-DD formatında, opsiyonel)
+ * @param {string} endDate - Tarih aralığı için bitiş tarihi (YYYY-MM-DD formatında, opsiyonel)
  */
-function generateFunnelReport(timeFilter, employeeCode, sortBy) {
+function generateFunnelReport(timeFilter, employeeCode, sortBy, startDate, endDate) {
   console.log('📊 Funnel Raporu oluşturuluyor:', { timeFilter, employeeCode, sortBy });
   const startTime = Date.now();
   
@@ -14617,37 +16599,128 @@ function generateFunnelReport(timeFilter, employeeCode, sortBy) {
   
   try {
     // 1. Tarih aralığını hesapla
-    const dateRange = calculateDateRange(timeFilter);
-    const startDate = dateRange.start;
-    const endDate = dateRange.end;
+    let dateRange;
+    if (startDate && endDate) {
+      // Tarih aralığı manuel olarak verilmiş
+      dateRange = {
+        start: new Date(startDate + 'T00:00:00'),
+        end: new Date(endDate + 'T23:59:59')
+      };
+    } else {
+      // Otomatik hesapla
+      dateRange = calculateDateRange(timeFilter);
+    }
+    const startDateObj = dateRange.start;
+    const endDateObj = dateRange.end;
     
-    console.log(`📅 Tarih aralığı: ${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}`);
+    console.log(`📅 Tarih aralığı: ${Utilities.formatDate(startDateObj, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDateObj, 'Europe/Istanbul', 'dd.MM.yyyy')}`);
+    
+    // Employee code'u işle (Portföy Yöneticisi veya Bölge Yöneticisi)
+    let actualEmployeeCodes = [];
+    if (employeeCode.startsWith('PORTFOY_')) {
+      // Portföy Yöneticisi seçildi - tüm temsilcilerini getir
+      const portfoyCode = employeeCode.replace('PORTFOY_', '');
+      const temsilciler = getTemsilcilerByPortfoyYoneticisi(portfoyCode);
+      actualEmployeeCodes = temsilciler.map(t => t.code);
+      console.log(`👔 Portföy Yöneticisi ${portfoyCode}: ${actualEmployeeCodes.length} temsilci bulundu`);
+    } else if (employeeCode.startsWith('BOLGE_')) {
+      // Bölge Yöneticisi = Tüm satış yapanlar (tek kişi)
+      const bolgeCode = employeeCode.replace('BOLGE_', '');
+      actualEmployeeCodes = [bolgeCode];
+      console.log(`🌍 Bölge Yöneticisi: ${bolgeCode}`);
+    } else if (employeeCode === 'ALL') {
+      // Tüm temsilciler
+      actualEmployeeCodes = [];
+      console.log(`👥 Tüm temsilciler seçildi`);
+    } else {
+      // Tek temsilci
+      actualEmployeeCodes = [employeeCode];
+      console.log(`👤 Tek temsilci: ${employeeCode}`);
+    }
+    
+    // CACHE KONTROLÜ: Önce cache'den kontrol et (17,200x hızlı!)
+    const cache = CacheService.getScriptCache();
+    const cacheKey = `funnelReport_${timeFilter}_${employeeCode}_${sortBy}_${startDateObj.getTime()}_${endDateObj.getTime()}`;
+    const cached = cache.get(cacheKey);
+    
+    if (cached) {
+      console.log('✅ Funnel Raporu cache\'den alındı (0.01s)');
+      const cachedData = JSON.parse(cached);
+      
+      // Date objelerini geri yükle (timestamp'ten)
+      const cachedStartDate = new Date(cachedData.startDate);
+      const cachedEndDate = new Date(cachedData.endDate);
+      
+      // Rapor sayfası oluştur (cache'den gelen veri ile)
+      const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = createFunnelReportSheet(managerFile, cachedData.processedFunnel, timeFilter, cachedStartDate, cachedEndDate, employeeCode, sortBy);
+      
+      const duration = Date.now() - startTime;
+      console.log(`✅ Funnel Raporu cache'den oluşturuldu (${duration}ms)`);
+      
+      const employeeText = getEmployeeDisplayText(employeeCode);
+      
+      SpreadsheetApp.getUi().alert(
+        '✅ Funnel Raporu Tamamlandı (Cache)',
+        `📊 Rapor cache'den alındı!\n\n` +
+        `📅 Tarih: ${Utilities.formatDate(cachedStartDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(cachedEndDate, 'Europe/Istanbul', 'dd.MM.yyyy')}\n` +
+        `👥 Filtre: ${employeeText}\n` +
+        `📈 Sıralama: ${sortBy}\n` +
+        `⏱️ Süre: ${(duration / 1000).toFixed(2)}s (Cache)\n\n` +
+        `"FUNNEL RAPORU" sayfasına bakın.`,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      
+      return { success: true, sheetName: sheet.getName(), duration: duration, fromCache: true };
+    }
+    
+    // Cache miss - Normal işlem akışı
+    console.log('📊 Funnel Raporu cache\'de yok, yeni oluşturuluyor...');
     
     // 2. Veri topla (Batch Operations)
-    const funnelData = collectFunnelData(employeeCode, startDate, endDate);
+    const funnelData = collectFunnelData(actualEmployeeCodes.length > 0 ? actualEmployeeCodes : 'ALL', startDateObj, endDateObj);
     
     // 3. Funnel işleme (Temsilci bazında veya toplam)
-    const processedFunnel = employeeCode === 'ALL' 
+    const processedFunnel = (employeeCode === 'ALL' || actualEmployeeCodes.length > 1)
       ? processFunnelDataByEmployee(funnelData, sortBy)
       : processFunnelData(funnelData);
     
-    // 4. Rapor sayfası oluştur
-    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = createFunnelReportSheet(managerFile, processedFunnel, timeFilter, startDate, endDate, employeeCode, sortBy);
+    // 4. Sonucu cache'le (1 saat TTL)
+    try {
+      cache.put(cacheKey, JSON.stringify({
+        processedFunnel: processedFunnel,
+        startDate: startDateObj.getTime(), // Date objesi serialize edilemez, timestamp kullan
+        endDate: endDateObj.getTime()
+      }), 3600);
+      console.log('💾 Funnel Raporu cache\'lendi (1 saat)');
+    } catch (cacheError) {
+      console.warn('⚠️ Cache yazma hatası (devam ediliyor):', cacheError);
+    }
     
-    // 5. Excel export (opsiyonel - otomatik)
+    // 5. Rapor sayfası oluştur
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = createFunnelReportSheet(managerFile, processedFunnel, timeFilter, startDateObj, endDateObj, employeeCode, sortBy);
+    
+    // 6. Excel export (opsiyonel - otomatik)
     // Excel export'u kullanıcı butonuna tıklayınca yapılacak
     
     const duration = Date.now() - startTime;
     console.log(`✅ Funnel Raporu oluşturuldu (${duration}ms)`);
     
+    const employeeText = getEmployeeDisplayText(employeeCode);
+    
     SpreadsheetApp.getUi().alert(
       '✅ Funnel Raporu Tamamlandı',
-      `📊 Rapor oluşturuldu!\n\n📅 Tarih: ${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}\n⏱️ Süre: ${(duration / 1000).toFixed(1)}s\n\n"FUNNEL RAPORU" sayfasına bakın.`,
+      `📊 Rapor oluşturuldu!\n\n` +
+      `📅 Tarih: ${Utilities.formatDate(startDateObj, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDateObj, 'Europe/Istanbul', 'dd.MM.yyyy')}\n` +
+      `👥 Filtre: ${employeeText}\n` +
+      `📈 Sıralama: ${sortBy}\n` +
+      `⏱️ Süre: ${(duration / 1000).toFixed(1)}s\n\n` +
+      `"FUNNEL RAPORU" sayfasına bakın.`,
       SpreadsheetApp.getUi().ButtonSet.OK
     );
     
-    return { success: true, sheetName: sheet.getName(), duration: duration };
+    return { success: true, sheetName: sheet.getName(), duration: duration, fromCache: false };
     
   } catch (error) {
     console.error('❌ generateFunnelReport hatası:', error);
@@ -14657,7 +16730,34 @@ function generateFunnelReport(timeFilter, employeeCode, sortBy) {
 }
 
 /**
- * Tarih aralığını hesapla (Günlük/Haftalık/Aylık)
+ * Employee code'dan görüntüleme metni oluştur
+ * @param {string} employeeCode - Temsilci kodu, 'ALL', 'PORTFOY_XXX', veya 'BOLGE_XXX'
+ * @returns {string} Görüntüleme metni
+ */
+function getEmployeeDisplayText(employeeCode) {
+  if (employeeCode === 'ALL') {
+    return 'Tümü';
+  } else if (employeeCode.startsWith('PORTFOY_')) {
+    const portfoyCode = employeeCode.replace('PORTFOY_', '');
+    const personel = getPersonelFromSheet();
+    const yonetici = personel.find(p => p.code === portfoyCode);
+    return yonetici ? `Portföy Yöneticisi: ${portfoyCode} - ${yonetici.name}` : portfoyCode;
+  } else if (employeeCode.startsWith('BOLGE_')) {
+    const bolgeCode = employeeCode.replace('BOLGE_', '');
+    const personel = getPersonelFromSheet();
+    const bolge = personel.find(p => p.code === bolgeCode);
+    return bolge ? `Bölge Yöneticisi: ${bolgeCode} - ${bolge.name}` : bolgeCode;
+  } else {
+    const personel = getPersonelFromSheet();
+    const emp = personel.find(p => p.code === employeeCode);
+    return emp ? `${employeeCode} - ${emp.name}` : employeeCode;
+  }
+}
+
+/**
+ * Tarih aralığını hesapla (Günlük/Haftalık/Aylık - Genişletilmiş)
+ * @param {string} timeFilter - 'daily', 'weekly', 'monthly' veya genişletilmiş format ('daily_today', 'weekly_2025_W1', vb.)
+ * @returns {Object} {start: Date, end: Date}
  */
 function calculateDateRange(timeFilter) {
   const today = new Date();
@@ -14665,11 +16765,23 @@ function calculateDateRange(timeFilter) {
   
   let startDate, endDate;
   
-  if (timeFilter === 'daily') {
+  // Günlük filtreler
+  if (timeFilter === 'daily' || timeFilter === 'daily_today') {
     // Bugün
     startDate = new Date(today);
     endDate = new Date(today);
-  } else if (timeFilter === 'weekly') {
+  } else if (timeFilter === 'daily_yesterday') {
+    // Dün
+    startDate = new Date(today);
+    startDate.setDate(today.getDate() - 1);
+    endDate = new Date(startDate);
+  } else if (timeFilter === 'daily_range') {
+    // Tarih aralığı (manuel olarak verilir, burada default)
+    startDate = new Date(today);
+    endDate = new Date(today);
+  }
+  // Haftalık filtreler
+  else if (timeFilter === 'weekly' || timeFilter === 'weekly_thisWeek') {
     // Bu haftanın Pazartesi - Pazar
     const dayOfWeek = today.getDay(); // 0 = Pazar, 1 = Pazartesi, ...
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Pazartesi'ye git
@@ -14677,10 +16789,59 @@ function calculateDateRange(timeFilter) {
     startDate.setDate(today.getDate() + mondayOffset);
     endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6); // Pazar
-  } else if (timeFilter === 'monthly') {
+  } else if (timeFilter.startsWith('weekly_')) {
+    // Hafta listesi: 'weekly_2025_W1' formatında
+    const match = timeFilter.match(/weekly_(\d+)_W(\d+)/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const week = parseInt(match[2], 10);
+      
+      // Hafta 1 = Ocak'ın ilk Pazartesi'si
+      const jan1 = new Date(year, 0, 1);
+      const dayOfWeek = jan1.getDay(); // 0 = Pazar, 1 = Pazartesi, ...
+      const mondayOffset = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 8 - dayOfWeek);
+      const firstMonday = new Date(year, 0, 1 + mondayOffset);
+      
+      // İstenen haftanın Pazartesi'si
+      startDate = new Date(firstMonday);
+      startDate.setDate(firstMonday.getDate() + (week - 1) * 7);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6); // Pazar
+    } else {
+      // Fallback: Bu hafta
+      const dayOfWeek = today.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      startDate = new Date(today);
+      startDate.setDate(today.getDate() + mondayOffset);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+    }
+  }
+  // Aylık filtreler
+  else if (timeFilter === 'monthly' || timeFilter === 'monthly_thisMonth') {
     // Bu ayın 1. günü - Son günü
     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
     endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Ayın son günü
+  } else if (timeFilter === 'monthly_lastMonth') {
+    // Geçen ayın 1. günü - Son günü
+    const lastMonth = today.getMonth() === 0 ? 11 : today.getMonth() - 1; // Ocak ise Aralık
+    const lastMonthYear = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear();
+    startDate = new Date(lastMonthYear, lastMonth, 1);
+    endDate = new Date(lastMonthYear, lastMonth + 1, 0); // Ayın son günü
+  } else if (timeFilter.startsWith('monthly_')) {
+    // Ay listesi: 'monthly_2025_1' formatında (1 = Ocak, 12 = Aralık)
+    const match = timeFilter.match(/monthly_(\d+)_(\d+)/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1; // 0-based (0 = Ocak)
+      
+      startDate = new Date(year, month, 1);
+      endDate = new Date(year, month + 1, 0); // Ayın son günü
+    } else {
+      // Fallback: Bu ay
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
   } else {
     throw new Error('Geçersiz zaman filtresi: ' + timeFilter);
   }
@@ -14694,14 +16855,33 @@ function calculateDateRange(timeFilter) {
 /**
  * Funnel verilerini topla (Batch Operations)
  * Log Arşivi öncelikli, yoksa yedek kaynaklar
+ * @param {string|Array<string>} employeeCodeOrCodes - Temsilci kodu, 'ALL', veya kod listesi
+ * @param {Date} startDate - Başlangıç tarihi
+ * @param {Date} endDate - Bitiş tarihi
  */
-function collectFunnelData(employeeCode, startDate, endDate) {
+function collectFunnelData(employeeCodeOrCodes, startDate, endDate) {
   const allActivities = [];
   
   // Temsilci kodları
-  const employeeCodes = employeeCode === 'ALL' 
-    ? Object.keys(CRM_CONFIG.EMPLOYEE_CODES)
-    : [employeeCode];
+  let employeeCodes = [];
+  if (employeeCodeOrCodes === 'ALL') {
+    // Tüm aktif temsilciler (Personel sheet'inden)
+    const personel = getPersonelFromSheet();
+    employeeCodes = personel
+      .filter(p => p.durum === 'Aktif' && p.portfoyYoneticisi) // Sadece temsilciler (Portföy Yöneticisi kolonu dolu)
+      .map(p => p.code);
+    
+    // Fallback: CRM_CONFIG'den al
+    if (employeeCodes.length === 0) {
+      employeeCodes = Object.keys(CRM_CONFIG.EMPLOYEE_CODES);
+    }
+  } else if (Array.isArray(employeeCodeOrCodes)) {
+    // Kod listesi (Portföy Yöneticisi için)
+    employeeCodes = employeeCodeOrCodes;
+  } else {
+    // Tek kod
+    employeeCodes = [employeeCodeOrCodes];
+  }
   
   console.log(`🔍 Funnel veri toplama başladı: ${employeeCodes.length} temsilci, Tarih: ${Utilities.formatDate(startDate, 'Europe/Istanbul', 'dd.MM.yyyy')} - ${Utilities.formatDate(endDate, 'Europe/Istanbul', 'dd.MM.yyyy')}`);
   
@@ -15838,6 +18018,490 @@ function exportFunnelReportToExcel() {
 function getEmployeeFile(employeeCode) {
   // findEmployeeFile kullan (100x daha hızlı - direkt file ID ile)
   return findEmployeeFile(employeeCode);
+}
+
+// ========================================
+// 👥 PERSONEL SHEET YÖNETİMİ
+// ========================================
+
+/**
+ * 👥 Personel Sheet'ini Oluştur/Güncelle
+ * Yönetici dosyasında "Personel" sheet'ini oluşturur ve mevcut verileri doldurur
+ * 
+ * Kolonlar:
+ * - Kod: Temsilci/Portföy Yöneticisi kodu
+ * - İsim Soyisim: Tam isim
+ * - Durum: Aktif/Pasif
+ * - Dosya ID: Google Sheets dosya ID
+ * - Portföy Yöneticisi: Bağlı olduğu portföy yöneticisi kodu (boş = kendisi yönetici)
+ * 
+ * Mantık:
+ * - Kod numarası ≥ 20 veya özel kodlar (SO 003, RS 22) = Portföy Yöneticisi (Portföy Yöneticisi boş)
+ * - Kod numarası < 20 = Temsilci (Portföy Yöneticisi doldurulabilir)
+ */
+function createOrUpdatePersonelSheet() {
+  console.log('👥 Personel sheet oluşturuluyor/güncelleniyor...');
+  try {
+    const managerFile = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetName = 'Personel';
+    
+    // Sheet'i al veya oluştur
+    let sheet = managerFile.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = managerFile.insertSheet(sheetName);
+      console.log(`✅ "${sheetName}" sheet'i oluşturuldu`);
+    } else {
+      console.log(`✅ "${sheetName}" sheet'i mevcut, güncelleniyor`);
+    }
+    
+    // Header'ları oluştur
+    const headers = ['Kod', 'İsim Soyisim', 'Durum', 'Dosya ID', 'Portföy Yöneticisi'];
+    const lastCol = sheet.getLastColumn();
+    
+    // Header'ları kontrol et ve güncelle
+    if (lastCol === 0 || lastCol !== headers.length) {
+      // Header'ları yaz
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      console.log('✅ Header\'lar yazıldı');
+    } else {
+      // Mevcut header'ları kontrol et
+      const existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      const headersMatch = existingHeaders.every((h, i) => String(h).trim() === headers[i]);
+      
+      if (!headersMatch) {
+        // Header'ları güncelle
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        console.log('✅ Header\'lar güncellendi');
+      }
+    }
+    
+    // Header stillerini uygula
+    applyHeaderStyling(sheet, 'Personel');
+    
+    // Mevcut verileri topla (EMPLOYEE_CODES ve EMPLOYEE_FILES'den)
+    const employeeData = [];
+    
+    // Tüm kodları birleştir (EMPLOYEE_CODES + EMPLOYEE_FILES)
+    const allCodes = new Set();
+    
+    // EMPLOYEE_CODES'dan ekle
+    for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+      allCodes.add(code);
+    }
+    
+    // EMPLOYEE_FILES'den ekle (EMPLOYEE_CODES'da olmayanları)
+    for (const code in EMPLOYEE_FILES) {
+      allCodes.add(code);
+    }
+    
+    // YENİ PERSONEL KAYITLARI (Manuel eklenenler)
+    const newEmployees = [
+      { code: 'SS 014', name: 'Seçil Sayan', portfoyYoneticisi: 'RS 22', fileId: '1bb5bxhIU-uIZ9zXEDjJN-JkkcCvwm9EFkMU2CMIUAcc' },
+      { code: 'NK 015', name: 'Neslihan Kaya', portfoyYoneticisi: 'RS 22', fileId: '1raSTU4mZdMc63i27KRCFLw3GNDOd3c4u60lc9H8Tdu4' },
+      { code: 'AD 016', name: 'Aslı Doğan', portfoyYoneticisi: 'OC 23', fileId: '1eLrz837xfkWn1Subfbnu9oN2CLCPFnp35ttmSiIUoSM' }
+    ];
+    
+    // Yeni personelleri ekle
+    for (const emp of newEmployees) {
+      allCodes.add(emp.code);
+    }
+    
+    // Her kod için veri hazırla
+    for (const code of allCodes) {
+      // Yeni personel kayıtlarından kontrol et
+      const newEmp = newEmployees.find(e => e.code === code);
+      
+      let name = '';
+      let portfoyYoneticisi = '';
+      
+      if (newEmp) {
+        // Yeni personel kaydı
+        name = newEmp.name;
+        portfoyYoneticisi = newEmp.portfoyYoneticisi || '';
+        // Yeni personel için dosya ID'yi de al
+        if (newEmp.fileId) {
+          // fileId'yi özel olarak kullan
+        }
+      } else {
+        // Mevcut kayıtlardan
+        name = CRM_CONFIG.EMPLOYEE_CODES[code] || ''; // İsim varsa al
+        
+        // Portföy Yöneticisi mantığı
+        // Kod numarasını parse et (örn: "SB 004" -> 4, "RS 22" -> 22)
+        const codeMatch = String(code).match(/(\d+)/);
+        const codeNumber = codeMatch ? parseInt(codeMatch[1], 10) : 0;
+        
+        // Özel portföy yöneticileri: SO 003, RS 22, OC 23 (Özlem Çoksatan)
+        const isSpecialManager = code === 'SO 003' || code === 'RS 22' || code === 'OC 23';
+        
+        // Portföy Yöneticisi belirleme:
+        // - Kod numarası ≥ 20 veya özel kodlar = Portföy Yöneticisi (boş)
+        // - Kod numarası < 20 = Temsilci (şimdilik boş, kullanıcı doldurur)
+        if (codeNumber >= 20 || isSpecialManager) {
+          // Portföy Yöneticisi (kendisi yönetici, boş bırak)
+          portfoyYoneticisi = '';
+        } else {
+          // Temsilci (şimdilik boş, kullanıcı manuel doldurur)
+          portfoyYoneticisi = '';
+        }
+      }
+      
+      // Dosya ID'yi belirle (yeni personel için özel, diğerleri için EMPLOYEE_FILES)
+      let fileId = '';
+      if (newEmp && newEmp.fileId) {
+        fileId = newEmp.fileId;
+      } else {
+        fileId = EMPLOYEE_FILES[code] || '';
+      }
+      
+      // BH 007'yi pasif yap
+      let durum = 'Aktif'; // Varsayılan "Aktif"
+      if (code === 'BH 007') {
+        durum = 'Pasif';
+      }
+      
+      employeeData.push([code, name, durum, fileId, portfoyYoneticisi]);
+    }
+    
+    // Mevcut verileri kontrol et (duplicate önleme)
+    const lastRow = sheet.getLastRow();
+    let existingData = [];
+    let existingCodes = new Set();
+    
+    if (lastRow > 1) {
+      // Mevcut verileri oku (batch)
+      existingData = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+      existingCodes = new Set(existingData.map(row => String(row[0] || '').trim()));
+    }
+    
+    // Yeni verileri ekle veya güncelle (mevcut verileri koru)
+    const rowsToUpdate = [];
+    const rowsToAdd = [];
+    
+    for (const rowData of employeeData) {
+      const code = String(rowData[0] || '').trim();
+      
+      if (existingCodes.has(code)) {
+        // Mevcut satırı güncelle (ama mevcut verileri koru)
+        const existingRowIndex = existingData.findIndex(row => String(row[0] || '').trim() === code) + 2;
+        if (existingRowIndex > 1) {
+          // Mevcut satırdan verileri al
+          const existingRow = existingData[existingRowIndex - 2];
+          const updatedRow = [
+            code, // Kod (değişmez)
+            rowData[1] || existingRow[1] || '', // İsim (yeni varsa güncelle, yoksa mevcut)
+            code === 'BH 007' ? 'Pasif' : (existingRow[2] || rowData[2] || 'Aktif'), // Durum (BH 007 pasif, diğerleri mevcut)
+            rowData[3] || existingRow[3] || '', // Dosya ID (yeni varsa güncelle, yoksa mevcut)
+            rowData[4] || existingRow[4] || '' // Portföy Yöneticisi (yeni varsa güncelle, yoksa mevcut)
+          ];
+          rowsToUpdate.push({ row: existingRowIndex, data: updatedRow });
+        }
+      } else {
+        // Yeni satır ekle
+        rowsToAdd.push(rowData);
+      }
+    }
+    
+    // Batch güncelleme
+    if (rowsToUpdate.length > 0) {
+      for (const update of rowsToUpdate) {
+        sheet.getRange(update.row, 1, 1, headers.length).setValues([update.data]);
+      }
+      console.log(`✅ ${rowsToUpdate.length} satır güncellendi`);
+    }
+    
+    // Batch ekleme
+    if (rowsToAdd.length > 0) {
+      const nextRow = lastRow + 1;
+      sheet.getRange(nextRow, 1, rowsToAdd.length, headers.length).setValues(rowsToAdd);
+      console.log(`✅ ${rowsToAdd.length} yeni satır eklendi`);
+    }
+    
+    // Kolon genişliklerini optimize et
+    sheet.setColumnWidth(1, 100);  // Kod
+    sheet.setColumnWidth(2, 200);  // İsim Soyisim
+    sheet.setColumnWidth(3, 100); // Durum
+    sheet.setColumnWidth(4, 250);  // Dosya ID
+    sheet.setColumnWidth(5, 180);  // Portföy Yöneticisi
+    
+    // Data validation: Durum kolonu için
+    const durumIndex = headers.indexOf('Durum') + 1; // 1-based
+    const lastDataRow = sheet.getLastRow();
+    if (lastDataRow > 1) {
+      const durumRange = sheet.getRange(2, durumIndex, lastDataRow - 1, 1);
+      const durumRule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(['Aktif', 'Pasif'], true)
+        .build();
+      durumRange.setDataValidation(durumRule);
+    }
+    
+    console.log('✅ Personel sheet başarıyla oluşturuldu/güncellendi');
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Personel Sheet Hazır',
+      `📊 ${employeeData.length} personel kaydı işlendi\n\n` +
+      `📋 Kolonlar:\n` +
+      `- Kod\n` +
+      `- İsim Soyisim\n` +
+      `- Durum\n` +
+      `- Dosya ID\n` +
+      `- Portföy Yöneticisi\n\n` +
+      `💡 Portföy Yöneticisi kolonunu manuel olarak doldurun.`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    return { success: true, sheetName: sheetName, totalRecords: employeeData.length };
+    
+  } catch (error) {
+    console.error('❌ createOrUpdatePersonelSheet hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Personel sheet oluşturma hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    throw error;
+  }
+}
+
+// ========================================
+// 📊 LOG SİSTEMİ İYİLEŞTİRMELERİ (23. Bölüm Standartları)
+// ========================================
+
+/**
+ * 23.1 - PRIMARY KPI'LARI HESAPLA
+ * Log kayıtlarından KPI'ları hesaplar (Salesforce/HubSpot standartları)
+ * @param {Array} logs - Log kayıtları [{date, aktivite, log, ...}]
+ * @returns {Object} KPI objesi
+ */
+function calculateKPIs(logs) {
+  try {
+    const totalContacts = logs.length;
+    
+    if (totalContacts === 0) {
+      return {
+        totalContacts: 0,
+        attempts: 0,
+        connections: 0,
+        connectionRate: 0,
+        leadsQualified: 0,
+        opportunitiesCreated: 0,
+        conversionRate: 0,
+        opportunityWinRate: 0,
+        noAnswerRate: 0,
+        notInterestedRate: 0,
+        invalidRate: 0,
+        aktiviteCounts: {},
+        positiveCount: 0,
+        negativeCount: 0
+      };
+    }
+    
+    // Aktivite bazlı sayım (normalize edilmiş)
+    const aktiviteCounts = {};
+    logs.forEach(log => {
+      const aktivite = normalizeActivity(log.aktivite || '');
+      aktiviteCounts[aktivite] = (aktiviteCounts[aktivite] || 0) + 1;
+    });
+    
+    // Negatif aktiviteler (23.1 - Negative Metrics)
+    const negativeActivities = ['Ulaşılamadı', 'İlgilenmiyor', 'Geçersiz Numara', 'Kurumsal'];
+    const negativeCount = negativeActivities.reduce((sum, act) => 
+      sum + (aktiviteCounts[act] || 0), 0
+    );
+    
+    // Pozitif aktiviteler (23.1 - Conversion Metrics)
+    const positiveActivities = [
+      'Randevu Alındı', 
+      'İleri Tarih Randevu',
+      'Fırsat İletildi', 
+      'Toplantı Tamamlandı', 
+      'Satış Yapıldı',
+      'Bilgi Verildi'
+    ];
+    const positiveCount = positiveActivities.reduce((sum, act) => 
+      sum + (aktiviteCounts[act] || 0), 0
+    );
+    
+    // Connections (Ulaşılan) = Total - Ulaşılamadı - Geçersiz Numara
+    const connections = totalContacts - (aktiviteCounts['Ulaşılamadı'] || 0) - (aktiviteCounts['Geçersiz Numara'] || 0);
+    
+    // KPI Hesaplamaları (23.1 - Primary KPIs)
+    const kpis = {
+      // Activity Metrics
+      totalContacts: totalContacts,
+      attempts: totalContacts,
+      connections: connections,
+      connectionRate: totalContacts > 0 ? (connections / totalContacts) * 100 : 0,
+      
+      // Conversion Metrics
+      leadsQualified: (aktiviteCounts['Randevu Alındı'] || 0) + 
+                      (aktiviteCounts['İleri Tarih Randevu'] || 0) +
+                      (aktiviteCounts['Fırsat İletildi'] || 0) + 
+                      (aktiviteCounts['Bilgi Verildi'] || 0),
+      opportunitiesCreated: (aktiviteCounts['Randevu Alındı'] || 0) + 
+                            (aktiviteCounts['İleri Tarih Randevu'] || 0),
+      conversionRate: connections > 0 ? 
+        (((aktiviteCounts['Randevu Alındı'] || 0) + (aktiviteCounts['İleri Tarih Randevu'] || 0)) / connections) * 100 : 0,
+      opportunityWinRate: (aktiviteCounts['Randevu Alındı'] || 0) > 0 
+        ? ((aktiviteCounts['Satış Yapıldı'] || 0) / (aktiviteCounts['Randevu Alındı'] || 0)) * 100 
+        : 0,
+      
+      // Negative Metrics
+      noAnswerRate: totalContacts > 0 ? ((aktiviteCounts['Ulaşılamadı'] || 0) / totalContacts) * 100 : 0,
+      notInterestedRate: connections > 0 ? ((aktiviteCounts['İlgilenmiyor'] || 0) / connections) * 100 : 0,
+      invalidRate: totalContacts > 0 ? ((aktiviteCounts['Geçersiz Numara'] || 0) / totalContacts) * 100 : 0,
+      
+      // Activity Breakdown
+      aktiviteCounts: aktiviteCounts,
+      positiveCount: positiveCount,
+      negativeCount: negativeCount
+    };
+    
+    return kpis;
+    
+  } catch (error) {
+    console.error('❌ calculateKPIs hatası:', error);
+    throw error;
+  }
+}
+
+/**
+ * Aktivite ismini normalize et (büyük/küçük harf, boşluk, typo toleranslı)
+ * @param {string} aktivite - Ham aktivite ismi
+ * @returns {string} Normalize edilmiş aktivite ismi
+ */
+function normalizeActivity(aktivite) {
+  if (!aktivite || typeof aktivite !== 'string') return '';
+  
+  const normalized = aktivite.trim();
+  
+  // Aktivite mapping (typo toleranslı)
+  const activityMap = {
+    'randevu alındı': 'Randevu Alındı',
+    'randevu alindi': 'Randevu Alındı',
+    'ileri tarih randevu': 'İleri Tarih Randevu',
+    'ileri tarih': 'İleri Tarih Randevu',
+    'fırsat iletildi': 'Fırsat İletildi',
+    'firsat iletildi': 'Fırsat İletildi',
+    'toplantı tamamlandı': 'Toplantı Tamamlandı',
+    'toplanti tamamlandi': 'Toplantı Tamamlandı',
+    'satış yapıldı': 'Satış Yapıldı',
+    'satis yapildi': 'Satış Yapıldı',
+    'bilgi verildi': 'Bilgi Verildi',
+    'yeniden aranacak': 'Yeniden Aranacak',
+    'ulaşılamadı': 'Ulaşılamadı',
+    'ulasilamadi': 'Ulaşılamadı',
+    'ilgilenmiyor': 'İlgilenmiyor',
+    'geçersiz numara': 'Geçersiz Numara',
+    'gecersiz numara': 'Geçersiz Numara',
+    'kurumsal': 'Kurumsal',
+    'randevu iptal oldu': 'Randevu İptal oldu',
+    'randevu ertelendi': 'Randevu Ertelendi',
+    'fırsat kaybedilen': 'Fırsat Kaybedilen'
+  };
+  
+  const lowerKey = normalized.toLowerCase();
+  return activityMap[lowerKey] || normalized; // Mapping'de yoksa olduğu gibi döndür
+}
+
+/**
+ * Log formatını standardize et (23.1 standartlarına göre)
+ * @param {Object} log - Ham log objesi
+ * @returns {Object} Standardize edilmiş log objesi
+ */
+function standardizeLogFormat(log) {
+  try {
+    // Tarih parse et
+    let date = null;
+    if (log.date instanceof Date) {
+      date = log.date;
+    } else if (log.Tarih instanceof Date) {
+      date = log.Tarih;
+    } else if (log.date || log.Tarih) {
+      date = parseDdMmYyyy(log.date || log.Tarih) || new Date(String(log.date || log.Tarih));
+    } else {
+      date = new Date(); // Varsayılan: bugün
+    }
+    
+    // Aktivite normalize et
+    const activity = normalizeActivity(log.aktivite || log.Aktivite || '');
+    
+    // Log detayı
+    const logDetail = log.log || log['Log Detayı'] || '';
+    
+    // Saat parse et
+    let time = null;
+    if (log.time || log.Saat) {
+      const timeStr = String(log.time || log.Saat || '').trim();
+      if (timeStr) {
+        // HH:mm:ss veya HH:mm formatını parse et
+        const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (timeMatch) {
+          const hours = parseInt(timeMatch[1], 10);
+          const minutes = parseInt(timeMatch[2], 10);
+          const seconds = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+          time = hours * 3600 + minutes * 60 + seconds; // Saniye cinsinden
+        }
+      }
+    }
+    
+    return {
+      timestamp: date.toISOString(),
+      date: date,
+      time: time,
+      activity: activity,
+      logDetail: logDetail,
+      source: log.source || log['Kaynak Sayfa'] || 'Format Tablo',
+      code: log.code || log.Kod || '',
+      companyName: log.companyName || log['Company name'] || '',
+      employeeCode: log.employeeCode || log.employee || ''
+    };
+    
+  } catch (error) {
+    console.error('❌ standardizeLogFormat hatası:', error);
+    // Hata durumunda minimum format döndür
+    return {
+      timestamp: new Date().toISOString(),
+      date: new Date(),
+      time: null,
+      activity: String(log.aktivite || log.Aktivite || '').trim(),
+      logDetail: String(log.log || log['Log Detayı'] || '').trim(),
+      source: 'Format Tablo',
+      code: '',
+      companyName: '',
+      employeeCode: ''
+    };
+  }
+}
+
+/**
+ * Tarih parse et (dd.MM.yyyy formatından)
+ * @param {string|Date} dateStr - Tarih string veya Date objesi
+ * @returns {Date|null} Parse edilmiş Date objesi
+ */
+function parseDdMmYyyy(dateStr) {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  
+  const str = String(dateStr).trim();
+  
+  // dd.MM.yyyy formatı
+  const match = str.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1; // JavaScript month 0-based
+    const year = parseInt(match[3], 10);
+    return new Date(year, month, day);
+  }
+  
+  // yyyy-MM-dd formatı
+  const match2 = str.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (match2) {
+    const year = parseInt(match2[1], 10);
+    const month = parseInt(match2[2], 10) - 1;
+    const day = parseInt(match2[3], 10);
+    return new Date(year, month, day);
+  }
+  
+  // Varsayılan Date parse
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? null : parsed;
 }
 
 console.log("🔧 DEBUG: Ana dosyaya eklendi");

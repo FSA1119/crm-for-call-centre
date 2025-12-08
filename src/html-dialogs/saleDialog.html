@@ -194,9 +194,6 @@
       <p>Satış bilgilerini doldurun</p>
     </div>
     
-    <!-- Performance Warning -->
-    <div id="performanceWarning" class="performance-warning"></div>
-    
     <!-- Company Information -->
     <div class="company-info">
       <h3>🏢 Firma Bilgileri</h3>
@@ -353,15 +350,6 @@
           .withSuccessHandler(function(result) {
             isSubmitting = false;
             if (result.success) {
-              // Show performance warning if exists
-              if (result.performanceWarning) {
-                const warningDiv = document.getElementById('performanceWarning');
-                if (warningDiv) {
-                  warningDiv.textContent = result.performanceWarning;
-                  warningDiv.style.display = 'block';
-                }
-              }
-              
               setTimeout(function() {
                 try {
                   google.script.host.close();

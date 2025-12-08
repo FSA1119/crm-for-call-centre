@@ -135,17 +135,6 @@
       margin-top: 5px;
     }
     
-    .performance-warning {
-      background-color: #fff3cd;
-      border: 1px solid #ffc107;
-      border-radius: 6px;
-      padding: 10px 15px;
-      margin-bottom: 15px;
-      font-size: 13px;
-      color: #856404;
-      display: none;
-    }
-    
     .company-info {
       background-color: #e8f5e8;
       border: 1px solid #c3e6c3;
@@ -174,9 +163,6 @@
     </div>
     
     <div class="form-container">
-      <!-- Performance Warning -->
-      <div id="performanceWarning" class="performance-warning"></div>
-      
       <!-- Company Information -->
       <div class="company-info">
         <h3>🏢 Firma Bilgileri</h3>
@@ -229,10 +215,10 @@
           </select>
         </div>
         
-        <!-- 5. Yetkili Tel (Manuel) -->
+        <!-- 5. Yetkili Tel (Otomatik: Önce Yetkili Tel, yoksa Phone) -->
         <div class="form-group">
           <label for="yetkiliTel">5. Yetkili Telefon</label>
-          <input type="tel" id="yetkiliTel" name="yetkiliTel" placeholder="05XX XXX XX XX" value="<?= rowData['Yetkili Tel'] || '' ?>">
+          <input type="tel" id="yetkiliTel" name="yetkiliTel" placeholder="05XX XXX XX XX" value="<?= rowData['Yetkili Tel'] || rowData['Phone'] || '' ?>">
         </div>
         
         <!-- 6. Mail (Manuel) -->
@@ -298,7 +284,6 @@
       // Clear previous messages
       document.getElementById('errorMessage').style.display = 'none';
       document.getElementById('successMessage').style.display = 'none';
-      document.getElementById('performanceWarning').style.display = 'none';
       
       // Validate required fields
       const isimSoyisim = document.getElementById('isimSoyisim').value.trim();
@@ -396,6 +381,7 @@
       // Pre-fill some fields if available
       const companyName = '<?= rowData['Company name'] || '' ?>';
       const phone = '<?= rowData['Phone'] || '' ?>';
+      const yetkiliTel = '<?= rowData['Yetkili Tel'] || '' ?>';
       
       if (companyName && !document.getElementById('isimSoyisim').value) {
         // Try to extract contact person from company name
@@ -405,8 +391,15 @@
         }
       }
       
-      if (phone && !document.getElementById('yetkiliTel').value) {
-        document.getElementById('yetkiliTel').placeholder = phone;
+      // ✅ DÜZELTME: Telefon numarasını otomatik doldur
+      // Önce "Yetkili Tel" kontrol et, yoksa "Phone" kullan
+      const yetkiliTelInput = document.getElementById('yetkiliTel');
+      if (!yetkiliTelInput.value) {
+        if (yetkiliTel) {
+          yetkiliTelInput.value = yetkiliTel;
+        } else if (phone) {
+          yetkiliTelInput.value = phone;
+        }
       }
     });
   </script>

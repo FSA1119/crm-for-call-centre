@@ -135,17 +135,6 @@
       margin-top: 5px;
     }
     
-    .performance-warning {
-      background-color: #fff3cd;
-      border: 1px solid #ffc107;
-      border-radius: 6px;
-      padding: 10px 15px;
-      margin-bottom: 15px;
-      font-size: 13px;
-      color: #856404;
-      display: none;
-    }
-    
     .company-info {
       background-color: #fff3cd;
       border: 1px solid #ffeaa7;
@@ -174,9 +163,6 @@
     </div>
     
     <div class="form-container">
-      <!-- Performance Warning -->
-      <div id="performanceWarning" class="performance-warning"></div>
-      
       <!-- Company Information -->
       <div class="company-info">
         <h3>🏢 Firma Bilgileri</h3>
@@ -277,7 +263,6 @@
       // Clear previous messages
       document.getElementById('errorMessage').style.display = 'none';
       document.getElementById('successMessage').style.display = 'none';
-      document.getElementById('performanceWarning').style.display = 'none';
       
       // Collect form data
       const formData = {
@@ -317,13 +302,6 @@
       submitButton.textContent = 'Fırsat Oluştur';
       
       if (result.success) {
-        // Show performance warning if exists
-        if (result.performanceWarning) {
-          const warningDiv = document.getElementById('performanceWarning');
-          warningDiv.textContent = result.performanceWarning;
-          warningDiv.style.display = 'block';
-        }
-        
         showSuccess(result.message);
         setTimeout(() => {
           google.script.host.close();
