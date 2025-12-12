@@ -1,0 +1,59 @@
+{
+  "test": {
+    "scriptId": "1b2elejSNBtQaStBat1CPWzqsVRiyz7Jx6WQa5fJ38RhOvKHDyKj6ynbH",
+    "name": "Test Environment",
+    "description": "Test için kullanılan Script ID"
+  },
+  "fabrika": {
+    "scriptId": "1sjjHO394FpEtjVwDBHlv8r_YuDG1C3Tdn9UEwVEIwN-H0MEnwGpO19hl",
+    "name": "Fabrika Google Sheets",
+    "description": "Fabrika dosyası için Script ID"
+  },
+  "employees": [
+    {
+      "code": "NT 002",
+      "name": "Neslihan Türk",
+      "scriptId": "14LX-98hRz2BTDyQiTWtFEAYtWOBTL-1jZ3NiOFJ7hpQp8ezifZ-QlChZ"
+    },
+    {
+      "code": "SB 004",
+      "name": "Sinem Bakalcı",
+      "scriptId": "13QM9XUYQxRosVahcqdO5XlB0bswdhSc6C8ai1U3D5oZbHU28BYVzMtpr"
+    },
+    {
+      "code": "KM 005",
+      "name": "Kübra Murat",
+      "scriptId": "1z_tzkmuSETrLFN0m9MdZ4ZPc2h_seSpuB61TCNeoQRHMca_iprkwzEhp"
+    },
+    {
+      "code": "MK 009",
+      "name": "Merve Kılıc",
+      "scriptId": "15-4Iy-kZsVyIER5mG3Rcw8P1iZaUrIyRLI5OZHeC8V3mtsYqTmBttE3c"
+    },
+    {
+      "code": "NT 012",
+      "name": "Nazlı Tutuşan",
+      "scriptId": "1tpo1bci3FzhvxJ_YLH-C37LqkUkdpuU52F0OTEqqmGlnjisxrTWgySEN"
+    },
+    {
+      "code": "SS 014",
+      "name": "Seçil Sayan",
+      "scriptId": "1WT-oyd2qd7l5VoWYRiWM8P2s3ZGYgABDKa1E6aMbSPmOkrpLpYQksztD"
+    },
+    {
+      "code": "NK 015",
+      "name": "Neslihan Kaya",
+      "scriptId": "1_3lGcSVZdmZm_MIWRrj93YOCJPyIj1UpXdjPSrvTCGeWFwSVg4EZjijw"
+    },
+    {
+      "code": "AD 016",
+      "name": "Aslı Doğan",
+      "scriptId": "15qzvbxjcc2gr4Udb9YS2P-CYEn57znsa2xmzZHVU6PHTjFibialnYh88"
+    },
+    {
+      "code": "NB 017",
+      "name": "Neşe Bülbül",
+      "scriptId": "1XbSiFDEdr66A-HOdc7Ej8TfWlmDxVY_bWCme-zYHcs1yCfAiBXtW92fo"
+    }
+  ]
+}

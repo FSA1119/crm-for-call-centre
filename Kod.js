@@ -558,31 +558,11 @@ function getCurrentEmployeeCode(rowData = null) {
   const sheet = SpreadsheetApp.getActiveSheet();
   const sheetName = sheet.getName();
   
-  
   // Önce rowData'dan dene (Randevularım/Toplantılarım için)
-  if (rowData) {
-    // Önce rowData.Kod'dan dene
-    let kod = String(rowData.Kod || '').trim();
-    
-    // Eğer boşsa, rowData[''] (boş header) kontrol et
-    if (!kod || kod === '' || kod === 'undefined' || kod === 'null') {
-      kod = String(rowData[''] || '').trim();
-    }
-    
-    // Eğer hala boşsa, tüm key'leri tara ve employee code formatına uyan ilk değeri bul
-    if (!kod || kod === '' || kod === 'undefined' || kod === 'null') {
-      for (const key in rowData) {
-        const value = String(rowData[key] || '').trim();
-        // Employee code formatı: "NB 017", "SB 004", "FSA 019" gibi (2-3 harf + boşluk + 2-3 rakam)
-        if (value && value.match(/^[A-Z]{2,3}\s\d{2,3}$/)) {
-          kod = value;
-          break;
-        }
-      }
-    }
-    
-    // Employee code formatını kontrol et (örn: "SB 004", "FSA 019", "NB 017")
-    if (kod && kod.match(/^[A-Z]{2,3}\s\d{2,3}$/)) {
+  if (rowData && rowData.Kod) {
+    const kod = String(rowData.Kod || '').trim();
+    // Employee code formatını kontrol et (örn: "SB 004", "FSA 019")
+    if (kod.match(/^[A-Z]{2,3}\s\d{2,3}$/)) {
       return kod;
     }
   }
@@ -727,48 +707,6 @@ function logActivity(action, data = {}) {
       '@'            // Company name (text)
     ]]);
     
-    // 🎨 Aktivite'ye göre renklendirme (ana sayfaların renkleri ile aynı)
-    try {
-      let rowColor = 'rgb(255, 255, 255)'; // Varsayılan beyaz
-      
-      // Aktivite değerine göre renk al (CRM_CONFIG.COLOR_CODES'dan)
-      if (aktivite && String(aktivite).trim() !== '') {
-        const normalizedAktivite = String(aktivite).trim();
-        
-        // CRM_CONFIG.COLOR_CODES'dan renk al
-        if (CRM_CONFIG.COLOR_CODES[normalizedAktivite]) {
-          rowColor = CRM_CONFIG.COLOR_CODES[normalizedAktivite];
-          console.log(`🎨 logActivity: Aktivite "${normalizedAktivite}" → Renk: ${rowColor}`);
-        } else {
-          console.log(`ℹ️ logActivity: Aktivite "${normalizedAktivite}" için renk tanımlı değil, beyaz kullanılıyor`);
-        }
-      }
-      
-      // Renkleri batch olarak uygula
-      const colorArray = Array(7).fill(rowColor);
-      formatRange.setBackgrounds([colorArray]);
-      SpreadsheetApp.flush(); // ✅ KRİTİK: setBackgrounds sonrası flush ZORUNLU!
-      console.log(`✅ logActivity: Log Arşivi satır ${nextRow} renklendirildi: ${rowColor} (Aktivite: ${aktivite})`);
-    } catch (colorError) {
-      // Renklendirme hatası kritik değil, devam et
-      console.error('❌ logActivity: Log Arşivi renklendirme hatası:', colorError && colorError.message, colorError && colorError.stack);
-    }
-    
-    // 🚫 TÜM Log Arşivi sayfasındaki Aktivite sütunundaki veri doğrulamayı kaldır (dropdown olmasın)
-    try {
-      const lastRow = logSheet.getLastRow();
-      if (lastRow > 1) {
-        // Tüm sayfadaki Aktivite sütununu temizle (2. satırdan son satıra kadar)
-        const aktiviteColumn = logSheet.getRange(2, 3, lastRow - 1, 1); // Aktivite = 3. sütun
-        aktiviteColumn.clearDataValidations();
-        SpreadsheetApp.flush(); // ✅ KRİTİK: clearDataValidations sonrası flush ZORUNLU!
-        console.log(`✅ logActivity: Tüm Log Arşivi sayfasındaki Aktivite sütunundaki veri doğrulamalar kaldırıldı (${lastRow - 1} satır)`);
-      }
-    } catch (validationError) {
-      // Veri doğrulama temizleme hatası kritik değil
-      console.error('❌ logActivity: Aktivite veri doğrulama temizleme hatası:', validationError && validationError.message);
-    }
-    
   } catch (error) {
     console.error('Log Arşivi yazma hatası (kritik değil):', error);
     // Hata olsa bile devam et (log yazma kritik değil)
@@ -781,22 +719,244 @@ function logActivity(action, data = {}) {
 // FUNCTION 1: CREATE NEW TABLE
 // ========================================
 
-// ========================================
-// 🔄 DATA POOL'A TAŞINDI - Ham Veri → Format Tablo İşlemleri
-// Bu fonksiyonlar merkezi Data Pool sistemine taşınmıştır
-// ========================================
-// 
-// TAŞINAN FONKSİYONLAR:
-// - createNewTable() - Yeni tablo oluşturma
-// - createFormatTable() - Format Tablo oluşturma
-// - mapHamVeriToFormatTable() - Mapping kuralları
-// - applyFormatTableStyling() - Styling kuralları
-// - setDataValidation() - Validation kuralları (Format Tablo için)
-// - decodeTurkishText() - Türkçe karakter decode
-//
-// Bu fonksiyonlar artık backend.js'de yok, Data Pool'da olacak.
-// Temsilci dosyaları sadece Format Tablo hazır olduktan sonraki işlemlere odaklanır.
-// ========================================
+/**
+ * Creates new Format Tablo from Ham veri
+ * @param {Object} parameters - Function parameters
+ * @returns {Object} - Result object
+ */
+function createNewTable(parameters) {
+  try {
+    if (!validateInput(parameters)) {
+      throw new Error('Invalid input provided');
+    }
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const hamVeriSheet = spreadsheet.getSheetByName('Ham veri');
+    if (!hamVeriSheet) {
+      throw new Error('Ham veri sayfası bulunamadı');
+    }
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.prompt('Yeni Tablo Oluştur', 'Yeni Format Tablo için isim girin (örn: t10):', ui.ButtonSet.OK_CANCEL);
+    if (response.getSelectedButton() === ui.Button.OK) {
+      const tableName = response.getResponseText().trim();
+      if (!tableName) {
+        throw new Error('Tablo ismi boş olamaz');
+      }
+      const existingSheet = spreadsheet.getSheetByName(tableName);
+      if (existingSheet) {
+        throw new Error(`"${tableName}" isimli tablo zaten mevcut`);
+      }
+      const result = createFormatTable(spreadsheet, hamVeriSheet, tableName);
+      logActivity('createNewTable', { tableName, rowCount: result.rowCount });
+      return result;
+    } else {
+      return { success: false, message: 'İşlem iptal edildi' };
+    }
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Creates Format Tablo with standardized structure
+ * @param {Spreadsheet} spreadsheet - Active spreadsheet
+ * @param {Sheet} hamVeriSheet - Ham veri sheet
+ * @param {string} tableName - New table name
+ * @returns {Object} - Result object
+ */
+function createFormatTable(spreadsheet, hamVeriSheet, tableName) {
+  const newSheet = spreadsheet.insertSheet(tableName);
+  newSheet.activate();
+  const formatTableColumns = [
+    'Kod', 'Keyword', 'Location', 'Company name', 'Category', 'Website',
+    'CMS Adı', 'CMS Grubu',
+    'Phone', 'Yetkili Tel', 'Mail', 'İsim Soyisim', 'Aktivite',
+    'Aktivite Tarihi', 'Yorum', 'Yönetici Not',
+    'E-Ticaret İzi', 'Site Hızı', 'Site Trafiği', 'Log', 'Toplantı formatı',
+    'Address', 'City', 'Rating count', 'Review', 'Maplink'
+  ];
+  newSheet.getRange(1, 1, 1, formatTableColumns.length).setValues([formatTableColumns]);
+  const hamVeriData = hamVeriSheet.getDataRange().getValues();
+  const hamVeriHeaders = hamVeriData[0];
+  const hamVeriRows = hamVeriData.slice(1);
+  const mappedData = mapHamVeriToFormatTable(hamVeriRows, hamVeriHeaders, formatTableColumns, tableName);
+  if (mappedData.length > 0) {
+    newSheet.getRange(2, 1, mappedData.length, formatTableColumns.length).setValues(mappedData);
+    const reviewColumnIndex = formatTableColumns.indexOf('Review') + 1;
+    if (reviewColumnIndex > 0 && mappedData.length > 0) {
+      const reviewRange = newSheet.getRange(2, reviewColumnIndex, mappedData.length, 1);
+      reviewRange.setNumberFormat('@');
+    }
+    const kodColumnIndex = formatTableColumns.indexOf('Kod') + 1;
+    if (kodColumnIndex > 0 && mappedData.length > 0) {
+      const kodRange = newSheet.getRange(2, kodColumnIndex, mappedData.length, 1);
+      kodRange.setNumberFormat('@');
+    }
+  }
+  applyFormatTableStyling(newSheet);
+  setDataValidation(newSheet); // Aktivite dropdown'ı ekle
+  return { success: true, tableName, rowCount: mappedData.length, message: `${tableName} başarıyla oluşturuldu. ${mappedData.length} satır aktarıldı.` };
+}
+
+/**
+ * Decodes URL-encoded Turkish characters
+ * @param {string} text - URL-encoded text
+ * @returns {string} - Decoded text
+ */
+function decodeTurkishText(text) {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+  
+  try {
+    // First decode URL encoding
+    let decoded = decodeURIComponent(text);
+    
+    // Handle common Turkish character replacements
+    const turkishReplacements = {
+      '%C4%B0': 'İ', // İ (capital I with dot)
+      '%C4%B1': 'ı', // ı (lowercase i without dot)
+      '%C3%96': 'Ö', // Ö
+      '%C3%B6': 'ö', // ö
+      '%C3%9C': 'Ü', // Ü
+      '%C3%BC': 'ü', // ü
+      '%C5%9E': 'Ş', // Ş
+      '%C5%9F': 'ş', // ş
+      '%C4%9E': 'Ğ', // Ğ
+      '%C4%9F': 'ğ', // ğ
+      '%C3%87': 'Ç', // Ç
+      '%C3%A7': 'ç'  // ç
+    };
+    
+    // Apply Turkish character replacements
+    Object.keys(turkishReplacements).forEach(encoded => {
+      decoded = decoded.replace(new RegExp(encoded, 'g'), turkishReplacements[encoded]);
+    });
+    
+    console.log(`Decoded: "${text}" → "${decoded}"`);
+    return decoded;
+  } catch (error) {
+    console.warn('Error decoding text:', text, error);
+    return text; // Return original if decoding fails
+  }
+}
+
+/**
+ * Maps data from Ham veri to Format Tablo structure
+ * @param {Array} hamVeriRows - Ham veri rows
+ * @param {Array} hamVeriHeaders - Ham veri headers
+ * @param {Array} formatTableColumns - Format Tablo columns
+ * @param {string} tableName - New table name
+ * @returns {Array} - Mapped data
+ */
+function mapHamVeriToFormatTable(hamVeriRows, hamVeriHeaders, formatTableColumns, tableName) {
+  const mappedData = [];
+  const employeeCode = getCurrentEmployeeCode();
+  hamVeriRows.forEach((row) => {
+    const mappedRow = new Array(formatTableColumns.length).fill('');
+    formatTableColumns.forEach((formatCol, formatIndex) => {
+      const hamVeriIndex = hamVeriHeaders.indexOf(formatCol);
+      if (hamVeriIndex !== -1 && row[hamVeriIndex]) {
+        if (formatCol === 'Review') {
+          let reviewValue = row[hamVeriIndex];
+          if (reviewValue instanceof Date) {
+            const month = reviewValue.getMonth() + 1;
+            const day = reviewValue.getDate();
+            reviewValue = `${month}.${day}`;
+          }
+          mappedRow[formatIndex] = `R${String(reviewValue)}`;
+        } else {
+          mappedRow[formatIndex] = decodeTurkishText(row[hamVeriIndex]);
+        }
+      } else {
+        switch (formatCol) {
+          case 'Kod':
+            const sheetName = SpreadsheetApp.getActiveSpreadsheet().getName();
+            const beforeTire = sheetName.split(' - ')[0];
+            mappedRow[formatIndex] = beforeTire || 'Unknown';
+            break;
+          case 'Aktivite':
+            mappedRow[formatIndex] = '';
+            break;
+          case 'Aktivite Tarihi':
+            mappedRow[formatIndex] = ''; // Boş bırak, aktivite seçildiğinde otomatik doldurulacak
+            break;
+          case 'Log':
+            mappedRow[formatIndex] = `Ham veri'den aktarıldı - ${new Date().toLocaleString('tr-TR')}`;
+            break;
+          case 'Maplink':
+            const cidIndex = hamVeriHeaders.indexOf('Cid');
+            if (cidIndex !== -1 && row[cidIndex]) {
+              const cid = row[cidIndex];
+              const cidMatch = cid.match(/cid=(\d+)/);
+              if (cidMatch) {
+                mappedRow[formatIndex] = `https://maps.google.com/?cid=${cidMatch[1]}`;
+              } else {
+                mappedRow[formatIndex] = `https://maps.google.com/?cid=${cid}`;
+              }
+            }
+            break;
+          default:
+            mappedRow[formatIndex] = '';
+        }
+      }
+    });
+    mappedData.push(mappedRow);
+  });
+  return mappedData;
+}
+
+/**
+ * Applies styling to Format Tablo
+ * @param {Sheet} sheet - Target sheet
+ */
+function applyFormatTableStyling(sheet) {
+  const headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+  headerRange.setBackground('#4285f4');
+  headerRange.setFontColor('white');
+  headerRange.setFontWeight('bold');
+  sheet.setFrozenRows(1);
+  sheet.autoResizeColumns(1, sheet.getLastColumn());
+  const dataRange = sheet.getDataRange();
+  dataRange.setBorder(true, true, true, true, true, true);
+}
+
+/**
+ * Sets data validation for dropdown columns
+ * @param {Sheet} sheet - Target sheet
+ */
+function setDataValidation(sheet) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const aktiviteIndex = headers.indexOf('Aktivite') + 1;
+  const toplantiFormatIndex = headers.indexOf('Toplantı formatı') + 1;
+  
+  if (aktiviteIndex > 0) {
+    const aktiviteRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(CRM_CONFIG.ACTIVITY_OPTIONS, true)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
+      .build();
+    const minRows = 1000;
+    const lastRow = Math.max(sheet.getLastRow(), 2);
+    const rowsToValidate = Math.max(minRows, lastRow - 1);
+    const validationRange = sheet.getRange(2, aktiviteIndex, rowsToValidate, 1);
+    validationRange.clearDataValidations();
+    validationRange.setDataValidation(aktiviteRule);
+  }
+  
+  if (toplantiFormatIndex > 0) {
+    const toplantiRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(CRM_CONFIG.MEETING_FORMAT_OPTIONS, true)
+      .setAllowInvalid(true) // Geçersiz değerlere izin ver
+      .build();
+    const minRows = 1000;
+    const lastRow = Math.max(sheet.getLastRow(), 2);
+    const rowsToValidate = Math.max(minRows, lastRow - 1);
+    const toplantiValidationRange = sheet.getRange(2, toplantiFormatIndex, rowsToValidate, 1);
+    toplantiValidationRange.clearDataValidations();
+    toplantiValidationRange.setDataValidation(toplantiRule);
+  }
+}
 
 // ========================================
 // FUNCTION 2: TAKE APPOINTMENT
@@ -838,11 +998,6 @@ function takeAppointment(parameters) {
     
     // Get selected row data
     const selectedRowData = getSelectedRowData(activeSheet, activeRange.getRow());
-    
-    // Null check
-    if (!selectedRowData) {
-      throw new Error('Satır verisi alınamadı. Lütfen geçerli bir satır seçin.');
-    }
     
     // Check if row already has appointment (for both Format Tablo and Fırsatlarım)
     if (isFormatTable(activeSheet) && selectedRowData.Aktivite === 'Randevu Alındı') {
@@ -1052,11 +1207,6 @@ function processAppointmentForm(formData, selectedRowData = null, rowNumber = nu
       }
       rowData = getSelectedRowData(activeSheet, activeRange.getRow());
       rowNum = activeRange.getRow();
-    }
-    
-    // Null check - getSelectedRowData null dönebilir
-    if (!rowData) {
-      throw new Error('Satır verisi alınamadı. Lütfen geçerli bir satır seçin.');
     }
     
     if (isFormatTable(activeSheet)) {
@@ -1643,7 +1793,6 @@ function createAppointmentInRandevularim(spreadsheet, rowData, appointmentData) 
     // HIZLI YOL: Tüm satırın validation'ını kaldır, sonra batch write
     const range = randevularimSheet.getRange(nextRow, 1, 1, appointmentRow.length);
     range.clearDataValidations(); // Tüm satırın validation'ını kaldır (hızlı!)
-    SpreadsheetApp.flush(); // ✅ KRİTİK: clearDataValidations sonrası flush ZORUNLU!
     
     // Batch write (tek seferde yaz - 100x hızlı!)
     range.setValues([appointmentRow]);
@@ -1932,11 +2081,9 @@ function prepareAppointmentRow(rowData, appointmentData, columns, sheet) {
   
   // 0. Kod
   if (kodIndex !== -1) {
-    // Önce rowData.Kod'dan dene, yoksa rowData[''] (boş header) kontrol et
-    let kodValue = String(rowData.Kod || rowData[''] || '').trim();
-    
+    let kodValue = String(rowData.Kod || '').trim();
     if (!kodValue || kodValue === '' || kodValue === 'undefined' || kodValue === 'null') {
-      kodValue = getCurrentEmployeeCode(rowData);
+      kodValue = getCurrentEmployeeCode();
       console.log('🔧 Kod boştu, otomatik dolduruldu:', kodValue);
     }
     row[kodIndex] = kodValue;
@@ -1996,48 +2143,24 @@ function prepareAppointmentRow(rowData, appointmentData, columns, sheet) {
   
   // 9. Randevu durumu (KÜÇÜK d! - TAM EŞLEŞME GEREKLİ)
   if (randevuDurumuIndex !== -1) {
-    // Görseldeki sıraya göre: Randevu Alındı, İleri Tarih Randevu, Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi, İlgilenmiyor, Ulaşılamadı, Geçersiz Numara, Kurumsal
     const VALID_RANDEVU_DURUMU = [
       'Randevu Alındı',
       'İleri Tarih Randevu',
-      'Yeniden Aranacak',
-      'Bilgi Verildi',
-      'Fırsat İletildi',
-      'İlgilenmiyor',
-      'Ulaşılamadı',
-      'Geçersiz Numara',
-      'Kurumsal'
+      'Randevu Teyitlendi',
+      'Randevu Ertelendi',
+      'Randevu İptal oldu'
     ];
     
     let randevuDurumu = String(appointmentData.aktivite || 'Randevu Alındı').trim();
     
-    // Normalize: Görseldeki seçeneklerden birini kullan (ACTIVITY_OPTIONS)
-    // Eğer geçerli bir seçenek değilse, default olarak 'Randevu Alındı' kullan
-    if (!VALID_RANDEVU_DURUMU.includes(randevuDurumu)) {
-      // Fuzzy matching: Benzer seçenekleri kontrol et
-      const randevuLower = randevuDurumu.toLowerCase();
-      if (randevuLower.includes('randevu') && randevuLower.includes('alındı')) {
-        randevuDurumu = 'Randevu Alındı';
-      } else if (randevuLower.includes('ileri') || randevuLower.includes('tarih')) {
-        randevuDurumu = 'İleri Tarih Randevu';
-      } else if (randevuLower.includes('yeniden') && randevuLower.includes('aranacak')) {
-        randevuDurumu = 'Yeniden Aranacak';
-      } else if (randevuLower.includes('bilgi') && randevuLower.includes('verildi')) {
-        randevuDurumu = 'Bilgi Verildi';
-      } else if (randevuLower.includes('fırsat') && randevuLower.includes('iletildi')) {
-        randevuDurumu = 'Fırsat İletildi';
-      } else if (randevuLower.includes('ilgilenmiyor')) {
-        randevuDurumu = 'İlgilenmiyor';
-      } else if (randevuLower.includes('ulaşılamadı')) {
-        randevuDurumu = 'Ulaşılamadı';
-      } else if (randevuLower.includes('geçersiz') && randevuLower.includes('numara')) {
-        randevuDurumu = 'Geçersiz Numara';
-      } else if (randevuLower.includes('kurumsal')) {
-        randevuDurumu = 'Kurumsal';
-      } else {
-        randevuDurumu = 'Randevu Alındı'; // Default
-        console.log(`⚠️ Aktivite "${appointmentData.aktivite}" için default "Randevu Alındı" kullanılıyor`);
-      }
+    // Normalize: Sadece izin verilen değerlerden birini kullan
+    if (randevuDurumu === 'Randevu Alındı') {
+      randevuDurumu = 'Randevu Alındı'; // TAM EŞLEŞME
+    } else if (randevuDurumu === 'İleri Tarih Randevu') {
+      randevuDurumu = 'İleri Tarih Randevu'; // TAM EŞLEŞME
+    } else {
+      randevuDurumu = 'Randevu Alındı'; // Default
+      console.log(`⚠️ Aktivite "${appointmentData.aktivite}" için default "Randevu Alındı" kullanılıyor`);
     }
     
     // Final check: TAM EŞLEŞME kontrolü
@@ -2158,9 +2281,15 @@ function updateFormatTableRow(sheet, rowNumber, activity, formData = {}) {
   // Log kaldırıldı (performans için)
   
   // Normalize activity to valid Format Tablo Aktivite values
-  // Valid values based on CRM_CONFIG.ACTIVITY_OPTIONS (9 aktivite: Randevu Alındı, İleri Tarih Randevu, Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi, İlgilenmiyor, Ulaşılamadı, Geçersiz Numara, Kurumsal)
+  // Valid values based on validation rules: 'Randevu Alındı', 'İleri Tarih Randevu', 'Randevu Teyitlendi', 'Randevu Ertelendi', 'Randevu İptal oldu'
   // DİKKAT: TAM EŞLEŞME GEREKLİ - başında/sonunda boşluk, büyük/küçük harf, Türkçe karakterler tam eşleşmeli
-  const VALID_AKTIVITE_OPTIONS = CRM_CONFIG.ACTIVITY_OPTIONS; // Tüm Format Tablo aktiviteleri (9 adet)
+  const VALID_AKTIVITE_OPTIONS = [
+    'Randevu Alındı',
+    'İleri Tarih Randevu',
+    'Randevu Teyitlendi',
+    'Randevu Ertelendi',
+    'Randevu İptal oldu'
+  ];
   
   let normalizedActivity = String(activity || 'Randevu Alındı').trim(); // Önce trim yap
   
@@ -2173,25 +2302,11 @@ function updateFormatTableRow(sheet, rowNumber, activity, formData = {}) {
     if (matchedOption) {
       normalizedActivity = matchedOption; // TAM EŞLEŞME ile eşleştir
     } else {
-      // Fuzzy matching (son çare) - Tüm Format Tablo aktiviteleri için
+      // Fuzzy matching (son çare)
       if (activityLower.includes('randevu') && activityLower.includes('alındı')) {
         normalizedActivity = 'Randevu Alındı';
       } else if (activityLower.includes('ileri') || activityLower.includes('tarih')) {
         normalizedActivity = 'İleri Tarih Randevu';
-      } else if (activityLower.includes('yeniden') && activityLower.includes('aranacak')) {
-        normalizedActivity = 'Yeniden Aranacak';
-      } else if (activityLower.includes('bilgi') && activityLower.includes('verildi')) {
-        normalizedActivity = 'Bilgi Verildi';
-      } else if (activityLower.includes('fırsat') && activityLower.includes('iletildi')) {
-        normalizedActivity = 'Fırsat İletildi';
-      } else if (activityLower.includes('ilgilenmiyor')) {
-        normalizedActivity = 'İlgilenmiyor';
-      } else if (activityLower.includes('ulaşılamadı')) {
-        normalizedActivity = 'Ulaşılamadı';
-      } else if (activityLower.includes('geçersiz') && activityLower.includes('numara')) {
-        normalizedActivity = 'Geçersiz Numara';
-      } else if (activityLower.includes('kurumsal')) {
-        normalizedActivity = 'Kurumsal';
       } else if (activityLower.includes('teyit')) {
         normalizedActivity = 'Randevu Teyitlendi';
       } else if (activityLower.includes('ertel')) {
@@ -2451,20 +2566,19 @@ function applyRandevularimStyling(sheet) {
   const dataRange = sheet.getDataRange();
   dataRange.setBorder(true, true, true, true, true, true);
   
-  // ✅ Saat kolonunu text formatına zorla (21.6.1 kuralı: "9:00" formatı için)
-  // ÖNCE validation'ı temizle (format uygularken validation conflict önleme), SONRA format uygula
-  // Not: Validation setRandevularimDataValidation içinde tekrar eklenecek (sadece tam saatler)
+  // ✅ DÜZELTME: Saat kolonunu text formatına zorla (21.6.1 kuralı: "9:05" formatı için)
+  // ÖNCE validation'ı temizle, SONRA format uygula
   const saatColumnIndex = headers.indexOf('Saat') + 1;
   if (saatColumnIndex > 0) {
     const lastRow = sheet.getLastRow() || 1;
     if (lastRow > 1) {
       const saatRange = sheet.getRange(2, saatColumnIndex, lastRow - 1, 1);
-      // ÖNCE validation'ı temizle (format uygularken validation conflict önleme)
+      // ÖNCE validation'ı temizle (21.6.1: "9:05" formatı, "09:00" validation'ı ile uyuşmuyor)
       saatRange.clearDataValidations();
       SpreadsheetApp.flush(); // Validation temizleme işlemini hemen uygula
       // SONRA format uygula
       saatRange.setNumberFormat('@');
-      console.log('✅ Saat kolonu text formatına zorlandı (validation setRandevularimDataValidation içinde tekrar eklenecek)');
+      console.log('✅ Saat kolonu validation temizlendi ve text formatına zorlandı (21.6.1: "9:05" formatı)');
     }
   }
   
@@ -2488,9 +2602,8 @@ function applyRandevularimStyling(sheet) {
     }
   }
   
-  // ✅ sortRandevularimByDate öncesi saat kolonunun validation'ını temizle
-  // (sortRandevularimByDate içinde setValues yapılıyor, validation aktif olmamalı - conflict önleme)
-  // Not: Validation setRandevularimDataValidation içinde tekrar eklenecek (sadece tam saatler)
+  // ✅ DÜZELTME: sortRandevularimByDate öncesi saat kolonunun validation'ını temizle
+  // (sortRandevularimByDate içinde setValues yapılıyor, validation aktif olmamalı)
   const saatIndexForSort = headers.indexOf('Saat') + 1;
   if (saatIndexForSort > 0) {
     const lastRowForSort = sheet.getLastRow() || 1;
@@ -2498,13 +2611,11 @@ function applyRandevularimStyling(sheet) {
       const saatRangeForSort = sheet.getRange(2, saatIndexForSort, lastRowForSort - 1, 1);
       saatRangeForSort.clearDataValidations();
       SpreadsheetApp.flush(); // Validation temizleme işlemini hemen uygula
-      console.log('✅ Saat kolonunun validation kuralları sortRandevularimByDate öncesi temizlendi (validation setRandevularimDataValidation içinde tekrar eklenecek)');
+      console.log('✅ Saat kolonunun validation kuralları sortRandevularimByDate öncesi temizlendi (21.6.1: "9:05" formatı için)');
     }
   }
   
   // Auto-sort by date (newest first)
-  // ✅ KRİTİK: sortRandevularimByDate öncesi flush()
-  SpreadsheetApp.flush();
   sortRandevularimByDate(sheet);
   
   console.log('Randevularım styling completed with optimized column widths and date sorting');
@@ -2559,8 +2670,7 @@ function setRandevularimDataValidation(sheet) {
       console.warn('⚠️ Randevu durumu validation temizleme hatası (devam ediliyor):', clearErr.message);
     }
     
-    // Görseldeki sıraya göre: Randevu Alındı, İleri Tarih Randevu, Yeniden Aranacak, Bilgi Verildi, Fırsat İletildi, İlgilenmiyor, Ulaşılamadı, Geçersiz Numara, Kurumsal
-    const randevuDurumuOptions = CRM_CONFIG.ACTIVITY_OPTIONS; // Görseldeki seçeneklerle aynı
+    const randevuDurumuOptions = ['Randevu Alındı', 'İleri Tarih Randevu', 'Randevu Teyitlendi', 'Randevu Ertelendi', 'Randevu İptal oldu', 'Toplantı Gerçekleşti'];
     const randevuRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(randevuDurumuOptions, true)
       .setAllowInvalid(false) // Geçersiz değerlere izin verme
@@ -2592,33 +2702,15 @@ function setRandevularimDataValidation(sheet) {
     console.log('Applied Randevu Tarihi validation');
   }
   
-  // ✅ Saat kolonu validation (21.6.1 kuralı: Sadece tam saatler - "9:00", "10:00", ..., "20:00")
-  // Format: Saat padStart YOK, Dakika her zaman "00" (tam saatler için)
+  // ✅ DÜZELTME: Saat kolonunun validation'ını KALDIR (21.6.1 kuralı: "9:05" formatı, "09:00" değil!)
+  // Saat formatı "9:05" olmalı (21.6.1: Saat padStart YOK, Dakika padStart VAR)
+  // Validation "09:00" formatında değer bekliyor, bu yüzden validation'ı kaldırıyoruz
   const saatIndex = headers.indexOf('Saat') + 1;
   if (saatIndex > 0) {
-    // ✅ KRİTİK: setDataValidation ÖNCESİ validation'ı temizle (validation conflict önleme!)
-    try {
-      const maxRows = Math.max(validationRows, sheet.getLastRow() - 1, 1000);
-      sheet.getRange(2, saatIndex, maxRows, 1).clearDataValidations();
-      SpreadsheetApp.flush(); // Validation temizleme işlemini hemen uygula
-    } catch (clearErr) {
-      console.warn('⚠️ Saat kolonu validation temizleme hatası (devam ediliyor):', clearErr.message);
-    }
-    
-    // Sadece tam saatler için validation (21.6.1: "9:00", "10:00", ..., "20:00")
-    const saatOptions = [];
-    for (let hour = 9; hour <= 20; hour++) {
-      saatOptions.push(`${hour}:00`); // Saat padStart YOK, dakika her zaman "00"
-    }
-    
-    const saatRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(saatOptions, true)
-      .setAllowInvalid(false) // Sadece tam saatlere izin ver
-      .build();
-    
-    sheet.getRange(2, saatIndex, validationRows, 1).setDataValidation(saatRule);
-    SpreadsheetApp.flush(); // Validation ekleme işlemini hemen uygula
-    console.log('Applied Saat validation (21.6.1: Sadece tam saatler - "9:00" formatı)');
+    // Validation'ı temizle (21.6.1 kuralına uygun format için)
+    sheet.getRange(2, saatIndex, validationRows, 1).clearDataValidations();
+    SpreadsheetApp.flush(); // Validation temizleme işlemini hemen uygula
+    console.log('✅ Saat kolonunun validation kuralları kaldırıldı (21.6.1: "9:05" formatı için)');
   }
   
   // Toplantı formatı validation (dropdown)
@@ -2748,11 +2840,6 @@ function addOpportunity(parameters) {
     console.log('Active range:', activeRange.getA1Notation());
     
     const selectedRowData = getSelectedRowData(activeSheet, selectedRow);
-    
-    // Null check
-    if (!selectedRowData) {
-      throw new Error('Satır verisi alınamadı. Lütfen geçerli bir satır seçin.');
-    }
     
     // Check if row already has opportunity (only if Aktivite field exists and is not empty)
     if (selectedRowData.Aktivite && selectedRowData.Aktivite.toString().trim() === 'Fırsat İletildi') {
@@ -4059,114 +4146,29 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
     'Yorum', 'Yönetici Not', 'Address', 'Maplink'
   ];
   
-  // KRİTİK: Sheet'teki gerçek kolon sırasını kontrol et!
-  const actualHeaders = toplantilarimSheet.getRange(1, 1, 1, toplantilarimSheet.getLastColumn()).getValues()[0];
-  
-  // #region agent log
-  console.log('🔍 [DEBUG] createMeetingInToplantilarim: Column order check', JSON.stringify({
-    expectedColumns: toplantilarimColumns,
-    actualHeaders: actualHeaders,
-    match: JSON.stringify(toplantilarimColumns) === JSON.stringify(actualHeaders)
-  }));
-  // #endregion
-  
-  // KRİTİK: Sheet'teki gerçek kolon sırasını kullan, ama verileri doğru kolonlara yazmak için kolon adlarını kullan!
-  // Gerçek header'ları al (boş değerleri temizle)
-  const actualHeadersClean = actualHeaders.filter(h => h && String(h).trim() !== '');
-  
-  // #region agent log
-  console.log('🔍 [DEBUG] createMeetingInToplantilarim: Column order check', JSON.stringify({
-    expectedColumns: toplantilarimColumns,
-    actualHeaders: actualHeadersClean,
-    match: JSON.stringify(toplantilarimColumns) === JSON.stringify(actualHeadersClean)
-  }));
-  // #endregion
-  
-  // Eğer kolon sırası uyumsuzsa, uyarı ver ama toplantilarimColumns'u kullan (doğru sıra)
-  if (JSON.stringify(toplantilarimColumns) !== JSON.stringify(actualHeadersClean)) {
-    console.warn('⚠️ [DEBUG] Column order mismatch! Sheet needs to be fixed with fixToplantilarimColumnOrder.');
-    console.warn('⚠️ [DEBUG] Using expected column order for data mapping.');
-  }
-  
-  // KRİTİK: prepareMeetingRow için toplantilarimColumns kullan (doğru sıra)
-  // Ama yazarken gerçek kolon indekslerini kullan!
-  const columnsToUse = toplantilarimColumns;
-  
   // Prepare meeting row data
-  // #region agent log
-  console.log('🔍 [DEBUG] createMeetingInToplantilarim: Before prepareMeetingRow', JSON.stringify({
-    columnsToUse: columnsToUse,
-    columnsToUseLength: columnsToUse.length,
-    actualHeadersLength: actualHeadersClean.length,
-    rowDataKeys: Object.keys(rowData || {}),
-    meetingDataKeys: Object.keys(meetingData || {})
-  }));
-  // #endregion
-  
-  const meetingRow = prepareMeetingRow(rowData, meetingData, columnsToUse, toplantilarimSheet);
-  
-  // #region agent log
-  console.log('🔍 [DEBUG] createMeetingInToplantilarim: After prepareMeetingRow', JSON.stringify({
-    meetingRowLength: meetingRow.length,
-    meetingRowSample: meetingRow.slice(0, 5), // İlk 5 değer
-    columnsSample: toplantilarimColumns.slice(0, 5) // İlk 5 kolon
-  }));
-  // #endregion
+  const meetingRow = prepareMeetingRow(rowData, meetingData, toplantilarimColumns, toplantilarimSheet);
+  // Performance: Gereksiz console.log'lar kaldırıldı
   
   // PERFORMANS: Doğru pozisyonu bul ve insertRowBefore() kullan (sıralamaya gerek yok!)
-  const toplantiTarihiIdx = columnsToUse.indexOf('Toplantı Tarihi');
-  const toplantiSonucuIdx = columnsToUse.indexOf('Toplantı Sonucu');
+  const toplantiTarihiIdx = toplantilarimColumns.indexOf('Toplantı Tarihi');
+  const toplantiSonucuIdx = toplantilarimColumns.indexOf('Toplantı Sonucu');
   const newDate = meetingData.toplantiTarihi || meetingData.meetingDate || meetingRow[toplantiTarihiIdx] || '';
   const newStatus = meetingData.toplantiSonucu || meetingData.meetingResult || meetingRow[toplantiSonucuIdx] || '';
   
   // Doğru pozisyonu bul (batch read ile hızlı!)
-  const insertRow = findInsertPositionForToplanti(toplantilarimSheet, newDate, newStatus, columnsToUse);
+  const insertRow = findInsertPositionForToplanti(toplantilarimSheet, newDate, newStatus, toplantilarimColumns);
   
   // insertRowBefore() kullanarak doğru yere ekle
   toplantilarimSheet.insertRowBefore(insertRow);
   const nextRow = insertRow;
   
-  // KRİTİK: Gerçek kolon indekslerini kullan (sheet'teki gerçek sıra)
-  // actualHeadersClean zaten yukarıda tanımlı
-  const kaynakIdx = actualHeadersClean.indexOf('Kaynak') + 1;
-  const kodColumnIndex = actualHeadersClean.indexOf('Kod') + 1;
+  const kaynakIdx = toplantilarimColumns.indexOf('Kaynak') + 1;
+  const kodColumnIndex = toplantilarimColumns.indexOf('Kod') + 1;
   
   // Batch write: data + formats in one operation
-  // KRİTİK: Verileri doğru kolonlara yazmak için gerçek kolon indekslerini kullan!
-  const actualColumnCount = toplantilarimSheet.getLastColumn();
-  const rowToWrite = new Array(actualColumnCount).fill(''); // Gerçek kolon sayısı kadar boş array
-  
-  // Her kolonu doğru yere yaz (kolon adına göre)
-  columnsToUse.forEach((columnName, expectedIndex) => {
-    const actualIndex = actualHeadersClean.indexOf(columnName);
-    if (actualIndex !== -1 && expectedIndex < meetingRow.length) {
-      rowToWrite[actualIndex] = meetingRow[expectedIndex];
-      
-      // #region agent log
-      if (expectedIndex < 5) { // İlk 5 kolon için log
-        console.log(`🔍 [DEBUG] createMeetingInToplantilarim: Mapping column ${columnName}`, JSON.stringify({
-          expectedIndex: expectedIndex,
-          actualIndex: actualIndex,
-          value: meetingRow[expectedIndex]
-        }));
-      }
-      // #endregion
-    } else if (actualIndex === -1) {
-      console.warn(`⚠️ [DEBUG] Column "${columnName}" not found in actual sheet headers!`);
-    }
-  });
-  
-  // #region agent log
-  console.log('🔍 [DEBUG] createMeetingInToplantilarim: Row mapping complete', JSON.stringify({
-    meetingRowLength: meetingRow.length,
-    rowToWriteLength: rowToWrite.length,
-    actualColumnCount: actualColumnCount,
-    sampleValues: rowToWrite.slice(0, 5)
-  }));
-  // #endregion
-  
-  const dataRange = toplantilarimSheet.getRange(nextRow, 1, 1, actualColumnCount);
-  dataRange.setValues([rowToWrite]);
+  const dataRange = toplantilarimSheet.getRange(nextRow, 1, 1, toplantilarimColumns.length);
+  dataRange.setValues([meetingRow]);
   
   // Set formats for Kod and Kaynak columns (batch)
   if (kodColumnIndex > 0) {
@@ -4179,33 +4181,12 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
   // PERFORMANS: Sıralama kaldırıldı - yeni satır zaten en alta ekleniyor (1-2s kazanç!)
   // Sadece yeni satırı renklendir (tüm liste değil - opsiyonel)
   try {
-    // #region agent log
-    console.log('🔍 [DEBUG] createMeetingInToplantilarim: Starting color coding', JSON.stringify({nextRow, toplantilarimColumnsLength: toplantilarimColumns.length}));
-    // #endregion
-    
-    // KRİTİK: Gerçek kolon indekslerini kullan (sheet'teki gerçek sıra)
-    // actualHeadersClean zaten yukarıda tanımlı (satır 4187)
-    const toplantiSonucuActualIdx = actualHeadersClean.indexOf('Toplantı Sonucu');
-    const satisPotansiyeliActualIdx = actualHeadersClean.indexOf('Satış Potansiyeli');
-    
-    // #region agent log
-    console.log('🔍 [DEBUG] createMeetingInToplantilarim: Column indices', JSON.stringify({
-      toplantiSonucuActualIdx, 
-      satisPotansiyeliActualIdx,
-      columnsToUseLength: columnsToUse.length,
-      actualColumnCount: toplantilarimSheet.getLastColumn()
-    }));
-    // #endregion
-    
-    if (toplantiSonucuActualIdx !== -1 || satisPotansiyeliActualIdx !== -1) {
-      // Gerçek kolon indekslerinden değerleri al
-      const toplantiSonucu = rowToWrite[toplantiSonucuActualIdx] || '';
-      const satisPotansiyeli = rowToWrite[satisPotansiyeliActualIdx] || '';
+    const toplantiSonucuIdx = toplantilarimColumns.indexOf('Toplantı Sonucu');
+    const satisPotansiyeliIdx = toplantilarimColumns.indexOf('Satış Potansiyeli');
+    if (toplantiSonucuIdx !== -1 || satisPotansiyeliIdx !== -1) {
+      const toplantiSonucu = meetingRow[toplantiSonucuIdx] || '';
+      const satisPotansiyeli = meetingRow[satisPotansiyeliIdx] || '';
       let color = 'rgb(255, 255, 255)'; // Default white
-      
-      // #region agent log
-      console.log('🔍 [DEBUG] createMeetingInToplantilarim: Values', JSON.stringify({toplantiSonucu, satisPotansiyeli}));
-      // #endregion
       
       // Önce Satış Potansiyeli'ne bak
       if (satisPotansiyeli && satisPotansiyeli.toLowerCase() === 'sıcak') {
@@ -4220,96 +4201,13 @@ function createMeetingInToplantilarim(spreadsheet, rowData, meetingData) {
         color = CRM_CONFIG.COLOR_CODES['Toplantı Teklif'] || 'rgb(255, 255, 255)';
       }
       
-      // #region agent log
-      console.log('🔍 [DEBUG] createMeetingInToplantilarim: Color determined', JSON.stringify({
-        color, 
-        nextRow, 
-        columnsToUseLength: columnsToUse.length,
-        actualColumnCount: toplantilarimSheet.getLastColumn()
-      }));
-      // #endregion
-      
-      // KRİTİK: setBackground() öncesi validation'ı temizle (validation conflict önleme!)
-      // Gerçek kolon sayısını kullan!
-      const actualColumnCount = toplantilarimSheet.getLastColumn();
-      const colorRange = toplantilarimSheet.getRange(nextRow, 1, 1, actualColumnCount);
-      
-      // #region agent log
-      console.log('🔍 [DEBUG] createMeetingInToplantilarim: Range info', JSON.stringify({
-        row: nextRow,
-        column: 1,
-        numRows: 1,
-        numColumns: toplantilarimColumns.length,
-        rangeA1: colorRange.getA1Notation()
-      }));
-      // #endregion
-      
-      colorRange.clearDataValidations();
-      
-      // #region agent log
-      console.log('🔍 [DEBUG] createMeetingInToplantilarim: clearDataValidations called before setBackground');
-      // #endregion
-      
-      // flush() hemen uygula (validation temizleme için ZORUNLU!)
-      SpreadsheetApp.flush();
-      
-      // #region agent log
-      console.log('🔍 [DEBUG] createMeetingInToplantilarim: flush() after clearDataValidations');
-      // #endregion
-      
-      // Şimdi renk uygula (validation temizlendi, güvenli!)
-      // ALTERNATİF: setBackgrounds() kullan (batch operation, validation'dan bağımsız)
-      try {
-        // Tek satır için setBackgrounds() kullan (validation conflict önleme!)
-        // Gerçek kolon sayısını kullan!
-        const actualColumnCount = toplantilarimSheet.getLastColumn();
-        const colorArray = Array(actualColumnCount).fill(color);
-        colorRange.setBackgrounds([colorArray]);
-        
-        // #region agent log
-        console.log('🔍 [DEBUG] createMeetingInToplantilarim: setBackgrounds called successfully', JSON.stringify({color, nextRow, columnsCount: toplantilarimColumns.length}));
-        // #endregion
-      } catch (setBgError) {
-        // #region agent log
-        console.error('🔍 [DEBUG] createMeetingInToplantilarim: setBackgrounds ERROR', JSON.stringify({
-          error: setBgError.message,
-          stack: setBgError.stack,
-          color: color,
-          nextRow: nextRow
-        }));
-        // #endregion
-        
-        // Fallback: setBackground() dene (eğer setBackgrounds() başarısız olursa)
-        try {
-          console.log('🔍 [DEBUG] createMeetingInToplantilarim: Trying setBackground() as fallback');
-          colorRange.setBackground(color);
-          console.log('🔍 [DEBUG] createMeetingInToplantilarim: setBackground() fallback succeeded');
-        } catch (fallbackError) {
-          console.error('🔍 [DEBUG] createMeetingInToplantilarim: Both setBackgrounds() and setBackground() failed', JSON.stringify({
-            setBackgroundsError: setBgError.message,
-            setBackgroundError: fallbackError.message
-          }));
-          // Hata fırlatma, renklendirme kritik değil
-        }
-      }
-      
-      // KRİTİK: setBackground() sonrası flush() ZORUNLU!
-      SpreadsheetApp.flush();
-      
-      // #region agent log
-      console.log('🔍 [DEBUG] createMeetingInToplantilarim: flush() called after setBackground');
-      // #endregion
-    } else {
-      // #region agent log
-      console.log('🔍 [DEBUG] createMeetingInToplantilarim: Color coding skipped (columns not found)');
-      // #endregion
+      toplantilarimSheet.getRange(nextRow, 1, 1, toplantilarimColumns.length).setBackground(color);
     }
   } catch (colorError) {
-    // #region agent log
-    console.error('🔍 [DEBUG] createMeetingInToplantilarim: Color coding error', JSON.stringify({error: colorError.message, stack: colorError.stack}));
-    // #endregion
     // Renklendirme hatası kritik değil
   }
+  
+  // flush() kaldırıldı - processMeetingForm en sonda flush yapacak
   
   // Yeni satırı seçili yap (mavi çerçeve) - UX iyileştirmesi
   try {
@@ -4857,28 +4755,6 @@ function createLogArchiveSheet(spreadsheet) {
   // Sayfa varsa döndür (gizli olsa bile)
   let sheet = spreadsheet.getSheetByName(SHEET_NAME);
   if (sheet) {
-    // 🚫 Mevcut sayfadaki Aktivite sütunundaki tüm veri doğrulamayı kaldır (dropdown olmasın)
-    try {
-      const lastRow = sheet.getLastRow();
-      if (lastRow > 1) {
-        // Mevcut veri varsa, sadece veri olan satırları temizle
-        const aktiviteColumn = sheet.getRange(2, 3, lastRow - 1, 1); // Aktivite = 3. sütun, 2. satırdan başla
-        aktiviteColumn.clearDataValidations();
-        SpreadsheetApp.flush(); // ✅ KRİTİK: clearDataValidations sonrası flush ZORUNLU!
-        console.log(`✅ createLogArchiveSheet: Mevcut Log Arşivi - Aktivite sütunundaki ${lastRow - 1} satırın veri doğrulamaları kaldırıldı`);
-      }
-      // Gelecekteki satırlar için de temizle (maxRows kullan)
-      const maxRows = sheet.getMaxRows();
-      if (maxRows > 1) {
-        const aktiviteColumn = sheet.getRange(2, 3, maxRows - 1, 1);
-        aktiviteColumn.clearDataValidations();
-        SpreadsheetApp.flush();
-        console.log(`✅ createLogArchiveSheet: Tüm Log Arşivi sayfasındaki Aktivite sütunundaki veri doğrulamalar kaldırıldı (gelecek satırlar dahil, ${maxRows - 1} satır)`);
-      }
-    } catch (validationError) {
-      console.warn('⚠️ Aktivite veri doğrulama temizleme hatası (devam ediliyor):', validationError && validationError.message);
-    }
-    
     // Gizli değilse gizli yap
     if (!sheet.isSheetHidden()) {
       sheet.hideSheet();
@@ -4923,10 +4799,6 @@ function createLogArchiveSheet(spreadsheet) {
   // Format ayarları (sadece header satırı - 10000 satır format ayarlama gereksiz ve yavaş)
   // Format ayarları veri eklendiğinde otomatik uygulanacak
   
-  // 🚫 Aktivite sütunundaki tüm veri doğrulamayı kaldır (dropdown olmasın)
-  // Not: Yeni sayfa oluşturulduğunda henüz veri yok, bu yüzden bu kısım boş kalacak
-  // Dropdown temizleme işlemi showLogArchiveSheet ve logActivity'de yapılıyor
-  
   // Gizli yap (Temsilciler görmesin)
   sheet.hideSheet();
   
@@ -4946,69 +4818,6 @@ function showLogArchiveSheet() {
     // Sayfa yoksa oluştur
     if (!logSheet) {
       logSheet = createLogArchiveSheet(spreadsheet);
-    }
-    
-    // 🚫 TÜM Log Arşivi sayfasındaki Aktivite sütunundaki veri doğrulamayı kaldır (dropdown olmasın)
-    try {
-      const lastRow = logSheet.getLastRow();
-      if (lastRow > 1) {
-        // Tüm sayfadaki Aktivite sütununu temizle (2. satırdan son satıra kadar)
-        const aktiviteColumn = logSheet.getRange(2, 3, lastRow - 1, 1); // Aktivite = 3. sütun
-        aktiviteColumn.clearDataValidations();
-        SpreadsheetApp.flush(); // ✅ KRİTİK: clearDataValidations sonrası flush ZORUNLU!
-        console.log(`✅ showLogArchiveSheet: Tüm Log Arşivi sayfasındaki Aktivite sütunundaki veri doğrulamalar kaldırıldı (${lastRow - 1} satır)`);
-      } else {
-        // Sayfa boşsa, gelecekteki satırlar için de temizle (maxRows kullan)
-        const maxRows = logSheet.getMaxRows();
-        if (maxRows > 1) {
-          const aktiviteColumn = logSheet.getRange(2, 3, maxRows - 1, 1);
-          aktiviteColumn.clearDataValidations();
-          SpreadsheetApp.flush();
-          console.log(`✅ showLogArchiveSheet: Tüm Log Arşivi sayfasındaki Aktivite sütunundaki veri doğrulamalar kaldırıldı (gelecek satırlar dahil, ${maxRows - 1} satır)`);
-        }
-      }
-    } catch (validationError) {
-      console.warn('⚠️ Aktivite veri doğrulama temizleme hatası (devam ediliyor):', validationError && validationError.message);
-    }
-    
-    // 🎨 Mevcut satırları Aktivite'ye göre renklendir (ana sayfaların renkleri ile aynı)
-    try {
-      const lastRow = logSheet.getLastRow();
-      if (lastRow > 1) {
-        const dataRange = logSheet.getRange(2, 1, lastRow - 1, 7); // 2. satırdan başla, 7 sütun
-        const allData = dataRange.getValues();
-        const colors = [];
-        let coloredCount = 0;
-        
-        for (let i = 0; i < allData.length; i++) {
-          const row = allData[i];
-          const aktivite = row[2]; // Aktivite = 3. sütun (index 2)
-          let rowColor = 'rgb(255, 255, 255)'; // Varsayılan beyaz
-          
-          // Aktivite değerine göre renk al (CRM_CONFIG.COLOR_CODES'dan)
-          if (aktivite && String(aktivite).trim() !== '') {
-            const normalizedAktivite = String(aktivite).trim();
-            
-            // CRM_CONFIG.COLOR_CODES'dan renk al
-            if (CRM_CONFIG.COLOR_CODES[normalizedAktivite]) {
-              rowColor = CRM_CONFIG.COLOR_CODES[normalizedAktivite];
-              coloredCount++;
-            }
-          }
-          
-          // Renkleri array'e ekle
-          colors.push(Array(7).fill(rowColor));
-        }
-        
-        // Renkleri batch olarak uygula
-        if (colors.length > 0) {
-          dataRange.setBackgrounds(colors);
-          SpreadsheetApp.flush(); // ✅ KRİTİK: setBackgrounds sonrası flush ZORUNLU!
-          console.log(`✅ showLogArchiveSheet: ${coloredCount} satır renklendirildi (toplam ${allData.length} satır)`);
-        }
-      }
-    } catch (colorError) {
-      console.warn('⚠️ Log Arşivi renklendirme hatası (devam ediliyor):', colorError && colorError.message);
     }
     
     // Gizliyse göster
@@ -5563,18 +5372,9 @@ function prepareMeetingRow(rowData, meetingData, columns, sheet) {
   console.log('🔍 rowData.Kod:', rowData.Kod);
   console.log('🔍 meetingData:', meetingData);
   
-  // #region agent log
-  console.log('🔍 [DEBUG] prepareMeetingRow: Columns array', JSON.stringify({columns, columnsLength: columns.length}));
-  // #endregion
-  
   const row = new Array(columns.length).fill('');
   
   columns.forEach((column, index) => {
-    // #region agent log
-    if (index < 10) { // İlk 10 kolon için log
-      console.log(`🔍 [DEBUG] prepareMeetingRow: Processing column ${index} (${column})`);
-    }
-    // #endregion
     switch (column) {
       case 'Kod':
         // Use original format
@@ -7972,6 +7772,7 @@ function onOpen() {
       .addSeparator()
       .addItem('💰 Satışlarım', 'showSatislarimSheet')
       .addSeparator()
+      .addItem('📦 Dataset Raporu', 'showDatasetReportDialog');
 
         crmMenu.addToUi();
 
@@ -7981,8 +7782,13 @@ function onOpen() {
   }
 }
 
-// 🔄 DATA POOL'A TAŞINDI - showCreateTableDialog() artık yok
-// Bu fonksiyon createNewTable()'ı çağırıyordu, o da Data Pool'a taşındı
+/**
+ * Shows create table dialog
+ */
+function showCreateTableDialog() {
+  console.log('Showing create table dialog');
+  createNewTable({});
+}
 
 // ========================================
 // INITIALIZATION
@@ -8001,6 +7807,99 @@ console.log('Activity options:', CRM_CONFIG.ACTIVITY_OPTIONS);
  * @param {Object} parameters - Function parameters
  * @returns {Object} - Result object
  */
+function applyDataValidationToExistingSheets(parameters) {
+  console.log('Function started: applyDataValidationToExistingSheets', parameters);
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let appliedCount = 0;
+    
+    // Apply to all Format Tablo sheets
+    const sheets = spreadsheet.getSheets();
+    console.log('Total sheets found:', sheets.length);
+    
+    sheets.forEach(sheet => {
+      const sheetName = sheet.getName();
+      console.log('Checking sheet:', sheetName);
+      
+      if (isFormatTable(sheet)) {
+        console.log('✅ Applying data validation to Format Tablo:', sheetName);
+        setDataValidation(sheet);
+        appliedCount++;
+      } else {
+        console.log('❌ Skipping sheet (not Format Tablo):', sheetName);
+      }
+    });
+    
+    // Apply to Randevularım
+    const randevularimSheet = spreadsheet.getSheetByName('Randevularım');
+    console.log('Looking for Randevularım sheet:', randevularimSheet ? 'Found' : 'Not found');
+    if (randevularimSheet) {
+      console.log('Applying data validation to Randevularım');
+      setRandevularimDataValidation(randevularimSheet);
+      
+      // Force Kod column to be text format
+      const headers = randevularimSheet.getRange(1, 1, 1, randevularimSheet.getLastColumn()).getValues()[0];
+      const kodIndex = headers.indexOf('Kod') + 1;
+      if (kodIndex > 0) {
+        randevularimSheet.getRange(1, kodIndex, 1000, 1).setNumberFormat('@');
+        console.log('Randevularım Kod column forced to text format');
+      }
+      
+      appliedCount++;
+    }
+    
+    // Apply to Fırsatlarım
+    const firsatlarimSheet = spreadsheet.getSheetByName('Fırsatlarım');
+    console.log('Looking for Fırsatlarım sheet:', firsatlarimSheet ? 'Found' : 'Not found');
+    if (firsatlarimSheet) {
+      console.log('Applying data validation to Fırsatlarım');
+      setFirsatlarimDataValidation(firsatlarimSheet);
+      
+      // Force Kod column to be text format
+      const headers = firsatlarimSheet.getRange(1, 1, 1, firsatlarimSheet.getLastColumn()).getValues()[0];
+      const kodIndex = headers.indexOf('Kod') + 1;
+      if (kodIndex > 0) {
+        firsatlarimSheet.getRange(1, kodIndex, 1000, 1).setNumberFormat('@');
+        console.log('Fırsatlarım Kod column forced to text format');
+      }
+      
+      appliedCount++;
+    }
+    
+    // Apply to Toplantılarım
+    const toplantilarimSheet = spreadsheet.getSheetByName('Toplantılarım');
+    console.log('Looking for Toplantılarım sheet:', toplantilarimSheet ? 'Found' : 'Not found');
+    if (toplantilarimSheet) {
+      console.log('Applying data validation to Toplantılarım');
+      setToplantilarimDataValidation(toplantilarimSheet);
+      
+      // Force Kod column to be text format
+      const headers = toplantilarimSheet.getRange(1, 1, 1, toplantilarimSheet.getLastColumn()).getValues()[0];
+      const kodIndex = headers.indexOf('Kod') + 1;
+      if (kodIndex > 0) {
+        toplantilarimSheet.getRange(1, kodIndex, 1000, 1).setNumberFormat('@');
+        console.log('Toplantılarım Kod column forced to text format');
+      }
+      
+      appliedCount++;
+    }
+    
+    const result = {
+      success: true,
+      appliedCount: appliedCount,
+      message: `${appliedCount} sayfaya data validation ve Kod sütunu metin formatı uygulandı.`
+    };
+    
+    console.log('Processing complete:', result);
+    return result;
+    
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
 
 /**
  * Updates existing Kod values to match current sheet name
@@ -8379,6 +8278,62 @@ function onEdit(e) {
 /**
  * 🎨 Manual Color Coding - Force Apply Colors
  */
+function applyManualColorCoding() {
+  console.log('🎨 Applying manual color coding');
+  
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const sheetName = sheet.getName();
+    
+    console.log('Current sheet:', sheetName);
+    
+    if (sheetName === 'Randevularım') {
+      console.log('Applying color coding to Randevularım');
+      
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const randevuDurumuIndex = headers.indexOf('Randevu Durumu');
+      
+      if (randevuDurumuIndex !== -1) {
+        for (let i = 1; i < data.length; i++) {
+          const status = data[i][randevuDurumuIndex];
+          if (status && status !== '') {
+            console.log(`Row ${i + 1}: ${status}`);
+            updateRandevularimRowColor(sheet, i + 1, status);
+          }
+        }
+        SpreadsheetApp.getUi().alert('Randevularım renk kodlaması uygulandı');
+      } else {
+        SpreadsheetApp.getUi().alert('Randevu Durumu sütunu bulunamadı');
+      }
+    } else if (sheetName === 'Fırsatlarım') {
+      console.log('Applying color coding to Fırsatlarım');
+      
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const firsatDurumuIndex = headers.indexOf('Fırsat Durumu');
+      
+      if (firsatDurumuIndex !== -1) {
+        for (let i = 1; i < data.length; i++) {
+          const status = data[i][firsatDurumuIndex];
+          if (status && status !== '') {
+            console.log(`Row ${i + 1}: ${status}`);
+            applyOpportunityColorCoding(sheet, i + 1);
+          }
+        }
+        SpreadsheetApp.getUi().alert('Fırsatlarım renk kodlaması uygulandı');
+      } else {
+        SpreadsheetApp.getUi().alert('Fırsat Durumu sütunu bulunamadı');
+      }
+      } else {
+      SpreadsheetApp.getUi().alert('Bu fonksiyon sadece Randevularım veya Fırsatlarım sayfalarında çalışır');
+    }
+    
+  } catch (error) {
+    console.error('Error applying manual color coding:', error);
+    SpreadsheetApp.getUi().alert('Renk kodlaması uygulanırken hata: ' + error.message);
+  }
+}
 
 /**
  * Creates admin menu for all sheets
@@ -8392,17 +8347,26 @@ function createAdminMenu() {
     // Create Admin menu
     const menu = ui.createMenu('Admin');
     
-    // 📋 Tablo İşlemleri - DATA POOL'A TAŞINDI
-    // menu.addItem('📋 Yeni Tablo oluştur', 'showCreateTableDialog'); // 🔄 DATA POOL'A TAŞINDI
+    // 📋 Tablo İşlemleri
+    menu.addItem('📋 Yeni Tablo oluştur', 'showCreateTableDialog');
     menu.addSeparator();
     
-    // 📦 Format Tablo İşlemleri - DATA POOL'A TAŞINDI
-    // const archiveSubmenu = ui.createMenu('📦 Format Tablo İşlemleri')
-    //   .addItem('📦 Format Tablo Arşivle', 'archiveFormatTable')
-    //   .addItem('📊 Format Tabloyu Raporla', 'reportFormatTable')
-    //   .addItem('🗑️ Format Tabloyu Sil', 'deleteFormatTable');
-    // menu.addSubMenu(archiveSubmenu); // 🔄 DATA POOL'A TAŞINDI
+    // 📦 Format Tablo İşlemleri
+    const archiveSubmenu = ui.createMenu('📦 Format Tablo İşlemleri')
+      .addItem('📦 Format Tablo Arşivle', 'archiveFormatTable')
+      .addItem('📊 Format Tabloyu Raporla', 'reportFormatTable')
+      .addItem('🗑️ Format Tabloyu Sil', 'deleteFormatTable');
+    menu.addSubMenu(archiveSubmenu);
     menu.addSeparator();
+    
+    // 🎨 Renklendirme
+    const colorSubmenu = ui.createMenu('🎨 Renklendirme')
+        .addItem('Manuel Renk Uygula', 'applyManualColorCoding')
+      .addItem('Toplantılarım Renklerini Yenile', 'refreshToplantilarimColors')
+        .addSeparator()
+        .addItem('Bu Sayfa - Renkleri Yenile', 'refreshColorsOnActiveSheet')
+      .addItem('Tüm Sayfalar - Renkleri Yenile', 'refreshAllColors');
+    menu.addSubMenu(colorSubmenu);
     
     // 🔍 Website Analizi
     const websiteSubmenu = ui.createMenu('🔍 Website Analizi')
@@ -8411,43 +8375,44 @@ function createAdminMenu() {
       .addItem('E-ticaret İzi Tespiti (Seçili)', 'detectEcommerceSelectedRows')
       .addItem('Hız Testi (Seçili)', 'speedTestSelectedRows')
       .addSeparator()
-      .addItem('E-ticaret Kontrolü & İşaretleme', 'generateCategoryKeywordCMSReport')
-      .addItem('🗑️ Silinmeye Aday Satırları Sil', 'deleteSilinmeyeAdayRows');
+      .addItem('E-ticaret Kontrolü & İşaretleme', 'generateCategoryKeywordCMSReport');
     menu.addSubMenu(websiteSubmenu);
     
-    // 🧼 Bakım - DATA POOL'A TAŞINDI
+    // 🧼 Bakım
     const bakım = ui.createMenu('🧼 Bakım')
-        // .addItem('📵 Telefonu olmayanları sil', 'deleteRowsWithoutPhone') // 🔄 DATA POOL'A TAŞINDI
-        // .addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite') // 🔄 DATA POOL'A TAŞINDI
-        // .addSeparator()
-        // .addItem('🔎 Mükerrerleri Bul (Firma + Telefon)', 'findDuplicatesInFormatTable') // 🔄 DATA POOL'A TAŞINDI
-        // .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm') // 🔄 DATA POOL'A TAŞINDI
-        // .addItem('🗑️ Mükerrerleri Bul ve Hepsini Sil', 'deleteAllDuplicatesAuto') // 🔄 DATA POOL'A TAŞINDI
-        // .addSeparator()
-        // .addItem('🧹 URL Temizle (1. Aşama)', 'urlTemizleTumunu') // 🔄 DATA POOL'A TAŞINDI
-        // .addItem('🗑️ URL Tekrarları Sil (2. Aşama)', 'urlTekrarlariniSil') // 🔄 DATA POOL'A TAŞINDI
+        .addItem('📵 Telefonu olmayanları sil', 'deleteRowsWithoutPhone')
+        .addItem('🌐 Websitesi olmayanları sil', 'deleteRowsWithoutWebsite')
+        .addSeparator()
+        .addItem('🔎 Mükerrerleri Bul (Firma + Telefon)', 'findDuplicatesInFormatTable')
+        .addItem('🧽 Mükerrerleri Bul ve Sil', 'deleteDuplicateRowsWithConfirm')
+      .addItem('🗑️ Mükerrerleri Bul ve Hepsini Sil', 'deleteAllDuplicatesAuto')
+        .addSeparator()
+        .addItem('🧹 URL Temizle (1. Aşama)', 'urlTemizleTumunu')
+      .addItem('🗑️ URL Tekrarları Sil (2. Aşama)', 'urlTekrarlariniSil')
       .addSeparator()
-      .addItem('📦 Dataset Raporu', 'showDatasetReportDialog')
-      .addItem('🎨 Bu Sayfa - Renkleri Yenile', 'refreshColorsOnActiveSheet')
       .addItem('📋 Log Arşivi (Admin)', 'showLogArchiveSheet')
       .addSeparator()
-      .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation');
+      .addItem('🧭 Lokasyona göre sırala (A→Z)', 'sortActiveSheetByLocation')
+      .addItem('🗑️ Silinmeye Aday Satırları Sil', 'deleteSilinmeyeAdayRows');
     menu.addSubMenu(bakım);
     
     // 🔧 Düzenleme
     menu.addSeparator();
-    const duzenlemeSubmenu = ui.createMenu('🔧 Düzenleme')
-      .addItem('🔧 Randevularım - Yeni Kolon Düzenine Geçir', 'fixRandevularimColumnStructure')
-      .addItem('📅 Randevularım - Ay Kolonunu Doldur', 'fillAyColumnInRandevularim')
-      .addItem('🔄 Randevularım - Tarihe Göre Sırala', 'manualSortRandevularim')
-      .addItem('🔧 Fırsatlarım - Yeni Kolon Düzenine Geçir', 'fixFirsatlarimColumnOrder')
-      .addItem('🔧 Toplantılarım - Yeni Kolon Düzenine Geçir', 'fixToplantilarimColumnOrder')
-      .addItem('🔧 Satışlarım - Yeni Kolon Düzenine Geçir', 'fixSatislarimColumnOrder')
-      .addItem('🗑️ Toplantılarım - Duplicate Kayıtları Temizle', 'cleanDuplicateMeetings');
-    menu.addSubMenu(duzenlemeSubmenu);
-    
-    // ⭐ Referansları Üste Taşı (Format Tablo) - Düzenleme dışında, doğrudan Admin menüsünde
+    menu.addItem('🔧 Randevularım - Yeni Kolon Düzenine Geçir', 'fixRandevularimColumnStructure');
+    menu.addItem('📅 Randevularım - Ay Kolonunu Doldur', 'fillAyColumnInRandevularim');
+    menu.addItem('🔄 Randevularım - Tarihe Göre Sırala', 'manualSortRandevularim');
+    menu.addItem('🔧 Fırsatlarım - Yeni Kolon Düzenine Geçir', 'fixFirsatlarimColumnOrder');
+    menu.addItem('🔧 Toplantılarım - Yeni Kolon Düzenine Geçir', 'fixToplantilarimColumnOrder');
+    menu.addItem('🔧 Satışlarım - Yeni Kolon Düzenine Geçir', 'fixSatislarimColumnOrder');
+    menu.addItem('🗑️ Toplantılarım - Duplicate Kayıtları Temizle', 'cleanDuplicateMeetings');
     menu.addItem('⭐ Referansları Üste Taşı (Format Tablo)', 'markIdeaSoftReferencesOnActiveFormatTable');
+    menu.addItem('🧱 CMS Sütunlarını Website Yanına Taşı', 'addCmsColumnsNextToWebsiteOnAllFormatTables');
+    menu.addSeparator();
+    menu.addItem('✅ Tüm Sayfalara Veri Doğrulama Ekle (Format Tablo + Diğerleri)', 'applyDataValidationToExistingSheets');
+    
+    // 🔧 Boş Kodları Doldur (Admin only)
+    menu.addSeparator();
+    menu.addItem('🔧 Boş Kodları Doldur (Randevularım)', 'fillEmptyKodInRandevularim');
     
     // Add menu to UI
     menu.addToUi();
@@ -8463,8 +8428,69 @@ function createAdminMenu() {
 /**
  * 🔎 Mükerrerleri Bul (Firma + Telefon)
  */
-// 🔄 DATA POOL'A TAŞINDI - findDuplicatesInFormatTable()
-// Bu fonksiyon merkezi Data Pool sistemine taşınmıştır
+function findDuplicatesInFormatTable(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const sheetName = sheet.getName();
+    if (!isFormatTable(sheet) && sheetName !== 'Randevularım' && sheetName !== 'Fırsatlarım' && sheetName !== 'Toplantılarım') {
+      throw new Error('Bu işlem sadece Format Tablo / Randevularım / Fırsatlarım / Toplantılarım sayfalarında yapılabilir');
+    }
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      ui.alert('Bilgi', 'Veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, duplicates: 0 };
+    }
+    const headers = data[0];
+    const companyIdx = findColumnIndex(headers, ['Company name', 'Company Name']);
+    const phoneIdx = findColumnIndex(headers, ['Phone']);
+    if (companyIdx === -1) {
+      throw new Error("'Company name' kolonu bulunamadı");
+    }
+    const keyToRows = new Map();
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const company = (row[companyIdx] || '').toString().trim();
+      if (!company) continue;
+      const phoneRaw = phoneIdx !== -1 ? (row[phoneIdx] || '').toString() : '';
+      const phoneDigits = phoneRaw.replace(/\D+/g, '');
+      const phoneKey = phoneDigits.length >= 7 ? phoneDigits : '';
+      const key = `${company.toLowerCase()}|${phoneKey}`;
+      if (!keyToRows.has(key)) keyToRows.set(key, []);
+      keyToRows.get(key).push(i + 1);
+    }
+    const duplicates = [...keyToRows.entries()].filter(([, rows]) => rows.length > 1);
+    const ss = sheet.getParent();
+    const reportName = '🧪 Mükerrer Raporu';
+    let report = ss.getSheetByName(reportName) || ss.insertSheet(reportName);
+    report.clear();
+    const headerRow = ['Key', 'Şirket', 'Telefon', 'Tekrar Sayısı', 'Satırlar'];
+    report.getRange(1, 1, 1, headerRow.length).setValues([headerRow]).setFontWeight('bold');
+    let r = 2;
+    duplicates.forEach(([key, rows]) => {
+      const [companyKey, phoneKey] = key.split('|');
+      const company = companyKey ? companyKey : '';
+      const phone = phoneKey ? phoneKey : '';
+      report.getRange(r, 1, 1, 5).setValues([[key, company, phone, rows.length, rows.join(', ')]]);
+      r++;
+    });
+    if (r > 2) {
+      report.setFrozenRows(1);
+      report.getRange(1, 1, r - 1, headerRow.length).setBorder(true, true, true, true, true, true);
+      report.autoResizeColumns(1, headerRow.length);
+    }
+    ui.alert('Mükerrer tarama tamamlandı', `Toplam grup: ${duplicates.length}\nDetaylar '${reportName}' sayfasında.`, ui.ButtonSet.OK);
+    return { success: true, groups: duplicates.length };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
 
 /**
  * 🧭 Lokasyona göre sırala (A→Z)
@@ -8651,64 +8677,868 @@ function showDatasetReportDialog() {
 }
 
 /**
- * ========================================
- * 📦 FORMAT TABLO ANALİZ VE ARŞİVLEME SİSTEMİ
- * ========================================
+ * 📦 Format Tablo Analiz ve Arşivleme Sistemi
  * 
- * ⚠️ MİGRASYON NOTU: Bu fonksiyonlar Data Pool sistemine taşınmıştır.
- * 
- * Taşınan fonksiyonlar:
- * - analyzeFormatTableForArchive()
- * - archiveFormatTableToDrive()
- * - addDatasetReportToManager()
- * - reportFormatTable()
- * - deleteFormatTable()
- * - archiveFormatTable()
- * - extractLogStatisticsFromArchive()
- * - getOrCreateArchiveSheet()
- * - createArchiveCard()
- * - addArchiveCardToSheet()
- * 
- * Yeni konum: Data Pool (merkezi sistem)
- * 
- * Bu fonksiyonlar artık backend.js'de yoktur.
- * Format Tablo işlemleri merkezi Data Pool'dan yönetilir.
+ * Yeni profesyonel Dataset Raporu sistemi:
+ * 1. Format Tablo'yu analiz eder (istatistikler)
+ * 2. "Hepsi arandı mı" kontrolü yapar
+ * 3. Google Drive'a arşivler
+ * 4. Yönetici dosyasına rapor ekler
  */
 
-// ========================================
-// ⚠️ MİGRASYON: Fonksiyonlar kaldırıldı
-// ========================================
-// Aşağıdaki fonksiyonlar Data Pool sistemine taşınmıştır:
-// - analyzeFormatTableForArchive()
-// - archiveFormatTableToDrive()
-// - addDatasetReportToManager()
-// - reportFormatTable()
-// - deleteFormatTable()
-// - archiveFormatTable()
-// - extractLogStatisticsFromArchive()
-// - getOrCreateArchiveSheet()
-// - createArchiveCard()
-// - addArchiveCardToSheet()
-// ========================================
+/**
+ * Format Tablo sayfasını analiz eder ve istatistikler döndürür
+ * @param {Sheet} formatTableSheet - Format Tablo sayfası
+ * @param {string} sheetName - Sayfa adı
+ * @returns {Object} Analiz sonuçları
+ */
+function analyzeFormatTableForArchive(formatTableSheet, sheetName) {
+  const startTime = Date.now();
+  console.log(`📊 Format Tablo analizi başlatılıyor: ${sheetName}`);
+  
+  try {
+    if (!formatTableSheet || formatTableSheet.getLastRow() <= 1) {
+      throw new Error('Format Tablo boş veya bulunamadı');
+    }
+    
+    // Batch read: Tüm veriyi tek seferde oku (Google best practice)
+    const allData = formatTableSheet.getDataRange().getValues();
+    const headers = allData[0] || [];
+    const rows = allData.slice(1);
+    
+    // Kolon indekslerini bul
+    const aktiviteIdx = headers.findIndex(h => 
+      h && (String(h).toLowerCase().includes('aktivite') && !String(h).toLowerCase().includes('tarihi'))
+    );
+    const aktiviteTarihiIdx = headers.findIndex(h => 
+      h && (String(h).toLowerCase().includes('aktivite tarihi') || String(h).toLowerCase().includes('tarih'))
+    );
+    const logIdx = headers.findIndex(h => 
+      h && String(h).toLowerCase().includes('log')
+    );
+    const kaynakIdx = headers.indexOf('Kaynak');
+    
+    // Toplam kontak sayısı (boş olmayan satırlar)
+    const totalContacts = rows.filter(r => r.some(c => c && String(c).trim() !== '')).length;
+    
+    // Aktivite sayımları
+    let aramaYapilan = 0; // Aktivite dolu satırlar
+    let aktiviteTarihiDolu = 0; // Aktivite Tarihi dolu satırlar
+    let logDolu = 0; // Log dolu satırlar
+    
+    const aktiviteCounts = {
+      'Ulaşılamadı': 0,
+      'İlgilenmiyor': 0,
+      'Geçersiz Numara': 0,
+      'Randevu Alındı': 0,
+      'Fırsat Oluşturuldu': 0,
+      'Toplantı Yapıldı': 0,
+      'Diğer': 0
+    };
+    
+    // Her satırı analiz et (batch processing)
+    rows.forEach((row, index) => {
+      // Boş satırları atla
+      if (!row.some(c => c && String(c).trim() !== '')) return;
+      
+      // Aktivite kontrolü
+      const aktivite = aktiviteIdx !== -1 ? String(row[aktiviteIdx] || '').trim() : '';
+      if (aktivite) {
+        aramaYapilan++;
+        
+        // Aktivite tipine göre say
+        if (aktiviteCounts.hasOwnProperty(aktivite)) {
+          aktiviteCounts[aktivite]++;
+        } else {
+          aktiviteCounts['Diğer']++;
+        }
+      }
+      
+      // Aktivite Tarihi kontrolü
+      if (aktiviteTarihiIdx !== -1 && row[aktiviteTarihiIdx] && String(row[aktiviteTarihiIdx]).trim()) {
+        aktiviteTarihiDolu++;
+      }
+      
+      // Log kontrolü
+      if (logIdx !== -1 && row[logIdx] && String(row[logIdx]).trim()) {
+        logDolu++;
+      }
+    });
+    
+    // "Hepsi arandı mı" kontrolü
+    // Üç kriterden biri tamamlanmışsa "arandı" kabul edilir
+    const tumuAranmis = (
+      aramaYapilan >= totalContacts ||
+      aktiviteTarihiDolu >= totalContacts ||
+      logDolu >= totalContacts
+    );
+    
+    // Randevu/Fırsat/Toplantı sayımları (Randevularım, Fırsatlarım, Toplantılarım sayfalarından)
+    const ss = formatTableSheet.getParent();
+    const randevuSheet = ss.getSheetByName('Randevularım');
+    const firsatSheet = ss.getSheetByName('Fırsatlarım');
+    const toplantiSheet = ss.getSheetByName('Toplantılarım');
+    
+    // Kaynak kolonuna göre say (batch read)
+    let randevuAlindi = 0;
+    let toplantiYapildi = 0;
+    let satisYapildi = 0;
+    
+    if (randevuSheet && kaynakIdx !== -1) {
+      const randevuData = randevuSheet.getDataRange().getValues();
+      const randevuHeaders = randevuData[0] || [];
+      const randevuRows = randevuData.slice(1);
+      const randevuKaynakIdx = randevuHeaders.indexOf('Kaynak');
+      const randevuDurumIdx = randevuHeaders.indexOf('Randevu durumu');
+      
+      if (randevuKaynakIdx !== -1 && randevuDurumIdx !== -1) {
+        randevuAlindi = randevuRows.filter(r => {
+          const kaynak = String(r[randevuKaynakIdx] || '').trim();
+          const durum = String(r[randevuDurumIdx] || '').trim();
+          return kaynak === sheetName && (
+            durum === 'Randevu Alındı' ||
+            durum === 'Randevu Teyitlendi' ||
+            durum === 'İleri Tarih Randevu'
+          );
+        }).length;
+      }
+    }
+    
+    if (toplantiSheet && kaynakIdx !== -1) {
+      const toplantiData = toplantiSheet.getDataRange().getValues();
+      const toplantiHeaders = toplantiData[0] || [];
+      const toplantiRows = toplantiData.slice(1);
+      const toplantiKaynakIdx = toplantiHeaders.indexOf('Kaynak');
+      const toplantiSonucIdx = toplantiHeaders.indexOf('Toplantı Sonucu');
+      
+      if (toplantiKaynakIdx !== -1 && toplantiSonucIdx !== -1) {
+        toplantiYapildi = toplantiRows.filter(r => {
+          const kaynak = String(r[toplantiKaynakIdx] || '').trim();
+          return kaynak === sheetName;
+        }).length;
+        
+        satisYapildi = toplantiRows.filter(r => {
+          const kaynak = String(r[toplantiKaynakIdx] || '').trim();
+          const sonuc = String(r[toplantiSonucIdx] || '').trim();
+          return kaynak === sheetName && sonuc === 'Satış Yapıldı';
+        }).length;
+      }
+    }
+    
+    // Başarı puanı hesapla (şimdilik randevu sayısı / toplam kontak × 100)
+    const basariPuani = totalContacts > 0 
+      ? Math.round((randevuAlindi / totalContacts) * 100 * 10) / 10 
+      : 0;
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo analizi tamamlandı (${duration}ms)`);
+    
+    return {
+      sheetName: sheetName,
+      totalContacts: totalContacts,
+      aramaYapilan: aramaYapilan,
+      aktiviteTarihiDolu: aktiviteTarihiDolu,
+      logDolu: logDolu,
+      tumuAranmis: tumuAranmis,
+      aktiviteCounts: aktiviteCounts,
+      randevuAlindi: randevuAlindi,
+      toplantiYapildi: toplantiYapildi,
+      satisYapildi: satisYapildi,
+      basariPuani: basariPuani,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error(`❌ Format Tablo analiz hatası: ${error.message}`);
+    throw error;
+  }
+}
 
-// ========================================
-// ⚠️ MİGRASYON: Format Tablo Analiz ve Arşivleme Fonksiyonları
-// ========================================
-// Aşağıdaki fonksiyonlar Data Pool sistemine taşınmıştır:
-// - analyzeFormatTableForArchive()
-// - archiveFormatTableToDrive()
-// - addDatasetReportToManager()
-// - reportFormatTable()
-// - deleteFormatTable()
-// - archiveFormatTable()
-// - extractLogStatisticsFromArchive()
-// - getOrCreateArchiveSheet()
-// - createArchiveCard()
-// - addArchiveCardToSheet()
-// 
-// Bu fonksiyonlar artık backend.js'de yoktur.
-// Format Tablo işlemleri merkezi Data Pool'dan yönetilir.
-// ========================================
+/**
+ * Format Tablo sayfasını Google Drive klasörüne arşivler
+ * @param {Sheet} formatTableSheet - Format Tablo sayfası
+ * @param {string} archiveFolderId - Google Drive klasör ID
+ * @param {string} uniqueCode - Özel kod (Sayfa İsmi_Uzman Kodu_Tarih)
+ * @returns {Object} Arşivleme sonucu
+ */
+function archiveFormatTableToDrive(formatTableSheet, archiveFolderId, uniqueCode) {
+  const startTime = Date.now();
+  console.log(`📦 Format Tablo arşivleniyor: ${uniqueCode}`);
+  
+  try {
+    if (!formatTableSheet) {
+      throw new Error('Format Tablo sayfası bulunamadı');
+    }
+    
+    if (!archiveFolderId) {
+      throw new Error('Arşiv klasör ID belirtilmedi');
+    }
+    
+    // Klasörü al
+    const archiveFolder = DriveApp.getFolderById(archiveFolderId);
+    
+    // Sayfanın bağlı olduğu dosyayı al
+    const spreadsheet = formatTableSheet.getParent();
+    const spreadsheetFile = DriveApp.getFileById(spreadsheet.getId());
+    
+    // Yeni dosya oluştur (sadece bu sayfayı içeren)
+    const archiveFileName = `${uniqueCode}_Arşiv.xlsx`;
+    
+    // Sayfanın içeriğini yeni bir spreadsheet'e kopyala
+    const newSpreadsheet = SpreadsheetApp.create(archiveFileName);
+    const newSheet = newSpreadsheet.getActiveSheet();
+    
+    // Veriyi kopyala (batch read + batch write)
+    const allData = formatTableSheet.getDataRange().getValues();
+    if (allData.length > 0) {
+      newSheet.getRange(1, 1, allData.length, allData[0].length).setValues(allData);
+    }
+    
+    // Formatları kopyala (opsiyonel - yavaş olabilir, gerekirse kaldırılabilir)
+    try {
+      const formats = formatTableSheet.getDataRange().getBackgrounds();
+      if (formats.length > 0) {
+        newSheet.getRange(1, 1, formats.length, formats[0].length).setBackgrounds(formats);
+      }
+    } catch (formatError) {
+      console.warn('⚠️ Format kopyalama hatası (devam ediliyor):', formatError.message);
+    }
+    
+    // Yeni dosyayı Excel formatına çevir (opsiyonel - şimdilik .gsheet olarak bırakılabilir)
+    // Excel export için Drive API gerekir, şimdilik Google Sheets formatında sakla
+    
+    // Dosyayı arşiv klasörüne taşı
+    const newSpreadsheetFile = DriveApp.getFileById(newSpreadsheet.getId());
+    newSpreadsheetFile.moveTo(archiveFolder);
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo arşivlendi: ${archiveFileName} (${duration}ms)`);
+    
+    return {
+      success: true,
+      archiveFileName: archiveFileName,
+      archiveFileId: newSpreadsheetFile.getId(),
+      archiveFolderId: archiveFolderId,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error(`❌ Arşivleme hatası: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Yönetici dosyasına Dataset Raporu ekle (manager-sync.js'den çağrılır)
+ * Bu fonksiyon backend.js'den manager-sync.js'deki fonksiyonu çağırır
+ */
+function addDatasetReportToManager(uzmanKodu, sheetName, tarih, analysisResult, archiveFileId, archiveFileName) {
+  try {
+    // manager-sync.js'deki fonksiyonu çağır (Google Apps Script global scope)
+    if (typeof addDatasetReportToManagerSync === 'function') {
+      return addDatasetReportToManagerSync(uzmanKodu, sheetName, tarih, analysisResult, archiveFileId, archiveFileName);
+    } else {
+      console.warn('⚠️ addDatasetReportToManagerSync fonksiyonu bulunamadı, manager-sync.js yüklü mü kontrol edin');
+      throw new Error('Manager sync fonksiyonu bulunamadı');
+    }
+  } catch (error) {
+    console.error('❌ Yönetici raporu ekleme hatası:', error);
+    throw error;
+  }
+}
+
+/**
+ * Format Tablo'yu raporla (Basit versiyon)
+ * Temsilci dosyasında "Format Tablo Raporları" sayfası oluşturur ve özet rapor yazar
+ * @returns {Object} İşlem sonucu
+ */
+function reportFormatTable() {
+  const startTime = Date.now();
+  console.log('📊 Format Tablo raporlama başlatılıyor...');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const activeSheet = ss.getActiveSheet();
+    const sheetName = activeSheet.getName();
+    
+    // Format Tablo kontrolü
+    if (!isFormatTable(activeSheet)) {
+      ui.alert('❌ Hata', 'Aktif sayfa bir Format Tablo değil!', ui.ButtonSet.OK);
+      return { success: false, error: 'Not a Format Table' };
+    }
+    
+    // Temsilci kodunu otomatik bul (dosya adından)
+    let uzmanKodu = '';
+    const fileName = ss.getName();
+    console.log('📁 Dosya adı:', fileName);
+    
+    // Dosya adından kod çıkarmayı dene (örn: "SB_004 - Sinem Bakalcı" veya "SB 004")
+    for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+      if (fileName.includes(code)) {
+        uzmanKodu = code;
+        console.log(`✅ Temsilci kodu bulundu: ${uzmanKodu}`);
+        break;
+      }
+    }
+    
+    // Bulunamazsa kullanıcıya sor (basit prompt)
+    if (!uzmanKodu) {
+      const codeResp = ui.prompt(
+        '📋 Temsilci Kodu',
+        'Temsilci kodunu girin (örn: SB 004):\n\n(Boş bırakırsanız kod olmadan devam eder)',
+        ui.ButtonSet.OK_CANCEL
+      );
+      
+      if (codeResp.getSelectedButton() === ui.Button.OK) {
+        uzmanKodu = codeResp.getResponseText().trim();
+      }
+    }
+    
+    // Format Tablo'yu analiz et
+    console.log('📊 Format Tablo analiz ediliyor...');
+    const analysisResult = analyzeFormatTableForArchive(activeSheet, sheetName);
+    
+    // Tarih formatı: YYYY-MM-DD
+    const today = Utilities.formatDate(new Date(), 'Europe/Istanbul', 'yyyy-MM-dd');
+    
+    // Özel kod oluştur (Sayfa İsmi_Uzman Kodu_Tarih)
+    const uniqueCode = uzmanKodu 
+      ? `${sheetName}_${uzmanKodu}_${today}` 
+      : `${sheetName}_${today}`;
+    
+    // "Format Tablo Raporları" sayfasını oluştur veya al
+    let reportSheet = ss.getSheetByName('Format Tablo Raporları');
+    if (!reportSheet) {
+      reportSheet = ss.insertSheet('Format Tablo Raporları');
+      console.log('✅ "Format Tablo Raporları" sayfası oluşturuldu');
+    }
+    
+    // Eğer sayfa boşsa (header yoksa) başlık ve header ekle
+    const hasHeader = reportSheet.getLastRow() >= 4; // Header 4. satırda olmalı
+    if (!hasHeader) {
+      // Başlık satırı (1. satır)
+      reportSheet.getRange(1, 1, 1, 10).merge();
+      reportSheet.getRange(1, 1).setValue('📊 FORMAT TABLO RAPORLARI');
+      reportSheet.getRange(1, 1).setBackground('#1a73e8');
+      reportSheet.getRange(1, 1).setFontColor('#ffffff');
+      reportSheet.getRange(1, 1).setFontWeight('bold');
+      reportSheet.getRange(1, 1).setFontSize(16);
+      reportSheet.getRange(1, 1).setHorizontalAlignment('center');
+      reportSheet.setRowHeight(1, 40);
+      
+      // Açıklama satırı (2. satır)
+      reportSheet.getRange(2, 1, 1, 10).merge();
+      reportSheet.getRange(2, 1).setValue('Format Tablo analiz raporları - Her satır bir Format Tablo\'nun özet bilgilerini içerir');
+      reportSheet.getRange(2, 1).setBackground('#e8f0fe');
+      reportSheet.getRange(2, 1).setFontColor('#1967d2');
+      reportSheet.getRange(2, 1).setFontSize(10);
+      reportSheet.getRange(2, 1).setHorizontalAlignment('center');
+      reportSheet.setRowHeight(2, 30);
+      
+      // Boş satır (3. satır)
+      reportSheet.setRowHeight(3, 10);
+      
+      // Header satırı (4. satır)
+      const headers = [
+        'Kod',
+        'Tarih',
+        'Format Tablo Adı',
+        'Toplam Kontak',
+        'Arama Yapılan',
+        'Randevu Alındı',
+        'Toplantı Yapıldı',
+        'Satış Yapıldı',
+        'Başarı Puanı (%)',
+        'Tümü Arandı'
+      ];
+      reportSheet.getRange(4, 1, 1, headers.length).setValues([headers]);
+      
+      // Header stilleri
+      const headerRange = reportSheet.getRange(4, 1, 1, headers.length);
+      headerRange.setBackground('#4285f4');
+      headerRange.setFontColor('#ffffff');
+      headerRange.setFontWeight('bold');
+      headerRange.setFontSize(11);
+      headerRange.setHorizontalAlignment('center');
+      reportSheet.setRowHeight(4, 35);
+      
+      // Kolon genişlikleri
+      reportSheet.setColumnWidth(1, 200); // Kod
+      reportSheet.setColumnWidth(2, 100); // Tarih
+      reportSheet.setColumnWidth(3, 200); // Format Tablo Adı
+      reportSheet.setColumnWidth(4, 100); // Toplam Kontak
+      reportSheet.setColumnWidth(5, 120); // Arama Yapılan
+      reportSheet.setColumnWidth(6, 120); // Randevu Alındı
+      reportSheet.setColumnWidth(7, 120); // Toplantı Yapıldı
+      reportSheet.setColumnWidth(8, 120); // Satış Yapıldı
+      reportSheet.setColumnWidth(9, 120); // Başarı Puanı
+      reportSheet.setColumnWidth(10, 100); // Tümü Arandı
+    }
+    
+    // Yeni satır ekle (header'dan sonra - header 4. satırda)
+    const newRow = reportSheet.getLastRow() + 1;
+    
+    // Rapor verilerini yaz
+    const rowData = [
+      uniqueCode, // Kod
+      today, // Tarih
+      sheetName, // Format Tablo Adı
+      analysisResult.totalContacts, // Toplam Kontak
+      analysisResult.aramaYapilan, // Arama Yapılan
+      analysisResult.randevuAlindi, // Randevu Alındı
+      analysisResult.toplantiYapildi, // Toplantı Yapıldı
+      analysisResult.satisYapildi, // Satış Yapıldı
+      analysisResult.basariPuani, // Başarı Puanı (%)
+      analysisResult.tumuAranmis ? 'Evet' : 'Hayır' // Tümü Arandı
+    ];
+    
+    reportSheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+    
+    // Başarı puanına göre renklendirme
+    try {
+      const basariPuaniRange = reportSheet.getRange(newRow, 9); // Başarı Puanı kolonu
+      if (analysisResult.basariPuani >= 20) {
+        basariPuaniRange.setBackground('#c8e6c9'); // Yeşil - İyi
+      } else if (analysisResult.basariPuani >= 10) {
+        basariPuaniRange.setBackground('#fff9c4'); // Sarı - Orta
+      } else {
+        basariPuaniRange.setBackground('#ffcdd2'); // Kırmızı - Düşük
+      }
+    } catch (colorError) {
+      console.warn('⚠️ Renklendirme hatası (devam ediliyor):', colorError.message);
+    }
+    
+    // Tümü arandı kolonunu renklendir
+    try {
+      const tumuAranmisRange = reportSheet.getRange(newRow, 10); // Tümü Arandı kolonu
+      if (analysisResult.tumuAranmis) {
+        tumuAranmisRange.setBackground('#c8e6c9'); // Yeşil
+      } else {
+        tumuAranmisRange.setBackground('#ffcdd2'); // Kırmızı
+      }
+    } catch (colorError) {
+      console.warn('⚠️ Renklendirme hatası (devam ediliyor):', colorError.message);
+    }
+    
+    // Sayfaya geç
+    reportSheet.activate();
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo raporlama tamamlandı (${duration}ms)`);
+    
+    // Başarı mesajı
+    ui.alert(
+      '✅ Format Tablo Raporlandı',
+      `📊 ${sheetName} için rapor oluşturuldu!\n\n` +
+      `📋 Rapor sayfası: "Format Tablo Raporları"\n` +
+      `🆔 Kod: ${uniqueCode}\n` +
+      `📊 Toplam Kontak: ${analysisResult.totalContacts}\n` +
+      `🔍 Arama Yapılan: ${analysisResult.aramaYapilan}\n` +
+      `📅 Randevu Alındı: ${analysisResult.randevuAlindi}\n` +
+      `📈 Başarı Puanı: %${analysisResult.basariPuani}\n` +
+      `✅ Tümü Arandı: ${analysisResult.tumuAranmis ? 'Evet' : 'Hayır'}\n\n` +
+      `💡 Sonraki adımlar:\n` +
+      `1. Format Tablo'yu manuel olarak Google Drive'a arşivle\n` +
+      `2. "Senkronize Et" butonuna basarak raporu yönetici dosyasına gönder\n` +
+      `⏱️ Süre: ${(duration / 1000).toFixed(1)}s`,
+      ui.ButtonSet.OK
+    );
+    
+    return {
+      success: true,
+      uniqueCode: uniqueCode,
+      reportSheet: 'Format Tablo Raporları',
+      rowNumber: newRow,
+      analysis: analysisResult,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error('❌ Format Tablo raporlama hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Raporlama hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Format Tablo sayfasını sil
+ * @returns {Object} İşlem sonucu
+ */
+function deleteFormatTable() {
+  const startTime = Date.now();
+  console.log('🗑️ Format Tablo silme başlatılıyor...');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const activeSheet = ss.getActiveSheet();
+    const sheetName = activeSheet.getName();
+    
+    // Format Tablo kontrolü
+    if (!isFormatTable(activeSheet)) {
+      ui.alert('❌ Hata', 'Aktif sayfa bir Format Tablo değil!', ui.ButtonSet.OK);
+      return { success: false, error: 'Not a Format Table' };
+    }
+    
+    // Onay iste
+    const confirmResp = ui.alert(
+      '⚠️ Format Tablo Silme',
+      `"${sheetName}" sayfasını silmek istediğinizden emin misiniz?\n\n` +
+      `⚠️ Bu işlem geri alınamaz!\n\n` +
+      `Lütfen önce sayfayı arşivlediğinizden emin olun.`,
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (confirmResp !== ui.Button.YES) {
+      return { success: false, message: 'İptal edildi' };
+    }
+    
+    // Sayfayı sil
+    ss.deleteSheet(activeSheet);
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo silindi: ${sheetName} (${duration}ms)`);
+    
+    ui.alert('✅ Format Tablo Silindi', `"${sheetName}" sayfası başarıyla silindi.`, ui.ButtonSet.OK);
+    
+    return {
+      success: true,
+      deletedSheetName: sheetName,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error('❌ Format Tablo silme hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Silme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Format Tablo Arşivleme Fonksiyonu
+ * Log Arşivi'nden istatistikleri çıkarır ve yönetici dosyasına "Arşiv" sheet'ine kart formatında ekler
+ * Format sheet'ini gizler ve gereksiz sheet'leri siler
+ * @returns {Object} İşlem sonucu
+ */
+function archiveFormatTable() {
+  const startTime = Date.now();
+  console.log('📦 Format Tablo arşivleme başlatılıyor...');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const activeSheet = ss.getActiveSheet();
+    const sheetName = activeSheet.getName();
+    
+    // Format Tablo kontrolü
+    if (!isFormatTable(activeSheet)) {
+      ui.alert('❌ Hata', 'Aktif sayfa bir Format Tablo değil!', ui.ButtonSet.OK);
+      return { success: false, error: 'Not a Format Table' };
+    }
+    
+    // 1. Format kodu ve Data adı sor
+    const formatCodeResp = ui.prompt(
+      '📦 Format Tablo Arşivle',
+      'Format kodu nedir? (örn: TeksBH):',
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    if (formatCodeResp.getSelectedButton() !== ui.Button.OK) {
+      return { success: false, message: 'İptal edildi' };
+    }
+    
+    const formatCode = formatCodeResp.getResponseText().trim();
+    if (!formatCode) {
+      ui.alert('❌ Hata', 'Format kodu boş olamaz!', ui.ButtonSet.OK);
+      return { success: false, error: 'Format code is required' };
+    }
+    
+    const dataNameResp = ui.prompt(
+      '📦 Format Tablo Arşivle',
+      'Data adı nedir? (örn: Tekstil Anadolu):',
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    if (dataNameResp.getSelectedButton() !== ui.Button.OK) {
+      return { success: false, message: 'İptal edildi' };
+    }
+    
+    const dataName = dataNameResp.getResponseText().trim();
+    if (!dataName) {
+      ui.alert('❌ Hata', 'Data adı boş olamaz!', ui.ButtonSet.OK);
+      return { success: false, error: 'Data name is required' };
+    }
+    
+    // 2. Temsilci kodunu bul (dosya adından)
+    let temsilciKodu = '';
+    const fileName = ss.getName();
+    for (const code in CRM_CONFIG.EMPLOYEE_CODES) {
+      if (fileName.includes(code)) {
+        temsilciKodu = code;
+        break;
+      }
+    }
+    
+    // 3. Log Arşivi'nden istatistikleri çıkar
+    console.log('📊 Log Arşivi\'nden istatistikler çıkarılıyor...');
+    const logStats = extractLogStatisticsFromArchive(ss, sheetName);
+    
+    // 4. Yönetici dosyasına "Arşiv" sheet'ine kart formatında ekle
+    console.log('📦 Yönetici dosyasına arşiv kaydı ekleniyor...');
+    const managerFile = SpreadsheetApp.openById(CRM_CONFIG.MANAGER_FILE_ID);
+    const archiveSheet = getOrCreateArchiveSheet(managerFile);
+    
+    const today = Utilities.formatDate(new Date(), 'Europe/Istanbul', 'yyyy-MM-dd');
+    const archiveCard = createArchiveCard(
+      dataName,
+      formatCode,
+      temsilciKodu,
+      today,
+      logStats
+    );
+    
+    addArchiveCardToSheet(archiveSheet, archiveCard);
+    
+    // 5. Format sheet'ini gizle
+    console.log('🔒 Format Tablo gizleniyor...');
+    activeSheet.hideSheet();
+    
+    // 6. Gereksiz sheet'leri sil (varsa)
+    console.log('🗑️ Gereksiz sheet\'ler kontrol ediliyor...');
+    const datasetSheet = ss.getSheetByName('Dataset Raporu');
+    if (datasetSheet) {
+      ss.deleteSheet(datasetSheet);
+      console.log('✅ "Dataset Raporu" sheet\'i silindi');
+    }
+    
+    // Not: "Format Tablo Raporları" sheet'i silinmeyecek (raporlar için gerekli)
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Format Tablo arşivleme tamamlandı (${duration}ms)`);
+    
+    ui.alert(
+      '✅ Format Tablo Arşivlendi',
+      `"${sheetName}" başarıyla arşivlendi!\n\n` +
+      `📦 Format Kodu: ${formatCode}\n` +
+      `📋 Data Adı: ${dataName}\n` +
+      `👤 Temsilci: ${temsilciKodu || 'Bilinmiyor'}\n` +
+      `📊 Toplam Log: ${logStats.totalLogs}\n` +
+      `⏱️ Süre: ${(duration / 1000).toFixed(1)}s`,
+      ui.ButtonSet.OK
+    );
+    
+    return {
+      success: true,
+      formatCode,
+      dataName,
+      temsilciKodu,
+      logStats,
+      duration: duration
+    };
+    
+  } catch (error) {
+    console.error('❌ Format Tablo arşivleme hatası:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Arşivleme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Log Arşivi'nden Format Tablo için istatistikleri çıkarır
+ * @param {Spreadsheet} spreadsheet - Temsilci dosyası
+ * @param {string} formatTableName - Format Tablo adı
+ * @returns {Object} İstatistikler
+ */
+function extractLogStatisticsFromArchive(spreadsheet, formatTableName) {
+  try {
+    // Log Arşivi sayfasını bul
+    let logArchiveSheet = spreadsheet.getSheetByName('📋 Log Arşivi');
+    if (!logArchiveSheet) {
+      logArchiveSheet = spreadsheet.getSheetByName('Log Arşivi');
+    }
+    
+    if (!logArchiveSheet || logArchiveSheet.getLastRow() <= 1) {
+      console.log('⚠️ Log Arşivi bulunamadı veya boş');
+      return {
+        totalLogs: 0,
+        activityDistribution: {}
+      };
+    }
+    
+    // Batch read: Tüm veriyi tek seferde oku
+    const allData = logArchiveSheet.getDataRange().getValues();
+    const headers = allData[0] || [];
+    const rows = allData.slice(1);
+    
+    // Kolon indekslerini bul
+    const kaynakSayfaIdx = headers.findIndex(h => 
+      h && (String(h).toLowerCase().includes('kaynak') || String(h).toLowerCase().includes('kaynak sayfa'))
+    );
+    const aktiviteIdx = headers.findIndex(h => 
+      h && String(h).toLowerCase().includes('aktivite')
+    );
+    
+    if (kaynakSayfaIdx === -1 || aktiviteIdx === -1) {
+      console.log('⚠️ Log Arşivi kolonları bulunamadı');
+      return {
+        totalLogs: 0,
+        activityDistribution: {}
+      };
+    }
+    
+    // Format Tablo'ya ait logları filtrele
+    const formatLogs = rows.filter(row => {
+      const kaynakSayfa = String(row[kaynakSayfaIdx] || '').trim();
+      return kaynakSayfa === formatTableName;
+    });
+    
+    // Aktivite dağılımını hesapla
+    const activityDistribution = {};
+    formatLogs.forEach(row => {
+      const aktivite = String(row[aktiviteIdx] || '').trim();
+      if (aktivite) {
+        activityDistribution[aktivite] = (activityDistribution[aktivite] || 0) + 1;
+      }
+    });
+    
+    return {
+      totalLogs: formatLogs.length,
+      activityDistribution: activityDistribution
+    };
+    
+  } catch (error) {
+    console.error('❌ Log Arşivi istatistik hatası:', error);
+    return {
+      totalLogs: 0,
+      activityDistribution: {}
+    };
+  }
+}
+
+/**
+ * Yönetici dosyasında "Arşiv" sheet'ini oluşturur veya alır
+ * @param {Spreadsheet} managerFile - Yönetici dosyası
+ * @returns {Sheet} Arşiv sheet'i
+ */
+function getOrCreateArchiveSheet(managerFile) {
+  let archiveSheet = managerFile.getSheetByName('Arşiv');
+  
+  if (!archiveSheet) {
+    archiveSheet = managerFile.insertSheet('Arşiv');
+    
+    // Başlık satırı (1. satır)
+    archiveSheet.getRange(1, 1, 1, 10).merge();
+    archiveSheet.getRange(1, 1).setValue('📦 FORMAT TABLO ARŞİVİ');
+    archiveSheet.getRange(1, 1).setBackground('#1a73e8');
+    archiveSheet.getRange(1, 1).setFontColor('#ffffff');
+    archiveSheet.getRange(1, 1).setFontWeight('bold');
+    archiveSheet.getRange(1, 1).setFontSize(16);
+    archiveSheet.getRange(1, 1).setHorizontalAlignment('center');
+    archiveSheet.setRowHeight(1, 40);
+    
+    // Açıklama satırı (2. satır)
+    archiveSheet.getRange(2, 1, 1, 10).merge();
+    archiveSheet.getRange(2, 1).setValue('Arşivlenen Format Tablo\'ların özet bilgileri - Kart formatında');
+    archiveSheet.getRange(2, 1).setBackground('#e8f0fe');
+    archiveSheet.getRange(2, 1).setFontColor('#1967d2');
+    archiveSheet.getRange(2, 1).setFontSize(10);
+    archiveSheet.getRange(2, 1).setHorizontalAlignment('center');
+    archiveSheet.setRowHeight(2, 30);
+    
+    // Boş satır (3. satır)
+    archiveSheet.setRowHeight(3, 10);
+    
+    console.log('✅ "Arşiv" sheet\'i oluşturuldu');
+  }
+  
+  return archiveSheet;
+}
+
+/**
+ * Arşiv kartı oluşturur (5-10 satır, okunabilir format)
+ * @param {string} dataName - Data adı
+ * @param {string} formatCode - Format kodu
+ * @param {string} temsilciKodu - Temsilci kodu
+ * @param {string} tarih - Tarih (YYYY-MM-DD)
+ * @param {Object} logStats - Log istatistikleri
+ * @returns {Array} Kart verisi (her satır bir array)
+ */
+function createArchiveCard(dataName, formatCode, temsilciKodu, tarih, logStats) {
+  const card = [];
+  
+  // Satır 1: Başlık (Data Adı - Format Kodu)
+  card.push([`📦 ${dataName} - ${formatCode}`, '', '', '', '', '', '', '', '', '']);
+  
+  // Satır 2: Temsilci ve Tarih
+  card.push([`👤 Temsilci: ${temsilciKodu || 'Bilinmiyor'}`, `📅 Tarih: ${tarih}`, '', '', '', '', '', '', '', '']);
+  
+  // Satır 3: Toplam Log
+  card.push([`📊 Toplam Log: ${logStats.totalLogs}`, '', '', '', '', '', '', '', '', '']);
+  
+  // Satır 4: Aktivite Dağılımı Başlığı
+  card.push([`📈 Aktivite Dağılımı:`, '', '', '', '', '', '', '', '', '']);
+  
+  // Satır 5-10: Aktivite dağılımı (her aktivite bir satır)
+  const activities = Object.entries(logStats.activityDistribution || {});
+  if (activities.length > 0) {
+    activities.forEach(([activity, count]) => {
+      card.push([`  • ${activity}: ${count}`, '', '', '', '', '', '', '', '', '']);
+    });
+  } else {
+    card.push([`  • Aktivite bulunamadı`, '', '', '', '', '', '', '', '', '']);
+  }
+  
+  // Boş satır (ayırıcı)
+  card.push(['', '', '', '', '', '', '', '', '', '']);
+  
+  return card;
+}
+
+/**
+ * Arşiv kartını sheet'e ekler
+ * @param {Sheet} archiveSheet - Arşiv sheet'i
+ * @param {Array} card - Kart verisi
+ */
+function addArchiveCardToSheet(archiveSheet, card) {
+  const startRow = archiveSheet.getLastRow() + 1;
+  
+  // Kart verilerini yaz
+  archiveSheet.getRange(startRow, 1, card.length, 10).setValues(card);
+  
+  // Stil uygula
+  const cardRange = archiveSheet.getRange(startRow, 1, card.length, 10);
+  
+  // Başlık satırı (ilk satır)
+  archiveSheet.getRange(startRow, 1, 1, 10).merge();
+  archiveSheet.getRange(startRow, 1).setFontWeight('bold');
+  archiveSheet.getRange(startRow, 1).setFontSize(14);
+  archiveSheet.getRange(startRow, 1).setBackground('#e3f2fd');
+  archiveSheet.setRowHeight(startRow, 35);
+  
+  // İkinci satır (Temsilci ve Tarih)
+  archiveSheet.getRange(startRow + 1, 1, 1, 2).setFontSize(11);
+  archiveSheet.setRowHeight(startRow + 1, 25);
+  
+  // Üçüncü satır (Toplam Log)
+  archiveSheet.getRange(startRow + 2, 1).setFontWeight('bold');
+  archiveSheet.getRange(startRow + 2, 1).setFontSize(12);
+  archiveSheet.setRowHeight(startRow + 2, 25);
+  
+  // Aktivite dağılımı başlığı
+  archiveSheet.getRange(startRow + 3, 1).setFontWeight('bold');
+  archiveSheet.setRowHeight(startRow + 3, 25);
+  
+  // Aktivite satırları
+  for (let i = 4; i < card.length - 1; i++) {
+    archiveSheet.setRowHeight(startRow + i, 20);
+  }
+  
+  // Son boş satır
+  archiveSheet.setRowHeight(startRow + card.length - 1, 10);
+  
+  console.log(`✅ Arşiv kartı eklendi (${card.length} satır)`);
+}
 
 
 /**
@@ -8825,9 +9655,7 @@ function handleRandevularimStatusChange(e, sheet) {
     
     // Status değiştiğinde sıralamayı yeniden yap - KESIN KURAL (zaten batch renklendirme yapıyor)
     try {
-      // ✅ KRİTİK: sortRandevularimByDate öncesi flush()
-  SpreadsheetApp.flush();
-  sortRandevularimByDate(sheet); // Bu zaten batch renklendirme yapıyor
+      sortRandevularimByDate(sheet); // Bu zaten batch renklendirme yapıyor
     } catch (sortError) {
       console.error('❌ Sıralama hatası:', sortError);
     }
@@ -8992,8 +9820,153 @@ function updateRandevularimRowColor(randevularimSheet, rowNumber, status) {
 }
 
 /**
+ * 🔧 Randevularım sayfasındaki boş kodlu satırları otomatik doldur
+ */
+function fillEmptyKodInRandevularim() {
+  console.log('🔧 Function started: fillEmptyKodInRandevularim');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('Randevularım');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('Hata', 'Randevularım sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      SpreadsheetApp.getUi().alert('Bilgi', 'Randevularım sayfasında veri bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    console.log(`🔧 Randevularım sayfasında ${lastRow} satır bulundu`);
+    
+    // Kod sütununu bul
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    const kodIndex = headers.indexOf('Kod');
+    
+    if (kodIndex === -1) {
+      SpreadsheetApp.getUi().alert('Hata', 'Kod sütunu bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    // Temsilci kodunu al
+    const employeeCode = getCurrentEmployeeCode();
+    console.log(`🔧 Temsilci kodu: ${employeeCode}`);
+    
+    // ✅ BATCH OPERATIONS: Tüm kod değerlerini tek seferde oku (Google best practice)
+    const dataRowCount = lastRow - 1; // Header hariç
+    const kodRange = sheet.getRange(2, kodIndex + 1, dataRowCount, 1);
+    const kodValues = kodRange.getValues(); // 1 API call - Tüm değerleri oku
+    
+    // Memory'de işle: Hangi satırlar doldurulacak?
+    const rowsToFill = [];
+    let filledCount = 0;
+    let skippedCount = 0;
+    
+    for (let i = 0; i < kodValues.length; i++) {
+      const kodValue = String(kodValues[i][0] || '').trim();
+      const rowNum = i + 2; // +2 çünkü header row=1, data starts at row=2
+      
+      // Kod boşsa veya geçersizse doldur
+      if (!kodValue || kodValue === '' || kodValue === 'undefined' || kodValue === 'null') {
+        rowsToFill.push(i); // Bu satırı doldur
+        filledCount++;
+      } else {
+        skippedCount++;
+      }
+    }
+    
+    // ✅ BATCH WRITE: Tüm değerleri tek seferde yaz (Google best practice)
+    if (rowsToFill.length > 0) {
+      // Format ve değerleri hazırla
+      const valuesToWrite = [];
+      const formatsToApply = [];
+      
+      for (let i = 0; i < rowsToFill.length; i++) {
+        const rowIndex = rowsToFill[i];
+        valuesToWrite.push([employeeCode]);
+        formatsToApply.push(['@']); // Text format
+      }
+      
+      // Tek seferde format ve değerleri uygula
+      const writeRange = sheet.getRange(2 + rowsToFill[0], kodIndex + 1, rowsToFill.length, 1);
+      
+      // Eğer tüm satırlar ardışıksa, tek batch yaz
+      if (rowsToFill.length === 1 || rowsToFill[rowsToFill.length - 1] - rowsToFill[0] === rowsToFill.length - 1) {
+        // Ardışık satırlar - tek batch
+        writeRange.setNumberFormats([formatsToApply]);
+        writeRange.setValues(valuesToWrite);
+        console.log(`✅ [BATCH] ${filledCount} satır kod dolduruldu (tek batch operation)`);
+      } else {
+        // Ardışık olmayan satırlar - her birini ayrı yaz (ama yine de batch)
+        // Bu durumda her satır için ayrı range oluştur ama yine de batch kullan
+        for (let i = 0; i < rowsToFill.length; i++) {
+          const rowIndex = rowsToFill[i];
+          const singleRowRange = sheet.getRange(2 + rowIndex, kodIndex + 1, 1, 1);
+          singleRowRange.setNumberFormat('@');
+          singleRowRange.setValue(employeeCode);
+        }
+        console.log(`✅ [BATCH] ${filledCount} satır kod dolduruldu (multiple batch operations)`);
+      }
+      
+      SpreadsheetApp.flush(); // Force immediate write
+    }
+    
+    const message = `✅ Kod doldurma tamamlandı!\n\n📊 Toplam satır: ${lastRow - 1}\n✅ Doldurulan: ${filledCount}\n⏭️ Atlanan: ${skippedCount}\n🔧 Temsilci kodu: ${employeeCode}`;
+    SpreadsheetApp.getUi().alert('✅ Başarılı', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    console.log(`🔧 Kod doldurma tamamlandı: ${filledCount} satır dolduruldu`);
+    
+  } catch (error) {
+    console.error('❌ Function failed:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Kod doldurma hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
  * 🎨 Toplantılarım sayfasındaki tüm satırları yeniden renklendir
  */
+function refreshToplantilarimColors() {
+  console.log('🎨 Function started: refreshToplantilarimColors');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('Toplantılarım');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('Hata', 'Toplantılarım sayfası bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      SpreadsheetApp.getUi().alert('Bilgi', 'Toplantılarım sayfasında veri bulunamadı!', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    console.log(`🎨 Toplantılarım sayfasında ${lastRow} satır bulundu`);
+    
+    // Her satırı yeniden renklendir
+          for (let row = 2; row <= lastRow; row++) {
+            try {
+              applyMeetingColorCoding(sheet, row);
+      } catch (error) {
+        console.error(`❌ Satır ${row} renklendirme hatası:`, error);
+      }
+    }
+    
+    const message = `✅ Toplantılarım renklendirme tamamlandı!\n\n📊 İşlenen satır: ${lastRow - 1}\n🎨 Toplantı Sonucu ve Satış Potansiyeli renklendirmesi uygulandı`;
+    SpreadsheetApp.getUi().alert('✅ Başarılı', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    console.log('🎨 Toplantılarım renklendirme tamamlandı');
+    
+  } catch (error) {
+    console.error('❌ Function failed:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Renklendirme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
 
 /**
  * 🎨 Aktif sayfadaki tüm satırları yeniden renklendir
@@ -9222,8 +10195,9 @@ function refreshColorsOnActiveSheet() {
         }
       }
     } else {
-      // Diğer sayfalar için renklendirme yapılmıyor
-      processedCount = 0;
+      // Diğer sayfalar için manuel renklendirme
+      applyManualColorCoding();
+      processedCount = lastRow - 1;
     }
     
     // Performance: UI alert yavaş olabilir, sadece console log yap
@@ -9241,6 +10215,80 @@ function refreshColorsOnActiveSheet() {
 /**
  * 🎨 Tüm sayfalardaki renkleri yenile
  */
+function refreshAllColors() {
+  console.log('🎨 Function started: refreshAllColors');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = spreadsheet.getSheets();
+    
+    let totalProcessed = 0;
+    let processedSheets = [];
+    
+    for (const sheet of sheets) {
+      const sheetName = sheet.getName();
+  const lastRow = sheet.getLastRow();
+  
+  if (lastRow <= 1) {
+        continue; // Boş sayfaları atla
+      }
+      
+      try {
+  let count = 0;
+  
+      if (sheetName === 'Randevularım') {
+            for (let row = 2; row <= lastRow; row++) {
+              try {
+              const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+              const randevuDurumuIndex = headers.indexOf('Randevu Durumu');
+              if (randevuDurumuIndex !== -1) {
+                const status = sheet.getRange(row, randevuDurumuIndex + 1).getDisplayValue();
+                updateRandevularimRowColor(sheet, row, status);
+                count++;
+    }
+  } catch (error) {
+                console.error(`❌ ${sheetName} satır ${row} hatası:`, error);
+            }
+          }
+        } else if (sheetName === 'Toplantılarım') {
+          for (let row = 2; row <= lastRow; row++) {
+            try {
+              applyMeetingColorCoding(sheet, row);
+                count++;
+  } catch (error) {
+              console.error(`❌ ${sheetName} satır ${row} hatası:`, error);
+            }
+          }
+        } else if (sheetName === 'Fırsatlarım') {
+          for (let row = 2; row <= lastRow; row++) {
+            try {
+              applyOpportunityColorCoding(sheet, row);
+                  count++;
+  } catch (error) {
+              console.error(`❌ ${sheetName} satır ${row} hatası:`, error);
+            }
+          }
+        }
+        
+        if (count > 0) {
+          totalProcessed += count;
+          processedSheets.push(`${sheetName} (${count} satır)`);
+    }
+  } catch (error) {
+        console.error(`❌ ${sheetName} sayfası hatası:`, error);
+      }
+    }
+    
+    const message = `✅ Tüm sayfalar renklendirme tamamlandı!\n\n📊 Toplam işlenen satır: ${totalProcessed}\n📄 İşlenen sayfalar: ${processedSheets.length}\n\n${processedSheets.join('\n')}`;
+    SpreadsheetApp.getUi().alert('✅ Başarılı', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+    console.log(`🎨 Tüm sayfalar renklendirme tamamlandı: ${totalProcessed} satır`);
+    
+  } catch (error) {
+    console.error('❌ Function failed:', error);
+    SpreadsheetApp.getUi().alert('❌ Hata', `Renklendirme hatası: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
 
 // ========================================
 // ЭТАП 4: СИНХРОНИЗАЦИЯ CRM СИСТЕМЫ
@@ -10344,7 +11392,7 @@ function addWebsiteAnalysisToAdminMenu() {
         .addItem('🛒 E-TİCARET İZİ', 'detectEcommerceIzi')
         .addItem('⚡ HIZ TESTİ', 'testSiteHizi')
         .addSeparator()
-        // .addItem('Yeni Tablo oluştur', 'showCreateTableDialog') // 🔄 DATA POOL'A TAŞINDI
+        .addItem('Yeni Tablo oluştur', 'showCreateTableDialog')
         .addToUi();
     } else {
       console.log('Admin menüsüne Website Analiz butonları ekleniyor');
@@ -10372,35 +11420,244 @@ console.log('⚡ Hız Testi fonksiyonları hazır');
 // CMS fonksiyonları src/managers/cms_detector.gs dosyasına taşındı
 
 // ========================================
-// ⚠️ MİGRASYON: Mükerrer ve URL Temizleme Fonksiyonları
+// 🧽 MÜKERRER SİLME (ONAYLI)
 // ========================================
-// Aşağıdaki fonksiyonlar Data Pool sistemine taşınmıştır:
-// - deleteDuplicateRowsWithConfirm()
-// - deleteAllDuplicatesAuto()
-// - deleteRowsWithoutPhone()
-// - deleteRowsWithoutWebsite()
-// - urlTemizleTumunu()
-// - urlTekrarlariniSil()
-// 
-// Bu fonksiyonlar artık backend.js'de yoktur.
-// Format Tablo işlemleri merkezi Data Pool'dan yönetilir.
-// ========================================
+function deleteDuplicateRowsWithConfirm(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    const ui = SpreadsheetApp.getUi();
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      ui.alert('Bilgi', 'Veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, deleted: 0 };
+    }
+    const headers = data[0];
+    const rows = data.slice(1);
+    const companyIdx = findColumnIndex(headers, ['Company name', 'Company Name']);
+    const phoneIdx = findColumnIndex(headers, ['Phone']);
+    if (companyIdx === -1) {
+      throw new Error("'Company name' kolonu bulunamadı");
+    }
+    const keyToRowIndexes = new Map();
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const rowNumber = i + 2;
+      const company = (r[companyIdx] || '').toString().trim();
+      if (!company) continue;
+      const phoneRaw = phoneIdx !== -1 ? (r[phoneIdx] || '').toString() : '';
+      const phoneDigits = phoneRaw.replace(/\D+/g, '');
+      const phoneKey = phoneDigits.length >= 7 ? phoneDigits : '';
+      const key = `${company.toLowerCase()}|${phoneKey}`;
+      if (!keyToRowIndexes.has(key)) keyToRowIndexes.set(key, []);
+      keyToRowIndexes.get(key).push(rowNumber);
+    }
+    const dupGroups = [...keyToRowIndexes.entries()].filter(([, arr]) => arr.length > 1);
+    if (dupGroups.length === 0) {
+      ui.alert('Mükerrer bulunamadı');
+      return { success: true, deleted: 0 };
+    }
+    let deleted = 0;
+    for (const [key, rowNums] of dupGroups) {
+      const sorted = [...rowNums].sort((a,b) => b - a);
+      const keep = Math.min(...sorted);
+      for (const rowNum of sorted) {
+        if (rowNum === keep) continue;
+        const rowValues = sheet.getRange(rowNum, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const companyVal = rowValues[companyIdx];
+        const phoneVal = phoneIdx !== -1 ? rowValues[phoneIdx] : '';
+        const msg = `Satır ${rowNum} bulundu:\nŞirket: ${companyVal || ''}\nTelefon: ${phoneVal || ''}\nBu mükerrer kaydı silmek istiyor musunuz?`;
+        const res = ui.alert('Mükerrer Sil', msg, ui.ButtonSet.YES_NO);
+        if (res === ui.Button.YES) {
+          sheet.deleteRow(rowNum);
+          deleted++;
+        }
+      }
+    }
+    ui.alert('İşlem tamam', `${deleted} satır silindi.`, ui.ButtonSet.OK);
+    console.log('Processing complete:', { deleted });
+    return { success: true, deleted };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
 
 /**
- * 🧽 Mükerrerleri Bul ve Sil (Onaylı - OPTİMİZE EDİLMİŞ)
- * 
- * ⚠️ MİGRASYON: Bu fonksiyon Data Pool sistemine taşınmıştır.
+ * 🗑️ Mükerrerleri Bul ve Hepsini Sil (Orijinal + Kopya Tümünü)
+ * Her mükerrer grubundaki TÜM satırları siler (hiçbirini tutmaz)
  */
-// ========================================
-// ⚠️ MİGRASYON: Mükerrer Silme Fonksiyonları
-// ========================================
-// Aşağıdaki fonksiyonlar Data Pool sistemine taşınmıştır:
-// - deleteDuplicateRowsWithConfirm()
-// - deleteAllDuplicatesAuto()
-// 
-// Bu fonksiyonlar artık backend.js'de yoktur.
-// Format Tablo işlemleri merkezi Data Pool'dan yönetilir.
-// ========================================
+function deleteAllDuplicatesAuto(parameters) {
+  console.log('Function started:', parameters);
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    
+    const ui = SpreadsheetApp.getUi();
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      ui.alert('Bilgi', 'Veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, deleted: 0 };
+    }
+    
+    const headers = data[0];
+    const rows = data.slice(1);
+    const companyIdx = findColumnIndex(headers, ['Company name', 'Company Name']);
+    const phoneIdx = findColumnIndex(headers, ['Phone']);
+    
+    if (companyIdx === -1) {
+      throw new Error("'Company name' kolonu bulunamadı");
+    }
+    
+    // Mükerrer gruplarını bul
+    const keyToRowIndexes = new Map();
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const rowNumber = i + 2;
+      const company = (r[companyIdx] || '').toString().trim();
+      if (!company) continue;
+      
+      const phoneRaw = phoneIdx !== -1 ? (r[phoneIdx] || '').toString() : '';
+      const phoneDigits = phoneRaw.replace(/\D+/g, '');
+      const phoneKey = phoneDigits.length >= 7 ? phoneDigits : '';
+      const key = `${company.toLowerCase()}|${phoneKey}`;
+      
+      if (!keyToRowIndexes.has(key)) keyToRowIndexes.set(key, []);
+      keyToRowIndexes.get(key).push(rowNumber);
+    }
+    
+    // Sadece mükerrer grupları (2 veya daha fazla satır)
+    const dupGroups = [...keyToRowIndexes.entries()].filter(([, arr]) => arr.length > 1);
+    
+    if (dupGroups.length === 0) {
+      ui.alert('Mükerrer bulunamadı', 'Sayfada tekrar eden kayıt bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, deleted: 0 };
+    }
+    
+    // Silinecek tüm satır numaralarını topla (OPTİMİZE: data array'inden oku, sheet'ten okuma)
+    const rowsToDelete = [];
+    const groupDetails = [];
+    
+    for (const [key, rowNums] of dupGroups) {
+      const [companyKey, phoneKey] = key.split('|');
+      const sortedRows = [...rowNums].sort((a, b) => a - b);
+      
+      // OPTİMİZE: data array'inden oku (sheet.getRange çok yavaş!)
+      const sampleCompany = companyKey || '';
+      const samplePhone = phoneKey || '';
+      
+      groupDetails.push({
+        company: sampleCompany,
+        phone: samplePhone,
+        count: sortedRows.length,
+        rows: sortedRows
+      });
+      
+      // TÜM satırları silinecek listesine ekle
+      rowsToDelete.push(...sortedRows);
+    }
+    
+    // Özet mesaj hazırla (hızlı)
+    const totalGroups = dupGroups.length;
+    const totalRows = rowsToDelete.length;
+    
+    let summaryMsg = `Mükerrer tarama sonucu:\n\n`;
+    summaryMsg += `• Toplam tekrar grup: ${totalGroups}\n`;
+    summaryMsg += `• Silinecek toplam satır: ${totalRows}\n\n`;
+    
+    if (groupDetails.length <= 10) {
+      summaryMsg += `Gruplar:\n`;
+      for (let i = 0; i < groupDetails.length; i++) {
+        const g = groupDetails[i];
+        summaryMsg += `\n${i + 1}. "${g.company}" (${g.count} adet): Satır ${g.rows.join(', ')}`;
+      }
+    } else {
+      summaryMsg += `Örnek gruplar (ilk 5):\n`;
+      for (let i = 0; i < 5; i++) {
+        const g = groupDetails[i];
+        summaryMsg += `\n${i + 1}. "${g.company}" (${g.count} adet): Satır ${g.rows.join(', ')}`;
+      }
+      summaryMsg += `\n\n... ve ${groupDetails.length - 5} grup daha`;
+    }
+    
+    summaryMsg += `\n\n⚠️ DİKKAT: Her gruptaki TÜM satırlar silinecek (orijinal + kopyalar).`;
+    summaryMsg += `\n\nDevam etmek istiyor musunuz?`;
+    
+    // Onay al
+    const confirm = ui.alert('🗑️ Mükerrerleri Hepsini Sil', summaryMsg, ui.ButtonSet.YES_NO);
+    
+    if (confirm !== ui.Button.YES) {
+      ui.alert('İptal edildi', 'Silme işlemi iptal edildi.', ui.ButtonSet.OK);
+      return { success: false, deleted: 0, cancelled: true };
+    }
+    
+    // OPTİMİZE: Toplu silme - satır numaralarını küçükten büyüğe sırala
+    rowsToDelete.sort((a, b) => a - b);
+    
+    // Ardışık satırları grupla ve batch sil
+    let deleted = 0;
+    let i = 0;
+    
+    while (i < rowsToDelete.length) {
+      const startRow = rowsToDelete[i];
+      let endRow = startRow;
+      let consecutiveCount = 1;
+      
+      // Ardışık satırları bul
+      while (i + consecutiveCount < rowsToDelete.length && 
+             rowsToDelete[i + consecutiveCount] === startRow + consecutiveCount) {
+        endRow = rowsToDelete[i + consecutiveCount];
+        consecutiveCount++;
+      }
+      
+      // Toplu sil (ardışık satırlar için)
+      if (consecutiveCount === 1) {
+        // Tek satır - normal sil
+        try {
+          sheet.deleteRow(startRow);
+          deleted++;
+        } catch (err) {
+          console.error(`Satır ${startRow} silinirken hata:`, err);
+        }
+      } else {
+        // Çoklu ardışık satır - batch sil
+        try {
+          sheet.deleteRows(startRow, consecutiveCount);
+          deleted += consecutiveCount;
+        } catch (err) {
+          console.error(`Satırlar ${startRow}-${endRow} silinirken hata:`, err);
+          // Fallback: tek tek sil
+          for (let j = startRow; j <= endRow; j++) {
+            try {
+              sheet.deleteRow(j);
+              deleted++;
+            } catch (e) {
+              console.error(`Satır ${j} silinirken hata:`, e);
+            }
+          }
+        }
+      }
+      
+      i += consecutiveCount;
+    }
+    
+    ui.alert('İşlem tamamlandı', `${deleted} satır başarıyla silindi.\n${totalGroups} mükerrer grup temizlendi.`, ui.ButtonSet.OK);
+    console.log('Processing complete:', { deleted, totalGroups, totalRows });
+    return { success: true, deleted, totalGroups, totalRows };
+    
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
 
 // ========================================
 // 📅 OTOMATİK TARİH SIRALAMA FONKSİYONLARI
@@ -10420,9 +11677,7 @@ function manualSortRandevularim() {
       return;
     }
     
-    // ✅ KRİTİK: sortRandevularimByDate öncesi flush()
-  SpreadsheetApp.flush();
-  sortRandevularimByDate(sheet);
+    sortRandevularimByDate(sheet);
     SpreadsheetApp.getUi().alert('✅ Başarılı', 'Randevularım sayfası sıralandı!\n\nSıralama: Normal > Ertelendi > İptal\nTarih: En yeni önce', SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (error) {
     console.error('❌ Manuel sıralama hatası:', error);
@@ -11104,31 +12359,397 @@ function sortSatislarimByDate(sheet) {
 // 🧹 DATA CLEANUP FUNCTIONS
 // ========================================
 
-// ========================================
-// ⚠️ MİGRASYON: Data Cleanup Fonksiyonları
-// ========================================
-// Aşağıdaki fonksiyonlar Data Pool sistemine taşınmıştır:
-// - deleteRowsWithoutPhone()
-// - deleteRowsWithoutWebsite()
-// - urlTemizleTumunu()
-// - urlTekrarlariniSil()
-// 
-// Bu fonksiyonlar artık backend.js'de yoktur.
-// Format Tablo işlemleri merkezi Data Pool'dan yönetilir.
-// ========================================
+/**
+ * "Telefon olmayanları sil" - Aktif sayfada Phone kolonu boş/geçersiz olan satırları siler
+ * @param {Object} parameters - { scope?: 'all' | 'selection' }
+ * @returns {Object} - Sonuç bilgisi
+ */
+function deleteRowsWithoutPhone(parameters) {
+  console.log('Function started: deleteRowsWithoutPhone', parameters);
+  
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const sheetName = sheet.getName();
+    console.log('🧹 Target sheet:', sheetName);
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const phoneIdx = headers.indexOf('Phone');
+    if (phoneIdx === -1) {
+      throw new Error("'Phone' kolonu bulunamadı");
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      ui.alert('Silinecek satır bulunamadı');
+      return { success: true, deleted: 0 };
+    }
+    
+    // Kapsam: seçim varsa seçim, yoksa tüm veri
+    const range = sheet.getActiveRange();
+    let startRow = 2;
+    let endRow = lastRow;
+    if (range && range.getRow() > 1) {
+      startRow = range.getRow();
+      endRow = range.getLastRow();
+      if (startRow === 1) startRow = 2;
+    }
+    
+    console.log(`🔎 Scan rows: ${startRow}-${endRow}`);
+    const values = sheet.getRange(startRow, 1, endRow - startRow + 1, sheet.getLastColumn()).getValues();
+    
+    // Sıralı silme için alt->üst
+    const rowsToDelete = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const phoneRaw = row[phoneIdx];
+      const phoneStr = (phoneRaw || '').toString();
+      const digits = phoneStr.replace(/\D+/g, '');
+      const hasValidPhone = digits.length >= 7; // esnek eşik
+      if (!hasValidPhone) {
+        rowsToDelete.push(startRow + i);
+      }
+    }
+    
+    console.log('🗑️ Rows to delete (no phone):', rowsToDelete);
+    
+    // Sil
+    let deleted = 0;
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+      sheet.deleteRow(rowsToDelete[i]);
+      deleted++;
+    }
+    
+    ui.alert(`📵 Telefonu olmayan satırlar silindi: ${deleted}`);
+    console.log('Processing complete:', { deleted });
+    
+    return { success: true, deleted };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
 
-// ========================================
-// ⚠️ MİGRASYON: Data Cleanup Fonksiyonları - TAMAMEN ÇIKARILDI
-// ========================================
-// Aşağıdaki fonksiyonlar Data Pool sistemine taşınmıştır:
-// - deleteRowsWithoutPhone()
-// - deleteRowsWithoutWebsite()
-// - urlTemizleTumunu()
-// - urlTekrarlariniSil()
-// 
-// Bu fonksiyonlar artık backend.js'de yoktur.
-// Format Tablo işlemleri merkezi Data Pool'dan yönetilir.
-// ========================================
+/**
+ * "Website olmayanları sil" - Aktif sayfada Website kolonu boş/geçersiz olan satırları siler
+ * @param {Object} parameters - { scope?: 'all' | 'selection' }
+ * @returns {Object} - Sonuç bilgisi
+ */
+function deleteRowsWithoutWebsite(parameters) {
+  console.log('Function started: deleteRowsWithoutWebsite', parameters);
+  
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const sheetName = sheet.getName();
+    console.log('🧹 Target sheet:', sheetName);
+    
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const websiteIdx = headers.indexOf('Website');
+    if (websiteIdx === -1) {
+      throw new Error("'Website' kolonu bulunamadı");
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      ui.alert('Silinecek satır bulunamadı');
+      return { success: true, deleted: 0 };
+    }
+    
+    const range = sheet.getActiveRange();
+    let startRow = 2;
+    let endRow = lastRow;
+    if (range && range.getRow() > 1) {
+      startRow = range.getRow();
+      endRow = range.getLastRow();
+      if (startRow === 1) startRow = 2;
+    }
+    
+    console.log(`🔎 Scan rows: ${startRow}-${endRow}`);
+    const values = sheet.getRange(startRow, 1, endRow - startRow + 1, sheet.getLastColumn()).getValues();
+    
+    const rowsToDelete = [];
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const websiteRaw = (row[websiteIdx] || '').toString().trim();
+      const hasWebsite = websiteRaw.length > 0;
+      if (!hasWebsite) {
+        rowsToDelete.push(startRow + i);
+      }
+    }
+    
+    console.log('🗑️ Rows to delete (no website):', rowsToDelete);
+    
+    let deleted = 0;
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+      sheet.deleteRow(rowsToDelete[i]);
+      deleted++;
+    }
+    
+    ui.alert(`🌐 Websitesi olmayan satırlar silindi: ${deleted}`);
+    console.log('Processing complete:', { deleted });
+    
+    return { success: true, deleted };
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🧹 URL Temizle (1. Aşama) - Website kolonundaki URL'leri normalize eder
+ * - http:// ve https:// ekler
+ * - www. kontrolü yapar
+ * - Trailing slash temizler
+ * - Geçersiz URL'leri düzeltir
+ */
+function urlTemizleTumunu(parameters) {
+  console.log('Function started: urlTemizleTumunu', parameters);
+  
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      ui.alert('Bilgi', 'Veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, updated: 0 };
+    }
+    
+    const headers = data[0];
+    const websiteIdx = findColumnIndex(headers, ['Website', 'website']);
+    
+    if (websiteIdx === -1) {
+      ui.alert('Hata', "'Website' kolonu bulunamadı.", ui.ButtonSet.OK);
+      return { success: false, updated: 0 };
+    }
+    
+    // URL normalize fonksiyonu
+    function normalizeUrl(url) {
+      if (!url) return '';
+      let cleaned = String(url).trim();
+      if (!cleaned) return '';
+      
+      // Boşlukları temizle
+      cleaned = cleaned.replace(/\s+/g, '');
+      
+      // zaten normalize edilmişse atla
+      if (/^https?:\/\//i.test(cleaned)) {
+        cleaned = cleaned.replace(/\/+$/, ''); // trailing slash temizle
+        return cleaned;
+      }
+      
+        // http/https yoksa ekle
+        if (!/^https?:\/\//i.test(cleaned)) {
+          cleaned = 'https://' + cleaned;
+        }
+        
+      // www. kontrolü (isteğe bağlı - zaten varsa dokunma)
+      
+      // trailing slash temizle
+      cleaned = cleaned.replace(/\/+$/, '');
+      
+      return cleaned;
+    }
+    
+    let updated = 0;
+    const updates = [];
+    
+    // URL'leri kontrol et ve normalize et
+    for (let i = 1; i < data.length; i++) {
+      const rowNum = i + 1;
+      const currentUrl = (data[i][websiteIdx] || '').toString().trim();
+      
+      if (!currentUrl) continue;
+      
+      const normalized = normalizeUrl(currentUrl);
+      
+      if (normalized !== currentUrl && normalized !== '') {
+        updates.push({ row: rowNum, old: currentUrl, new: normalized });
+      }
+    }
+    
+    if (updates.length === 0) {
+      ui.alert('Bilgi', 'Temizlenecek URL bulunamadı. Tüm URL\'ler zaten temiz görünüyor.', ui.ButtonSet.OK);
+      return { success: true, updated: 0 };
+    }
+    
+    // Özet göster
+    let summaryMsg = `Toplam ${updates.length} URL temizlenecek.\n\n`;
+    summaryMsg += `Örnekler (ilk 5):\n`;
+    for (let i = 0; i < Math.min(5, updates.length); i++) {
+      const u = updates[i];
+      summaryMsg += `\nSatır ${u.row}:\n  "${u.old}"\n  → "${u.new}"`;
+    }
+    if (updates.length > 5) {
+      summaryMsg += `\n\n... ve ${updates.length - 5} URL daha`;
+    }
+    summaryMsg += `\n\nDevam etmek istiyor musunuz?`;
+    
+    const confirm = ui.alert('🧹 URL Temizle', summaryMsg, ui.ButtonSet.YES_NO);
+    
+    if (confirm !== ui.Button.YES) {
+      ui.alert('İptal edildi', 'URL temizleme iptal edildi.', ui.ButtonSet.OK);
+      return { success: false, updated: 0, cancelled: true };
+    }
+    
+    // URL'leri güncelle
+    for (const u of updates) {
+      sheet.getRange(u.row, websiteIdx + 1).setValue(u.new);
+      updated++;
+    }
+    
+    ui.alert('İşlem tamamlandı', `${updated} URL başarıyla temizlendi.`, ui.ButtonSet.OK);
+    console.log('Processing complete:', { updated });
+    return { success: true, updated };
+    
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🗑️ URL Tekrarları Sil (2. Aşama) - Aynı URL'ye sahip mükerrer satırları siler
+ * Her URL için ilk satırı tutar, diğerlerini siler
+ */
+function urlTekrarlariniSil(parameters) {
+  console.log('Function started: urlTekrarlariniSil', parameters);
+  
+  try {
+    if (!validateInput(parameters || {})) {
+      throw new Error('Invalid input provided');
+    }
+    
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const ui = SpreadsheetApp.getUi();
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      ui.alert('Bilgi', 'Veri bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, deleted: 0 };
+    }
+    
+    const headers = data[0];
+    const websiteIdx = findColumnIndex(headers, ['Website', 'website']);
+    
+    if (websiteIdx === -1) {
+      ui.alert('Hata', "'Website' kolonu bulunamadı.", ui.ButtonSet.OK);
+      return { success: false, deleted: 0 };
+    }
+    
+    // URL'ye göre grupla
+    const urlToRows = new Map();
+    
+    for (let i = 1; i < data.length; i++) {
+      const rowNum = i + 1;
+      const url = (data[i][websiteIdx] || '').toString().trim().toLowerCase();
+      
+      if (!url) continue;
+      
+      if (!urlToRows.has(url)) {
+        urlToRows.set(url, []);
+      }
+      urlToRows.get(url).push(rowNum);
+    }
+    
+    // Mükerrer URL grupları (2 veya daha fazla satır)
+    const dupGroups = [...urlToRows.entries()].filter(([, rows]) => rows.length > 1);
+    
+    if (dupGroups.length === 0) {
+      ui.alert('Mükerrer bulunamadı', 'Aynı URL\'ye sahip tekrar eden satır bulunamadı.', ui.ButtonSet.OK);
+      return { success: true, deleted: 0 };
+    }
+    
+    // Silinecek satırları topla (ilk satırı tut, diğerlerini sil)
+    const rowsToDelete = [];
+    const groupDetails = [];
+    
+    for (const [url, rowNums] of dupGroups) {
+      const sortedRows = [...rowNums].sort((a, b) => a - b);
+      const keepRow = sortedRows[0]; // İlk satırı tut
+      const deleteRows = sortedRows.slice(1); // Diğerlerini sil
+      
+      groupDetails.push({
+        url: url,
+        count: sortedRows.length,
+        keep: keepRow,
+        delete: deleteRows
+      });
+      
+      rowsToDelete.push(...deleteRows);
+    }
+    
+    // Satır numaralarını büyükten küçüğe sırala
+    rowsToDelete.sort((a, b) => b - a);
+    
+    const totalGroups = dupGroups.length;
+    const totalRows = rowsToDelete.length;
+    
+    // Özet mesaj
+    let summaryMsg = `URL mükerrer tarama sonucu:\n\n`;
+    summaryMsg += `• Toplam tekrar grup: ${totalGroups}\n`;
+    summaryMsg += `• Silinecek satır: ${totalRows}\n`;
+    summaryMsg += `• Korunacak satır: ${totalGroups}\n\n`;
+    summaryMsg += `Örnek gruplar (ilk 5):\n`;
+    
+    for (let i = 0; i < Math.min(5, groupDetails.length); i++) {
+      const g = groupDetails[i];
+      summaryMsg += `\n${i + 1}. "${g.url.substring(0, 50)}${g.url.length > 50 ? '...' : ''}"\n`;
+      summaryMsg += `   Korunacak: Satır ${g.keep}\n`;
+      summaryMsg += `   Silinecek: Satır ${g.delete.join(', ')}`;
+    }
+    
+    if (groupDetails.length > 5) {
+      summaryMsg += `\n\n... ve ${groupDetails.length - 5} grup daha`;
+    }
+    
+    summaryMsg += `\n\n⚠️ Her grupta ilk satır korunacak, diğerleri silinecek.`;
+    summaryMsg += `\n\nDevam etmek istiyor musunuz?`;
+    
+    const confirm = ui.alert('🗑️ URL Tekrarlarını Sil', summaryMsg, ui.ButtonSet.YES_NO);
+    
+    if (confirm !== ui.Button.YES) {
+      ui.alert('İptal edildi', 'Silme işlemi iptal edildi.', ui.ButtonSet.OK);
+      return { success: false, deleted: 0, cancelled: true };
+    }
+    
+    // Satırları sil (büyükten küçüğe)
+    let deleted = 0;
+    for (const rowNum of rowsToDelete) {
+      try {
+        sheet.deleteRow(rowNum);
+        deleted++;
+      } catch (err) {
+        console.error(`Satır ${rowNum} silinirken hata:`, err);
+      }
+    }
+    
+    ui.alert('İşlem tamamlandı', `${deleted} satır başarıyla silindi.\n${totalGroups} mükerrer grup temizlendi.`, ui.ButtonSet.OK);
+    console.log('Processing complete:', { deleted, totalGroups });
+    return { success: true, deleted, totalGroups };
+    
+  } catch (error) {
+    console.error('Function failed:', error);
+    SpreadsheetApp.getUi().alert('Hata: ' + error.message);
+    throw error;
+  }
+}
 
 /**
  * 🎨 E-ticaret Sıcaklık Analizi - SADECE Category bazında çalışır
@@ -12146,61 +13767,11 @@ function fixRandevularimColumnStructure(parameters) {
     // Yeni başlıkları yaz
     sheet.getRange(1, 1, 1, newColumns.length).setValues([newColumns]);
     
-    // ✅ KRİTİK: setValues() ÖNCESİ saat değerlerini validation'a uygun hale getir!
-    // Eski validation ("09:00" formatı) hala aktif olabilir, bu yüzden saat değerlerini geçici olarak tam saate yuvarla
-    // Sonra setValues() yap, sonra tekrar doğru formata çevir
-    const saatColIndexBeforeWrite = newColumns.indexOf('Saat') + 1;
-    const originalSaatValues = []; // Orijinal değerleri sakla
-    
-    if (saatColIndexBeforeWrite > 0 && newDataRows.length > 0) {
-      // Orijinal saat değerlerini sakla ve geçici olarak tam saate yuvarla
-      for (let i = 0; i < newDataRows.length; i++) {
-        const saatValue = newDataRows[i][saatColIndexBeforeWrite - 1];
-        originalSaatValues.push(saatValue); // Orijinal değeri sakla
-        
-        if (saatValue && typeof saatValue === 'string') {
-          const timeMatch = saatValue.match(/(\d{1,2}):(\d{2})/);
-          if (timeMatch) {
-            const hours = parseInt(timeMatch[1], 10);
-            // Geçici olarak tam saate yuvarla (validation'a uygun: "9:00" formatı)
-            newDataRows[i][saatColIndexBeforeWrite - 1] = `${hours}:00`;
-          }
-        }
-      }
-      
-      // Tüm yazılacak range'in validation'ını temizle (ekstra güvenlik)
-      try {
-        const maxRowsForClear = Math.max(newDataRows.length, 100);
-        const writeRangeForClear = sheet.getRange(2, 1, maxRowsForClear, newColumns.length);
-        writeRangeForClear.clearDataValidations();
-        SpreadsheetApp.flush(); // Validation temizleme işlemini hemen uygula
-        console.log('✅ setValues() öncesi tüm validation kuralları temizlendi');
-      } catch (clearErr) {
-        console.warn('⚠️ setValues() öncesi validation temizleme hatası (devam ediliyor):', clearErr.message);
-      }
-    }
-    
-    // Yeni verileri yaz (saat değerleri geçici olarak tam saate yuvarlanmış)
+    // Yeni verileri yaz
     if (newDataRows.length > 0) {
-      try {
-        const dataRange = sheet.getRange(2, 1, newDataRows.length, newColumns.length);
-        dataRange.setValues(newDataRows);
-        // ✅ KRİTİK: setValues() sonrası flush() ZORUNLU! (getLastRow() doğru değer döndürmesi için)
-        SpreadsheetApp.flush();
-        console.log(`✅ ${newDataRows.length} satır veri yazıldı (saat değerleri geçici olarak tam saate yuvarlanmış)`);
-        
-        // ✅ KRİTİK: Şimdi saat değerlerini tekrar orijinal formata çevir (21.6.1: "9:05" formatı)
-        if (saatColIndexBeforeWrite > 0 && originalSaatValues.length > 0) {
-          const saatValuesToWrite = originalSaatValues.map(val => [val]);
-          const saatRange = sheet.getRange(2, saatColIndexBeforeWrite, originalSaatValues.length, 1);
-          saatRange.setValues(saatValuesToWrite);
-          SpreadsheetApp.flush(); // Tekrar flush
-          console.log('✅ Saat değerleri orijinal formata çevrildi (21.6.1: "9:05" formatı)');
-        }
-      } catch (writeError) {
-        console.error('❌ setValues() hatası:', writeError.message);
-        throw writeError; // Hata fırlat
-      }
+      const dataRange = sheet.getRange(2, 1, newDataRows.length, newColumns.length);
+      dataRange.setValues(newDataRows);
+      console.log(`✅ ${newDataRows.length} satır veri yazıldı`);
     }
     
     // Kod kolonunu text formatında zorla
@@ -12213,22 +13784,12 @@ function fixRandevularimColumnStructure(parameters) {
     const saatColumnIndex = newColumns.indexOf('Saat') + 1;
     if (saatColumnIndex > 0 && newDataRows.length > 0) {
       // ✅ KRİTİK: setNumberFormat ÖNCESİ validation'ı temizle (validation conflict önleme!)
-      // Eski validation aktif olabilir, bu yüzden daha geniş bir range kullan ve flush() sonrası tekrar dene
       try {
-        // Önce daha geniş bir range'de temizle (eski validation'ları da kapsasın)
-        const maxRows = Math.max(newDataRows.length, sheet.getLastRow() - 1, 100);
-        const saatRangeForFormat = sheet.getRange(2, saatColumnIndex, maxRows, 1);
+        const saatRangeForFormat = sheet.getRange(2, saatColumnIndex, newDataRows.length, 1);
         saatRangeForFormat.clearDataValidations();
         SpreadsheetApp.flush(); // Validation temizleme işlemini hemen uygula
-        
-        // Eğer hala hata varsa, sadece yazılacak range'i temizle
-        const saatRangeForWrite = sheet.getRange(2, saatColumnIndex, newDataRows.length, 1);
-        saatRangeForWrite.clearDataValidations();
-        SpreadsheetApp.flush(); // Tekrar flush
       } catch (formatClearErr) {
-        // Uyarıyı logla ama devam et (format uygulanacak, validation setRandevularimDataValidation içinde tekrar eklenecek)
         console.warn('⚠️ Saat kolonu validation temizleme hatası (setNumberFormat öncesi, devam ediliyor):', formatClearErr.message);
-        console.log('ℹ️ Validation setRandevularimDataValidation içinde tekrar eklenecek, bu yüzden sorun değil');
       }
       
       // Formatı text yap (batch)
@@ -12237,16 +13798,31 @@ function fixRandevularimColumnStructure(parameters) {
     }
     
     // Stil ve validation'ı yeniden uygula
-    // ✅ Saat kolonunun validation'ı setRandevularimDataValidation içinde eklenecek (21.6.1: Sadece tam saatler - "9:00" formatı)
-    // Önceki validation'lar zaten clear() sonrası temizlendi, bu yüzden burada temizlemeye gerek yok
+    // ✅ DÜZELTME: Saat kolonunun validation'ını temizle (21.6.1 kuralı: "9:05" formatı, "09:00" değil!)
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const saatIndex = headers.indexOf('Saat') + 1;
+    if (saatIndex > 0) {
+      const lastRow = sheet.getLastRow() || 1;
+      if (lastRow > 1) {
+        sheet.getRange(2, saatIndex, lastRow - 1, 1).clearDataValidations();
+        SpreadsheetApp.flush(); // Validation temizleme işlemini hemen uygula
+        console.log('✅ Saat kolonunun validation kuralları temizlendi (21.6.1: "9:05" formatı için)');
+      }
+    }
     
-    // ✅ KRİTİK: applyRandevularimStyling öncesi flush() (getLastRow() doğru değer döndürmesi için)
-    SpreadsheetApp.flush();
     applyRandevularimStyling(sheet);
     setRandevularimDataValidation(sheet);
     
-    // ✅ Artık saat kolonuna validation EKLİYORUZ (21.6.1: Sadece tam saatler - "9:00" formatı)
-    // setRandevularimDataValidation içinde saat validation'ı ekleniyor, bu yüzden temizlemeye gerek yok
+    // ✅ DÜZELTME: setRandevularimDataValidation sonrası tekrar saat kolonunun validation'ını temizle
+    // (Çünkü setRandevularimDataValidation saat kolonuna "09:00" formatında validation ekliyor)
+    if (saatIndex > 0) {
+      const lastRow = sheet.getLastRow() || 1;
+      if (lastRow > 1) {
+        sheet.getRange(2, saatIndex, lastRow - 1, 1).clearDataValidations();
+        SpreadsheetApp.flush(); // Validation temizleme işlemini hemen uygula
+        console.log('✅ Saat kolonunun validation kuralları tekrar temizlendi (21.6.1 kuralına uygun)');
+      }
+    }
     
     // Tüm satırlara BATCH renklendirme uygula (100x hızlı!)
     console.log('🎨 Tüm satırlara batch renklendirme uygulanıyor...');
@@ -12817,19 +14393,5 @@ function cleanDuplicateMeetings(parameters) {
     throw error;
   }
 }
-
-/**
- * Format Tablo Aktivite validation'ını yeniden set eder (TEST FONKSİYONU)
- * Kullanım: Google Sheets'te Extensions → Apps Script → refreshFormatTableValidation çalıştır
- */
-// ========================================
-// ⚠️ MİGRASYON: Format Tablo Validation Fonksiyonu - TAMAMEN ÇIKARILDI
-// ========================================
-// Aşağıdaki fonksiyon Data Pool sistemine taşınmıştır:
-// - refreshFormatTableValidation()
-// 
-// Bu fonksiyon artık backend.js'de yoktur.
-// Format Tablo işlemleri merkezi Data Pool'dan yönetilir.
-// ========================================
 
 

@@ -92,6 +92,112 @@ CRM_CONFIG = {
 
 
 
+## 🎨 FORMAT TABLO RENK YAPISI (СТРУКТУРА ЦВЕТОВ ФОРМАТ ТАБЛИЦЫ)
+
+### 📊 Format Tablo Aktivite Renklendirmesi
+
+Format Tablo'da her satır, **Aktivite** kolonundaki değere göre renklendirilir. Renklendirme **batch operation** ile yapılır (performans için).
+
+#### Renklendirme Kuralları
+
+| Aktivite Durumu | Renk Kodu | Hex | Açıklama |
+|-----------------|-----------|-----|----------|
+| Randevu Alındı | rgb(232, 245, 232) | #E8F5E8 | Açık Yeşil - Başarı |
+| İleri Tarih Randevu | rgb(245, 245, 245) | #F5F5F5 | Açık Gri - Beklemede |
+| Yeniden Aranacak | rgb(227, 242, 253) | #E3F2FD | Açık Mavi - Takip |
+| Bilgi Verildi | rgb(243, 229, 245) | #F3E5F5 | Açık Mor - Bilgilendirme |
+| Fırsat İletildi | rgb(255, 235, 238) | #FFEBEE | Açık Kırmızı - Fırsat |
+| İlgilenmiyor | rgb(255, 248, 225) | #FFF8E1 | Açık Sarı - Olumsuz |
+| Ulaşılamadı | rgb(255, 235, 238) | #FFEBEE | Açık Kırmızı - Hata |
+| Geçersiz Numara | rgb(255, 224, 178) | #FFE0B2 | Açık Turuncu - Uyarı |
+| Kurumsal | rgb(225, 190, 231) | #E1BEE7 | Açık Mor - Özel |
+| Boş/Aktivite Yok | rgb(255, 255, 255) | #FFFFFF | Beyaz - Boş |
+
+#### Batch Renklendirme (Zorunlu!)
+
+**❌ YAVAŞ (150 API call = 15 saniye!):**
+```javascript
+for (let i = 2; i <= 151; i++) {
+  sheet.getRange(i, 1, 1, 26).setBackground('#E8F5E8');
+}
+```
+
+**✅ HIZLI (1 API call = 0.5 saniye!):**
+```javascript
+// 1. Hafızada hesapla
+const data = sheet.getRange(2, 1, 150, 26).getValues();
+const colors = data.map(row => {
+  const aktivite = String(row[12] || '').trim(); // Aktivite kolonu (M = index 12)
+  if (!aktivite) return Array(26).fill('#FFFFFF');
+  
+  // Aktivite durumuna göre renk belirle
+  const colorMap = {
+    'Randevu Alındı': '#E8F5E8',
+    'İleri Tarih Randevu': '#F5F5F5',
+    'Yeniden Aranacak': '#E3F2FD',
+    'Bilgi Verildi': '#F3E5F5',
+    'Fırsat İletildi': '#FFEBEE',
+    'İlgilenmiyor': '#FFF8E1',
+    'Ulaşılamadı': '#FFEBEE',
+    'Geçersiz Numara': '#FFE0B2',
+    'Kurumsal': '#E1BEE7'
+  };
+  
+  const rowColor = colorMap[aktivite] || '#FFFFFF';
+  return Array(26).fill(rowColor);
+});
+
+// 2. Tek seferde yaz (1 API call!)
+sheet.getRange(2, 1, 150, 26).setBackgrounds(colors);
+SpreadsheetApp.flush(); // Batch işlem sonrası flush
+```
+
+**Kazanç: 30x daha hızlı!**
+
+#### Header Renklendirmesi
+
+Format Tablo header'ı (1. satır) her zaman **rgb(173, 216, 230)** (Koyu Mavi) renginde olmalıdır.
+
+```javascript
+const headerRange = sheet.getRange(1, 1, 1, 26);
+headerRange.setBackground('rgb(173, 216, 230)');
+headerRange.setFontWeight('bold');
+headerRange.setFontSize(11);
+headerRange.setHorizontalAlignment('center');
+```
+
+#### Conditional Formatting (Alternatif)
+
+Eğer batch renklendirme yerine conditional formatting kullanmak isterseniz:
+
+```javascript
+const aktiviteColumn = 13; // M kolonu
+const lastRow = sheet.getLastRow();
+const range = sheet.getRange(2, aktiviteColumn, lastRow - 1, 1);
+
+// "Randevu Alındı" = Yeşil
+const rule1 = SpreadsheetApp.newConditionalFormatRule()
+  .whenTextEqualTo('Randevu Alındı')
+  .setBackground('#E8F5E8')
+  .setRanges([range])
+  .build();
+
+// "Fırsat İletildi" = Kırmızı
+const rule2 = SpreadsheetApp.newConditionalFormatRule()
+  .whenTextEqualTo('Fırsat İletildi')
+  .setBackground('#FFEBEE')
+  .setRanges([range])
+  .build();
+
+const rules = sheet.getConditionalFormatRules();
+rules.push(rule1, rule2);
+sheet.setConditionalFormatRules(rules);
+```
+
+**Not:** Conditional formatting daha yavaş olabilir. Batch renklendirme önerilir.
+
+---
+
 ## 📝 MERKEZI DEĞIŞIKLIK TALİMATI (ЦЕНТРАЛИЗОВАННАЯ ИНСТРУКЦИЯ)
 
 ### 🎯 TEK YERDEN YÖNETIM (УПРАВЛЕНИЕ ИЗ ОДНОГО МЕСТА):

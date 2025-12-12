@@ -1,0 +1,363 @@
+---
+alwaysApply: true
+description: "Google Apps Script best practices ve batch operations"
+---
+
+
+# Google Apps Script Best Practices
+Her zaman uygulanması gereken temel kurallar.
+---
+## BATCH OPERATIONS (ZORUNLU!)
+### Temel Kural
+**ASLA loop içinde API call yapma!**
+### ❌ ANTİ-PATTERN (Yavaş)
+```javascript
+// 100 satır için 100 API call = 10+ saniye!
+for (let i = 2; i <= 101; i++) {
+  const value = sheet.getRange(i, 1).getValue();
+  processValue(value);
+}
+// Her satır için ayrı yazma
+for (let i = 0; i < data.length; i++) {
+  sheet.getRange(i + 2, 1).setValue(data[i]);
+}
+// Her hücreye ayrı renk
+for (let i = 2; i <= 151; i++) {
+  sheet.getRange(i, 1, 1, 10).setBackground('#E8F5E8');
+}
+✅ BEST PRACTICE (Hızlı)
+
+// Tek seferde oku (1 API call = 0.5s!)
+const values = sheet.getRange(2, 1, 100, 1).getValues();
+values.forEach(row => processValue(row[0]));
+// Batch yazma
+const writeData = data.map(item => [item]);
+sheet.getRange(2, 1, data.length, 1).setValues(writeData);
+// Batch renklendirme
+const colors = Array(150).fill(Array(10).fill('#E8F5E8'));
+sheet.getRange(2, 1, 150, 10).setBackgrounds(colors);
+Kazanç: 100x daha hızlı!
+
+CACHE KULLANIMI (Zorunlu!)
+Her Veriyi Cache'le
+
+const cache = CacheService.getScriptCache();
+// Reusable cache function
+function getCachedData(key, fetchFunction, ttl = 3600) {
+  const cached = cache.get(key);
+  if (cached) {
+    console.log(`✅ Cache hit: ${key}`);
+    return JSON.parse(cached);
+  }
+  
+  console.log(`❌ Cache miss: ${key}`);
+  const fresh = fetchFunction();
+  cache.put(key, JSON.stringify(fresh), ttl);
+  return fresh;
+}
+// Kullanım
+const employeeSheet = getCachedData(
+  `sheet_SB004`,
+  () => SpreadsheetApp.openById(fileId).getSheetByName('Randevularım'),
+  3600
+);
+İlk çağrı: 5s, sonrakiler: 0.01s!
+
+PERFORMANCE HEDEFLERİ
+Hedefler
+Tek işlem: <1s
+Batch işlem: <3s
+Rapor: <5s
+Senkronizasyon: <10s
+Her İşlemde Ölç
+
+function measurePerformance(funcName, func) {
+  const start = Date.now();
+  const result = func();
+  const duration = (Date.now() - start) / 1000;
+  
+  const status = duration < 2 ? '✅' : duration < 5 ? '⚠️' : '❌';
+  console.log(`⏱️ ${status} ${funcName}: ${duration.toFixed(2)}s`);
+  
+  if (duration > 3) {
+    console.warn(`⚠️ YAVAŞ! ${funcName} optimize edilmeli!`);
+  }
+  
+  return { result, duration };
+}
+API QUOTA YÖNETİMİ
+Google Sheets Quotas
+
+const QUOTAS = {
+  executionTime: 360,
+  dailyAPIcalls: 20000,
+  concurrentExecutions: 30,
+  cellLimit: 5000000
+};
+Quota Tasarrufu
+✅ YAP:
+
+Batch operations kullan
+Cache kullan
+Incremental sync
+Parallel processing
+❌ YAPMA:
+
+Loop içinde API call
+Her işlemde flush
+Cache'siz çalışma
+ERROR HANDLING (Zorunlu!)
+Her Fonksiyonda Try-Catch
+
+function safeOperation(operationName, operation) {
+  try {
+    console.log(`🔄 ${operationName} başladı`);
+    const result = operation();
+    console.log(`✅ ${operationName} başarılı`);
+    return { success: true, result };
+    
+  } catch (error) {
+    console.error(`❌ ${operationName}: ${error.message}`);
+    
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      operation: operationName,
+      error: error.message,
+      stack: error.stack
+    }));
+    
+    return { success: false, error: error.message };
+  }
+}
+Validation Error Handling
+
+try {
+  sheet.getRange(row, col, 1, values.length).setValues([values]);
+} catch (error) {
+  if (error.message.includes('validation')) {
+    const range = sheet.getRange(row, col, 1, values.length);
+    range.clearDataValidations();
+    range.setValues([values]);
+    console.log('✅ Validation temizlendi, yazıldı');
+  } else {
+    throw error;
+  }
+}
+ARRAY-HEADER SYNC (Kritik!)
+Her Yazmadan Önce Kontrol
+
+function validateArrayHeaderSync(array, headers) {
+  if (array.length !== headers.length) {
+    console.error('❌ KRİTİK: Array-Header uyumsuz!');
+    console.error(`Headers (${headers.length}):`, headers);
+    console.error(`Array (${array.length}):`, array);
+    throw new Error(`Array (${array.length}) ≠ Headers (${headers.length})`);
+  }
+  
+  console.log('✅ Array-Header sync OK');
+  return true;
+}
+const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+const dataRow = [value1, value2, value3];
+validateArrayHeaderSync(dataRow, headers);
+sheet.getRange(newRow, 1, 1, dataRow.length).setValues([dataRow]);
+
+STRUCTURED LOGGING
+Her Zaman JSON Format
+
+function log(level, message, metadata = {}) {
+  console.log(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level: level,
+    service: 'CRM-Backend',
+    message: message,
+    ...metadata
+  }));
+}
+log('INFO', 'Randevu eklendi', { customerId: '123', duration: 1.2 });
+log('ERROR', 'Validation hatası', { column: 'L', row: 85 });
+log('WARN', 'Yavaş işlem', { duration: 8.5, threshold: 3 });
+INCREMENTAL SYNC
+Sadece Yeni Veriyi İşle
+
+function incrementalSync(sheetName) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `lastProcessedRow_${sheetName}`;
+  
+  const lastRow = parseInt(cache.get(cacheKey) || '1');
+  const currentLastRow = sheet.getLastRow();
+  
+  const newRowCount = currentLastRow - lastRow;
+  if (newRowCount > 0) {
+    const newData = sheet.getRange(lastRow + 1, 1, newRowCount, 10).getValues();
+    
+    console.log(`📊 ${newRowCount} yeni satır işlenecek`);
+    processData(newData);
+    
+    cache.put(cacheKey, currentLastRow.toString(), 3600);
+    console.log(`✅ Son işlenen satır: ${currentLastRow}`);
+  } else {
+    console.log('ℹ️ Yeni veri yok');
+  }
+}
+İlk çalıştırma: Yavaş, sonrakiler: 100x hızlı!
+
+PARALLEL PROCESSING
+6'şar Chunk
+
+function parallelProcess(items) {
+  const chunkSize = 6;
+  
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    console.log(`📊 Chunk ${Math.floor(i/chunkSize) + 1} işleniyor...`);
+    chunk.map(item => processItem(item));
+  }
+  
+  console.log(`✅ ${items.length} item işlendi`);
+}
+12 item: 96s → 16s (6x hızlı!)
+
+
+
+## FLUSH KULLANIMI (KRİTİK!)
+### 🎯 flush() NE ZAMAN KULLANILIR?
+**1️⃣ ZORUNLU (hemen flush!):**
+```javascript
+// clearDataValidations() sonrası → ZORUNLU!
+range.clearDataValidations();
+SpreadsheetApp.flush(); // ← ZORUNLU!
+range.setValues([values]);
+// setDataValidation() sonrası → ZORUNLU!
+range.setDataValidation(validation);
+SpreadsheetApp.flush(); // ← ZORUNLU!
+2️⃣ ÖNERİLİR (toplu işlemden sonra):
+
+
+// Batch renklendirme sonrası
+const colors = Array(150).fill(Array(10).fill('#E8F5E8'));
+sheet.getRange(2, 1, 150, 10).setBackgrounds(colors);
+SpreadsheetApp.flush(); // ← ÖNERİLİR
+// Batch veri yazma sonrası
+sheet.getRange(2, 1, data.length, 10).setValues(data);
+SpreadsheetApp.flush(); // ← ÖNERİLİR
+3️⃣ YASAK (her küçük işlemde):
+
+
+// ❌ YANLIŞ (çok yavaş!)
+sheet.getRange('A1').setValue('Test1');
+SpreadsheetApp.flush(); // ← Gereksiz!
+sheet.getRange('A2').setValue('Test2');
+SpreadsheetApp.flush(); // ← Gereksiz!
+// ✅ DOĞRU (hızlı!)
+sheet.getRange('A1').setValue('Test1');
+sheet.getRange('A2').setValue('Test2');
+sheet.getRange('A3').setValue('Test3');
+SpreadsheetApp.flush(); // ← En sonda 1 kere!
+💡 NET KURAL:
+
+Validation işlemleri → Hemen flush() (uygulanması ZORUNLU)
+Batch işlemler → En sonda 1 flush() (performans için)
+Tek hücre işlemleri → flush() YAPMA! (gereksiz yavaşlatır)
+
+
+
+
+VALIDATION CONFLICT
+Çözüm Adımları
+
+// 1. Validation temizle + flush
+sheet.getRange("A2:Z1000").clearDataValidations();
+SpreadsheetApp.flush(); // ← ZORUNLU!
+// 2. Veri yaz
+sheet.getRange("A2:Z100").setValues(rawData);
+// 3. Format düzelt
+const timeColumn = sheet.getRange("N2:N100").getValues();
+const fixedTimes = timeColumn.map(row => {
+  const time = row[0];
+  if (time === "09:30") return ["09:00"];
+  if (time === "10:30") return ["10:00"];
+  return row;
+});
+sheet.getRange("N2:N100").setValues(fixedTimes);
+// 4. Validation ekle + flush
+const timeValidation = SpreadsheetApp.newDataValidation()
+  .requireValueInList(["09:00", "10:00", "11:00"])
+  .build();
+sheet.getRange("N2:N100").setDataValidation(timeValidation);
+SpreadsheetApp.flush(); // ← ZORUNLU!
+
+
+
+Sık Hatalar
+❌ Yanlış	✅ Doğru
+Validation sonra düzelt	Önce temizle
+setValue tek tek	setValues batch
+Eski validation kalsın	clearDataValidations
+Veri dropdown dışı	Önce uyarla
+
+COMMON ERRORS
+ReferenceError: X is not defined → Değişken tanımsız
+
+TypeError: Cannot read property X of undefined → Obje null/undefined
+
+Exception: Range not found → A1 notation yanlış
+
+Exception: Service invoked too many times → Batch kullan
+
+Data validation error in cell X → clearDataValidations ekle
+
+Exception: Invalid range coordinates → getRange parametreleri yanlış
+
+
+
+
+CHECKLIST
+□ Batch operations kullanılıyor
+□ Cache kullanılıyor
+□ Try-catch var
+□ Performance ölçülüyor
+□ Array-Header sync kontrol
+□ Validation error handling var
+□ Structured logging yapılıyor
+□ flush() kurallarına uyuluyor
+
+ÖZET
+✅ YAP
+Batch operations (100x hızlı)
+Cache kullan (ilk yavaş sonrası hızlı)
+Try-catch (production-ready)
+Performance ölç (<3s hedef)
+Structured logging (JSON)
+Validation: Temizle + flush → Yaz → Düzelt → Ekle + flush
+❌ YAPMA
+Loop içinde API call
+flush() kurallarını ihlal etme
+Cache'siz çalışma
+Validation conflict ignore
+Array-Header sync kontrolsüz
+
+## 🚨 Deploy Güvenliği
+**KURAL:** Deploy yaparken tek dosya push etme, tüm dosyaları push et!
+```bash
+# ❌ YANLIŞ
+clasp push src/agents/backend.js  # Diğer dosyalar SİLİNİR!
+# ✅ DOĞRU
+cd ~/Desktop/Google-Sheets-CRM
+clasp push  # Tüm dosyalar güvenli
+Sebep: Google Apps Script'te tek dosya push edince, diğer dosyalar silinir.
+
+📚 Döküman Senkronizasyonu
+KURAL: Kod değişince ilgili dökümanları güncelle!
+
+Format Tablo değişti → docs/sayfa_kolonlari.md güncelle
+Renk değişti → docs/RENK_KODLARI.md güncelle
+Mapping değişti → src/shared/smart-column-mapping.js güncelle
+✅ İş Tamamlama Protokolü
+KURAL: İş bitince sırayla:
+
+Test et
+Döküman güncelle
+Deploy et (clasp push)
+Git commit & push
+Rapor ver

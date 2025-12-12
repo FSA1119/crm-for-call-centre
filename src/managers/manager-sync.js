@@ -13,14 +13,18 @@
 const CRM_CONFIG = {
 
   // 👥 Employee Management - Team Structure
-  // Mevcut 6 aktif personel
+  // Mevcut 10 aktif personel
   EMPLOYEE_CODES: {
     'NT 002': 'Neslihan Türk', 
     'SB 004': 'Sinem Bakalcı',
     'KM 005': 'Kübra Murat',
     'BH 007': 'Bilge Hin',
     'MK 009': 'Merve Kılıç',
-    'NT 012': 'Nazlı Tutuşan'
+    'NT 012': 'Nazlı Tutuşan',
+    'SS 014': 'Seçil Sayan',
+    'NK 015': 'Neslihan Kaya',
+    'AD 016': 'Aslı Doğan',
+    'NB 017': 'Neşe Bülbül'
   },
   
   // 📁 File Management - Data Sources
@@ -4216,7 +4220,8 @@ const EMPLOYEE_FILES = {
   'BH 007': '1X0k3uUh7KoiywGO3ewg7ULMAWOrY86I2NCBV7zaHUus',
   'TD 008': '1tokFq-zPejBe-Npc1f4RHlRC15tgHn57qJIIIeVdXtQ',
   'MK 009': '1xje6Kf9OZt1T2mB3XAjQgRMle-i-gbuKdh9AYmjPrIA',
-  'TİA 010': '1ltRrpcd4EWQT9sZOnEn8fVRdWTSMfG96L7_wb82nrLk'
+  'TİA 010': '1ltRrpcd4EWQT9sZOnEn8fVRdWTSMfG96L7_wb82nrLk',
+  'NB 017': '1sKBlNxeG-c7xMYvQMrRy9-vNzouXMp-jLa2p4GWRoPQ'
 };
 
 const MANAGER_FILE_ID = '11IsZpaGgXtgpxrie9F_uVwp6uJPcueGhqB73WhZn60A';
@@ -18098,7 +18103,8 @@ function createOrUpdatePersonelSheet() {
     const newEmployees = [
       { code: 'SS 014', name: 'Seçil Sayan', portfoyYoneticisi: 'RS 22', fileId: '1bb5bxhIU-uIZ9zXEDjJN-JkkcCvwm9EFkMU2CMIUAcc' },
       { code: 'NK 015', name: 'Neslihan Kaya', portfoyYoneticisi: 'RS 22', fileId: '1raSTU4mZdMc63i27KRCFLw3GNDOd3c4u60lc9H8Tdu4' },
-      { code: 'AD 016', name: 'Aslı Doğan', portfoyYoneticisi: 'OC 23', fileId: '1eLrz837xfkWn1Subfbnu9oN2CLCPFnp35ttmSiIUoSM' }
+      { code: 'AD 016', name: 'Aslı Doğan', portfoyYoneticisi: 'OC 23', fileId: '1eLrz837xfkWn1Subfbnu9oN2CLCPFnp35ttmSiIUoSM' },
+      { code: 'NB 017', name: 'Neşe Bülbül', portfoyYoneticisi: '', fileId: '1sKBlNxeG-c7xMYvQMrRy9-vNzouXMp-jLa2p4GWRoPQ' }
     ];
     
     // Yeni personelleri ekle

@@ -61,6 +61,146 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 
 ---
 
+## 🔄 HAM VERİ → FORMAT TABLO DÖNÜŞÜMÜ (DİNAMİK)
+
+### Amaç
+Farklı kaynaklardan gelen ham veriyi standart Format Tablo yapısına dönüştür.
+
+### Temel Kurallar
+
+1. **Ham veri kaynağı farklı olabilir**
+   - Kaynak 1, 2, 3... farklı sütun yapıları olabilir
+   - Sütun isimleri farklı olabilir (Şirket/Firma/Company)
+   - Sütun sayısı farklı olabilir
+
+2. **Format Tablo yapısı SABİT**
+   - Her zaman aynı 26 sütun (A-Z)
+   - Sütun sırası ASLA değişmez
+   - Fırsatlarım/Randevularım ile uyumlu
+
+3. **Sütun mapping dinamik**
+   - Ham veri sütunları otomatik algılanır
+   - Benzer isimler eşleştirilir
+   - Eksik alanlar boş bırakılır
+
+4. **Zorunlu alanlar**
+   - `Company name` (D kolonu) - ZORUNLU
+   - `Phone` (I kolonu) - ZORUNLU
+   - Bu alanlar boş olan satırlar atlanır
+
+### Dinamik Sütun Mapping Kuralları
+
+Ham veri sütun isimleri otomatik olarak Format Tablo sütunlarına map edilir:
+
+| Ham Veri İsmi (Örnekler) | Format Tablo Sütunu | Kolon |
+|-------------------------|---------------------|-------|
+| Kod, ID, Kodu | Kod | A |
+| Keyword, Anahtar Kelime | Keyword | B |
+| Location, Konum, Lokasyon | Location | C |
+| Şirket, Firma, Company, Company name, İsim | Company name | D ⚠️ ZORUNLU |
+| Category, Kategori, Sektör | Category | E |
+| Website, Site, Web | Website | F |
+| CMS Adı, CMS, CMS Name | CMS Adı | G |
+| CMS Grubu, CMS Group | CMS Grubu | H |
+| Phone, Telefon, Tel, Telefon No | Phone | I ⚠️ ZORUNLU |
+| Yetkili Tel, Yetkili Telefon | Yetkili Tel | J |
+| Mail, Email, E-posta | Mail | K |
+| İsim Soyisim, Yetkili, Yetkili İsim | İsim Soyisim | L |
+| Aktivite, Durum, Status | Aktivite | M |
+| Aktivite Tarihi, Tarih, Date | Aktivite Tarihi | N |
+| Yorum, Not, Açıklama | Yorum | O |
+| Yönetici Not, Manager Note | Yönetici Not | P |
+| E-Ticaret, Ecommerce | E-Ticaret İzi | Q |
+| Hız, Speed | Site Hızı | R |
+| Trafik, Traffic | Site Trafiği | S |
+| Log, Günlük | Log | T |
+| Toplantı, Meeting, Format | Toplantı formatı | U |
+| Address, Adres | Address | V |
+| City, Şehir | City | W |
+| Rating, Rating Count | Rating count | X |
+| Review, Yorum | Review | Y |
+| Map, Maplink, Harita | Maplink | Z |
+
+### Mapping Algoritması
+
+1. **Case-insensitive arama:** Büyük/küçük harf duyarsız
+2. **Kısmi eşleşme:** "Telefon" → "Phone" eşleşir
+3. **Öncelik sırası:** Tam eşleşme > Kısmi eşleşme
+4. **Çoklu eşleşme:** İlk bulunan kullanılır
+
+### Dönüşüm Fonksiyonu Örneği
+
+```javascript
+/**
+ * Ham veriyi Format Tablo yapısına dönüştürür
+ */
+function convertHamVeriToFormatTable(sourceSheet, targetSheet) {
+  // 1. Ham veriyi oku
+  const lastCol = sourceSheet.getLastColumn();
+  const lastRow = sourceSheet.getLastRow();
+  const sourceHeaders = sourceSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const sourceData = sourceSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  
+  // 2. Format Tablo sütunları (26 sütun - SABİT)
+  const formatTableHeaders = [
+    'Kod', 'Keyword', 'Location', 'Company name', 'Category', 
+    'Website', 'CMS Adı', 'CMS Grubu', 'Phone', 'Yetkili Tel', 
+    'Mail', 'İsim Soyisim', 'Aktivite', 'Aktivite Tarihi', 
+    'Yorum', 'Yönetici Not', 'E-Ticaret İzi', 'Site Hızı', 
+    'Site Trafiği', 'Log', 'Toplantı formatı', 'Address', 
+    'City', 'Rating count', 'Review', 'Maplink'
+  ];
+  
+  // 3. Dinamik mapping oluştur
+  const mapping = createColumnMapping(sourceHeaders, formatTableHeaders);
+  
+  // 4. Veriyi dönüştür (batch)
+  const transformedData = [];
+  sourceData.forEach((row) => {
+    const newRow = new Array(26).fill('');
+    
+    // Mapping'e göre kopyala
+    Object.entries(mapping).forEach(([srcIdx, tgtIdx]) => {
+      if (tgtIdx !== -1) {
+        newRow[tgtIdx] = row[parseInt(srcIdx)] || '';
+      }
+    });
+    
+    // Zorunlu alan kontrolü
+    const companyName = newRow[3]; // D kolonu
+    const phone = newRow[8];       // I kolonu
+    
+    if (companyName && phone) {
+      transformedData.push(newRow);
+    }
+  });
+  
+  // 5. Format Tablo'ya yaz (batch)
+  targetSheet.clear();
+  targetSheet.getRange(1, 1, 1, 26).setValues([formatTableHeaders]);
+  if (transformedData.length > 0) {
+    targetSheet.getRange(2, 1, transformedData.length, 26).setValues(transformedData);
+  }
+  SpreadsheetApp.flush();
+}
+```
+
+### Kullanım Örneği
+
+**Ham Veri Sheet:**
+| ID | Firma Adı | Telefon No | E-posta |
+|----|-----------|------------|---------|
+| 1 | ABC Şirket | 05551234567 | info@abc.com |
+
+**Dönüşüm Sonrası Format Tablo:**
+| Kod | Keyword | Location | Company name | ... | Phone | ... | Mail |
+|-----|---------|----------|--------------|-----|-------|-----|------|
+| 1 | | | ABC Şirket | ... | 05551234567 | ... | info@abc.com |
+
+**Not:** Eşleşmeyen sütunlar boş bırakılır.
+
+---
+
 ## Randevularım / Randevular
 | Kolon | Tip |
 |---|---|
@@ -89,10 +229,13 @@ Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon
 Randevu durumu (dropdown):  
 - Randevu Alındı  
 - İleri Tarih Randevu
-- Randevu Teyitlendi
-- Randevu Ertelendi
-- Randevu İptal oldu
-- Toplantı Gerçekleşti (✅ YENİ: Otomatik Toplantılarım'a taşınır, koyu yeşil renk)
+- Yeniden Aranacak
+- Bilgi Verildi
+- Fırsat İletildi
+- İlgilenmiyor
+- Ulaşılamadı
+- Geçersiz Numara
+- Kurumsal
 
 Toplantı formatı (dropdown): Yüz Yüze, Online, Telefon  
 Toplantı Sonucu (dropdown): Satış Yapıldı, Teklif İletildi, Beklemede, Satış İptal

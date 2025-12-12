@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Satış Penceresi</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.5);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px rgba(0,0,0,0.15);
+      padding: 36px;
+      width: 98%;
+      max-width: 800px;
+      animation: slideUp 0.3s ease;
+      position: relative;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .header h1 {
+      color: #1f2937;
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    
+    .header p {
+      color: #6b7280;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 400;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #374151;
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: -0.2px;
+    }
+    
+    .required {
+      color: #ef4444;
+      font-weight: 600;
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+      background: #ffffff;
+      color: #111827;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #2E7D32;
+      box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+    }
+    
+    .form-row {
+      display: flex;
+      gap: 15px;
+    }
+    
+    .form-row .form-group {
+      flex: 1;
+    }
+    
+    .buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+    }
+    
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(46, 125, 50, 0.3);
+    }
+    
+    .performance-warning {
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 10px 15px;
+      margin: 15px 20px;
+      font-size: 13px;
+      color: #856404;
+      display: none;
+    }
+    
+    .btn-secondary {
+      background: #6b7280;
+      color: white;
+    }
+    
+    .btn-secondary:hover {
+      background: #4b5563;
+    }
+    
+    .company-info {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .company-info h3 {
+      margin: 0 0 12px 0;
+      color: #0369a1;
+      font-size: 16px;
+    }
+    
+    .company-info p {
+      margin: 6px 0;
+      font-size: 14px;
+      color: #1e293b;
+    }
+    
+    .ciro-highlight {
+      background: #f0fdf4;
+      border: 2px solid #2E7D32;
+      font-weight: 600;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>💰 Toplantıdan Satışa Geç</h1>
+      <p>Satış bilgilerini doldurun</p>
+    </div>
+    
+    <!-- Company Information -->
+    <div class="company-info">
+      <h3>🏢 Firma Bilgileri</h3>
+      <p><strong>Firma:</strong> <?= rowData['Company name'] || 'Belirtilmemiş' ?></p>
+      <p><strong>Telefon:</strong> <?= rowData['Phone'] || rowData['Yetkili Tel'] || 'Belirtilmemiş' ?></p>
+    </div>
+    
+    <form id="saleForm">
+      <!-- Toplantı Tarihi (Read-only, bilgi amaçlı) -->
+      <div class="form-group">
+        <label>📅 Toplantı Tarihi</label>
+        <input type="text" value="<?= toplantiTarihiDisplay || 'Belirtilmemiş' ?>" readonly style="background: #f3f4f6;">
+      </div>
+      
+      <!-- Satış Tarihi (Otomatik: Bugün) -->
+      <div class="form-group">
+        <label>📅 Satış Tarihi <span class="required">*</span></label>
+        <input type="date" id="satisTarihi" name="satisTarihi" required>
+      </div>
+      
+      <!-- Satış Türü -->
+      <div class="form-group">
+        <label for="satisTuru">🎯 Satış Türü <span class="required">*</span></label>
+        <select id="satisTuru" name="satisTuru" required>
+          <option value="">Seçiniz...</option>
+          <option value="Yerinde Satış" <?= (defaultSatisTuru === 'Yerinde Satış') ? 'selected' : '' ?>>Yerinde Satış</option>
+          <option value="Teklif Sonrası" <?= (defaultSatisTuru === 'Teklif Sonrası') ? 'selected' : '' ?>>Teklif Sonrası</option>
+        </select>
+        <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+          Yerinde Satış: Toplantı sırasında direkt satış | Teklif Sonrası: Teklif gönderildi, incelendi, sonradan satış
+        </small>
+      </div>
+      
+      <!-- Paket (Teklif Detayı) -->
+      <div class="form-group">
+        <label for="paket">📦 Paket (Teklif Detayı) <span class="required">*</span></label>
+        <select id="paket" name="paket" required>
+          <option value="">Seçiniz...</option>
+          <option value="Next" <?= (defaultPaket === 'Next') ? 'selected' : '' ?>>Next</option>
+          <option value="Elite" <?= (defaultPaket === 'Elite') ? 'selected' : '' ?>>Elite</option>
+          <option value="Platinium Plus" <?= (defaultPaket === 'Platinium Plus') ? 'selected' : '' ?>>Platinium Plus</option>
+          <option value="Platinium" <?= (defaultPaket === 'Platinium') ? 'selected' : '' ?>>Platinium</option>
+          <option value="Entegre" <?= (defaultPaket === 'Entegre') ? 'selected' : '' ?>>Entegre</option>
+          <option value="Pro" <?= (defaultPaket === 'Pro') ? 'selected' : '' ?>>Pro</option>
+          <option value="Digifirst" <?= (defaultPaket === 'Digifirst') ? 'selected' : '' ?>>Digifirst</option>
+          <option value="Custom" <?= (defaultPaket === 'Custom') ? 'selected' : '' ?>>Custom</option>
+        </select>
+      </div>
+      
+      <!-- Ciro -->
+      <div class="form-group">
+        <label for="ciro">💰 Ciro (₺) <span class="required">*</span></label>
+        <input type="number" id="ciro" name="ciro" step="0.01" min="0" required class="ciro-highlight" placeholder="0.00">
+      </div>
+      
+      <!-- Toplantı Formatı (Read-only, bilgi amaçlı) -->
+      <div class="form-group">
+        <label>📋 Toplantı Formatı</label>
+        <input type="text" value="<?= toplantiFormatDisplay || 'Belirtilmemiş' ?>" readonly style="background: #f3f4f6;">
+      </div>
+      
+      <!-- Toplantıyı Yapan (Read-only, bilgi amaçlı) -->
+      <div class="form-group">
+        <label>👤 Toplantıyı Yapan</label>
+        <input type="text" value="<?= toplantiYapanDisplay || 'Belirtilmemiş' ?>" readonly style="background: #f3f4f6;">
+      </div>
+      
+      <!-- Yorum -->
+      <div class="form-group">
+        <label for="yorum">📝 Yorum</label>
+        <textarea id="yorum" name="yorum" rows="3" placeholder="Satış ile ilgili notlarınızı buraya yazın..."><?= yorumDisplay || '' ?></textarea>
+      </div>
+      
+      <!-- Yönetici Not -->
+      <div class="form-group">
+        <label for="yoneticiNot">📋 Yönetici Not</label>
+        <textarea id="yoneticiNot" name="yoneticiNot" rows="2" placeholder="Yönetici notlarınızı buraya yazabilirsiniz..."><?= yoneticiNotDisplay || '' ?></textarea>
+      </div>
+      
+      <div class="buttons">
+        <button type="button" class="btn btn-secondary" onclick="closeDialog()">❌ İptal</button>
+        <button type="submit" class="btn btn-primary" id="submitButton">💰 Satışı Tamamla</button>
+      </div>
+    </form>
+  </div>
+  
+  <script>
+    // Set default sale date (today)
+    window.onload = function() {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = (today.getMonth() + 1).toString().padStart(2, '0');
+      const day = today.getDate().toString().padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+      
+      const satisTarihiInput = document.getElementById('satisTarihi');
+      if (satisTarihiInput) {
+        satisTarihiInput.value = todayStr;
+      }
+    };
+    
+    let isSubmitting = false;
+    
+    document.getElementById('saleForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      if (isSubmitting) return;
+      isSubmitting = true;
+      
+      const submitButton = document.getElementById('submitButton');
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = '⏳ Kaydediliyor...';
+      }
+      
+      // Collect form data
+      const formData = {
+        satisTarihi: document.getElementById('satisTarihi').value,
+        satisTuru: document.getElementById('satisTuru').value,
+        paket: document.getElementById('paket').value,
+        ciro: parseFloat(document.getElementById('ciro').value) || 0,
+        yorum: document.getElementById('yorum').value.trim(),
+        yoneticiNot: document.getElementById('yoneticiNot').value.trim(),
+        // Backward compatibility fields
+        toplantiSonucu: 'Satış Yapıldı',
+        meetingResult: 'Satış Yapıldı',
+        teklifDetayiSale: document.getElementById('paket').value,
+        ciro: parseFloat(document.getElementById('ciro').value) || 0,
+        satisCiro: parseFloat(document.getElementById('ciro').value) || 0
+      };
+      
+      // Validate
+      if (!formData.satisTuru) {
+        alert('❌ Lütfen Satış Türü seçin');
+        resetButton();
+        return;
+      }
+      
+      if (!formData.paket) {
+        alert('❌ Lütfen Paket seçin');
+        resetButton();
+        return;
+      }
+      
+      if (!formData.ciro || formData.ciro <= 0) {
+        alert('❌ Lütfen geçerli bir ciro miktarı girin');
+        resetButton();
+        return;
+      }
+      
+      // Submit to Google Apps Script
+      if (typeof google !== 'undefined' && google.script) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            isSubmitting = false;
+            if (result.success) {
+              setTimeout(function() {
+                try {
+                  google.script.host.close();
+                } catch (e) {
+                  // Dialog zaten kapalıysa hata verme
+                }
+              }, 1000);
+            } else {
+              resetButton();
+              alert('❌ Hata: ' + (result.message || 'Bilinmeyen hata'));
+            }
+          })
+          .withFailureHandler(function(error) {
+            isSubmitting = false;
+            resetButton();
+            alert('❌ Hata: ' + error.message);
+          })
+          .processSaleForm(formData, <?= (typeof rowNumber !== 'undefined' && rowNumber) ? parseInt(rowNumber, 10) : 0 ?>, 'Toplantılarım');
+      } else {
+        isSubmitting = false;
+        resetButton();
+      }
+    });
+    
+    function resetButton() {
+      const submitButton = document.getElementById('submitButton');
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = '💰 Satışı Tamamla';
+      }
+    }
+    
+    function closeDialog() {
+      if (typeof google !== 'undefined' && google.script) {
+        google.script.host.close();
+      }
+    }
+  </script>
+</body>
+</html>
+

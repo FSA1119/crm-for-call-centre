@@ -1,0 +1,4 @@
+**/**
+!src/agents/fabrika.js
+!src/managers/cms_detector.gs
+!appsscript.json

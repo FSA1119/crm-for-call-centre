@@ -41,14 +41,78 @@ Google-Sheets-CRM/
 
 ## 🎨 Renkler
 - Merkez: `docs/RENK_KODLARI.md`
-- Not: Eski satır renklerini yeni koda uyarlamak için “Renkleri Yenile” komutu (plan)  
+- Not: Eski satır renklerini yeni koda uyarlamak için "Renkleri Yenile" komutu (plan)  
+
+## 🔄 Ham Veri → Format Tablo Dönüşümü
+
+Farklı kaynaklardan gelen ham veriyi standart Format Tablo yapısına dönüştürme süreci.
+
+### Temel Prensip
+
+- **Format Tablo yapısı SABİT:** Her zaman 26 sütun (A-Z), sıra değişmez
+- **Ham veri kaynağı DİNAMİK:** Farklı sütun isimleri ve sayıları olabilir
+- **Otomatik mapping:** Benzer sütun isimleri otomatik eşleştirilir
+- **Zorunlu alanlar:** `Company name` ve `Phone` boş olan satırlar atlanır
+
+### Kullanım
+
+**Menüden:**
+1. CRM → Format Tablo Oluştur
+2. Ham veri sheet'ini seç
+3. Yeni Format Tablo adını gir
+4. Dönüşüm otomatik yapılır
+
+**Kod ile:**
+```javascript
+const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+const hamVeriSheet = spreadsheet.getSheetByName('Ham Veri 1');
+const formatTableSheet = spreadsheet.getSheetByName('Format Tablo');
+
+// Dönüşüm yap
+convertHamVeriToFormatTable(hamVeriSheet, formatTableSheet);
+```
+
+### Mapping Kuralları
+
+Ham veri sütun isimleri otomatik olarak Format Tablo sütunlarına map edilir:
+
+- **Şirket/Firma/Company** → `Company name` (D kolonu) ⚠️ ZORUNLU
+- **Telefon/Phone/Tel** → `Phone` (I kolonu) ⚠️ ZORUNLU
+- **Mail/Email/E-posta** → `Mail` (K kolonu)
+- **Adres/Address** → `Address` (V kolonu)
+- ... (tam liste: `docs/sayfa_kolonlari.md` → "Ham Veri → Format Tablo Dönüşümü")
+
+### Örnek Senaryo
+
+**Ham Veri (12 sütun):**
+```
+ID | Firma | Telefon | Email | Adres | ...
+```
+
+**Format Tablo (26 sütun):**
+```
+Kod | Keyword | Location | Company name | ... | Phone | ... | Mail | ... | Address | ...
+```
+
+**Sonuç:**
+- ✅ Eşleşen sütunlar kopyalanır
+- ⚠️ Eşleşmeyen sütunlar boş bırakılır
+- ❌ Zorunlu alan eksikse satır atlanır
+
+### Performans
+
+- **Batch operations:** Tüm veri tek seferde işlenir
+- **Mapping cache:** Sütun mapping'i cache'lenir
+- **Hedef:** 100 satır < 2 saniye
+
+Detaylar: `docs/sayfa_kolonlari.md` → "Ham Veri → Format Tablo Dönüşümü"
 
 ## 🌐 Website Analizi
 - CMS, E-Ticaret, Hız testleri  
 - CMS doğruluk iyileştirmesi ve test süreci (20-30 URL, hedef ≥%95) — plan  
 
 ## 🛠️ Yardımcı Araçlar
-- “Telefon olmayanları sil” + “Website olmayanları sil” (plan)  
+- "Telefon olmayanları sil" + "Website olmayanları sil" (plan)  
 - Admin Panel temizlik (plan)
 
 ## 🧭 Referans Dokümanlar
@@ -58,4 +122,4 @@ Google-Sheets-CRM/
 - Teknik Detaylar: `docs/technical-specification.md`
 
 ## 🔄 Versiyon
-- Mevcut: v1.3 — Ayrıntılar ve geçmiş: `docs/archive/README-2025-08-09.md` 
+- Mevcut: v1.3 — Ayrıntılar ve geçmiş: `docs/archive/README-2025-08-09.md`

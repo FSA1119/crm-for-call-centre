@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f8f9fa;
+    }
+    
+    .container {
+      max-width: 100%;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #34a853, #2d8f47);
+      color: white;
+      padding: 15px 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .form-container {
+      padding: 20px;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e1e5e9;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s ease;
+      box-sizing: border-box;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #34a853;
+      box-shadow: 0 0 0 3px rgba(52, 168, 83, 0.1);
+    }
+    
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .form-row {
+      display: flex;
+      gap: 15px;
+    }
+    
+    .form-row .form-group {
+      flex: 1;
+    }
+    
+    .required {
+      color: #dc3545;
+    }
+    
+    .pre-filled {
+      background-color: #f8f9fa;
+      color: #6c757d;
+    }
+    
+    .buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e1e5e9;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+      background-color: #34a853;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background-color: #2d8f47;
+    }
+    
+    .btn-secondary {
+      background-color: #6c757d;
+      color: white;
+    }
+    
+    .btn-secondary:hover {
+      background-color: #5a6268;
+    }
+    
+    .error {
+      color: #dc3545;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+    
+    .success {
+      color: #28a745;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+    
+    .company-info {
+      background-color: #e8f5e8;
+      border: 1px solid #c3e6c3;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .company-info h3 {
+      margin: 0 0 10px 0;
+      color: #2d8f47;
+      font-size: 16px;
+    }
+    
+    .company-info p {
+      margin: 5px 0;
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      📅 Randevu Al
+    </div>
+    
+    <div class="form-container">
+      <!-- Company Information -->
+      <div class="company-info">
+        <h3>🏢 Firma Bilgileri</h3>
+        <p><strong>Firma:</strong> <?= rowData['Company name'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Kategori:</strong> <?= rowData['Category'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Website:</strong> <?= rowData['Website'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Telefon:</strong> <?= rowData['Phone'] || 'Belirtilmemiş' ?></p>
+        <p><strong>Adres:</strong> <?= rowData['Address'] ? rowData['Address'] + ', ' + rowData['City'] : 'Belirtilmemiş' ?></p>
+      </div>
+      
+      <form id="appointmentForm">
+        <!-- 1. İsim Soyisim (Manuel - Zorunlu) -->
+        <div class="form-group">
+          <label for="isimSoyisim">1. İsim Soyisim <span class="required">*</span></label>
+          <input type="text" id="isimSoyisim" name="isimSoyisim" required placeholder="İletişim kurulan kişi" value="<?= rowData['İsim Soyisim'] || '' ?>">
+        </div>
+        
+        <!-- 2. Aktivite (Yarı Otomatik - Varsayılan: Randevu Alındı) -->
+        <div class="form-group">
+          <label for="aktivite">2. Aktivite Durumu <span class="required">*</span></label>
+          <select id="aktivite" name="aktivite" required>
+            <option value="Randevu Alındı" selected>Randevu Alındı</option>
+            <option value="İleri Tarih Randevu">İleri Tarih Randevu</option>
+          </select>
+        </div>
+        
+        <!-- 3. Aktivite Tarihi (Yarı Otomatik - Varsayılan: Yarınki tarih - ZORUNLU) -->
+        <div class="form-group">
+          <label for="randevuTarihi">3. Aktivite Tarihi <span class="required">*</span></label>
+          <input type="date" id="randevuTarihi" name="randevuTarihi" required>
+        </div>
+        
+        <!-- 4. Saat (Manuel - Zorunlu) -->
+        <div class="form-group">
+          <label for="saat">4. Saat <span class="required">*</span></label>
+          <select id="saat" name="saat" required>
+            <option value="">Saat seçin...</option>
+            <option value="09:00">09:00</option>
+            <option value="10:00">10:00</option>
+            <option value="11:00">11:00</option>
+            <option value="12:00">12:00</option>
+            <option value="13:00">13:00</option>
+            <option value="14:00">14:00</option>
+            <option value="15:00">15:00</option>
+            <option value="16:00">16:00</option>
+            <option value="17:00">17:00</option>
+            <option value="18:00">18:00</option>
+            <option value="19:00">19:00</option>
+            <option value="20:00">20:00</option>
+          </select>
+        </div>
+        
+        <!-- 5. Yetkili Tel (Sadece Yetkili Tel sütunundan, Phone'dan otomatik doldurulmaz) -->
+        <div class="form-group">
+          <label for="yetkiliTel">5. Yetkili Telefon</label>
+          <input type="tel" id="yetkiliTel" name="yetkiliTel" placeholder="05XX XXX XX XX" value="<?= rowData['Yetkili Tel'] || '' ?>">
+        </div>
+        
+        <!-- 6. Mail (Manuel) -->
+        <div class="form-group">
+          <label for="mail">6. E-posta Adresi</label>
+          <input type="email" id="mail" name="mail" placeholder="ornek@firma.com" value="<?= rowData['Mail'] || '' ?>">
+        </div>
+        
+        <!-- 7. Yorum (Manuel) -->
+        <div class="form-group">
+          <label for="yorum">7. Temsilci Yorumu</label>
+          <textarea id="yorum" name="yorum" placeholder="Randevu ile ilgili notlarınızı buraya yazın..."><?= rowData['Yorum'] || '' ?></textarea>
+        </div>
+        
+
+        
+        <!-- Toplantı Formatı (Ek Alan) -->
+        <div class="form-group">
+                  <label for="toplantiFormat">Toplantı Formatı</label>
+        <select id="toplantiFormat" name="toplantiFormat">
+            <option value="Yüz Yüze" selected>Yüz Yüze</option>
+            <option value="Online">Online</option>
+            <option value="Telefon">Telefon</option>
+          </select>
+        </div>
+        
+        <!-- Validation Messages -->
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        <div id="successMessage" class="success" style="display: none;"></div>
+        
+        <!-- Buttons -->
+        <div class="buttons">
+          <button type="button" class="btn btn-secondary" onclick="cancelForm()">İptal</button>
+          <button type="submit" class="btn btn-primary">Randevu Oluştur</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script>
+    // Set default date to tomorrow in YYYY-MM-DD format for date input
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const year = tomorrow.getFullYear();
+    const month = (tomorrow.getMonth() + 1).toString().padStart(2, '0');
+    const day = tomorrow.getDate().toString().padStart(2, '0');
+    document.getElementById('randevuTarihi').value = `${year}-${month}-${day}`;
+    
+    // Form validation and submission
+    document.getElementById('appointmentForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      // Prevent double submission
+      const submitButton = document.querySelector('button[type="submit"]');
+      if (submitButton.disabled) {
+        return; // Already processing
+      }
+      
+      // Disable submit button
+      submitButton.disabled = true;
+      submitButton.textContent = 'Kaydediliyor...';
+      
+      // Clear previous messages
+      document.getElementById('errorMessage').style.display = 'none';
+      document.getElementById('successMessage').style.display = 'none';
+      
+      // Validate required fields
+      const isimSoyisim = document.getElementById('isimSoyisim').value.trim();
+      const randevuTarihi = document.getElementById('randevuTarihi').value;
+      const aktivite = document.getElementById('aktivite').value;
+      const saat = document.getElementById('saat').value;
+      
+      if (!isimSoyisim) {
+        showError('İsim Soyisim alanı zorunludur');
+        submitButton.disabled = false;
+        submitButton.textContent = 'Randevu Oluştur';
+        return;
+      }
+      
+      // Randevu tarihi zorunlu kontrolü
+      if (!randevuTarihi || randevuTarihi.trim() === '') {
+        showError('Randevu Tarihi zorunludur. Lütfen bir tarih seçin.');
+        submitButton.disabled = false;
+        submitButton.textContent = 'Randevu Oluştur';
+        return;
+      }
+      
+      if (!aktivite) {
+        showError('Aktivite durumu seçilmelidir');
+        return;
+      }
+      
+      if (!saat) {
+        showError('Saat seçimi zorunludur');
+        return;
+      }
+      
+      // Collect form data
+      const formData = {
+        isimSoyisim: isimSoyisim,
+        yetkiliTel: document.getElementById('yetkiliTel').value.trim(),
+        mail: document.getElementById('mail').value.trim(),
+        randevuTarihi: randevuTarihi,
+        saat: document.getElementById('saat').value,
+        aktivite: aktivite,
+        toplantiFormat: document.getElementById('toplantiFormat').value,
+                yorum: document.getElementById('yorum').value.trim()
+      };
+      
+      // Submit to Google Apps Script
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onError)
+        .saveAppointmentData(formData);
+    });
+    
+    function showError(message) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+    
+    function showSuccess(message) {
+      const successDiv = document.getElementById('successMessage');
+      successDiv.textContent = message;
+      successDiv.style.display = 'block';
+    }
+    
+    function onSuccess(result) {
+      // Re-enable submit button
+      const submitButton = document.querySelector('button[type="submit"]');
+      submitButton.disabled = false;
+      submitButton.textContent = 'Randevu Oluştur';
+      
+      if (result.success) {
+        showSuccess(result.message);
+        setTimeout(() => {
+          google.script.host.close();
+        }, 1500);
+      } else {
+        showError(result.message || 'Bir hata oluştu');
+      }
+    }
+    
+    function onError(error) {
+      // Re-enable submit button
+      const submitButton = document.querySelector('button[type="submit"]');
+      submitButton.disabled = false;
+      submitButton.textContent = 'Randevu Oluştur';
+      
+      showError('Sistem hatası: ' + error.message);
+    }
+    
+    function cancelForm() {
+      google.script.host.close();
+    }
+    
+    // Auto-fill suggestions based on company data
+    window.addEventListener('load', function() {
+      // Pre-fill some fields if available
+      const companyName = '<?= rowData['Company name'] || '' ?>';
+      const phone = '<?= rowData['Phone'] || '' ?>';
+      const yetkiliTel = '<?= rowData['Yetkili Tel'] || '' ?>';
+      
+      if (companyName && !document.getElementById('isimSoyisim').value) {
+        // Try to extract contact person from company name
+        const words = companyName.split(' ');
+        if (words.length > 1) {
+          document.getElementById('isimSoyisim').placeholder = words[0] + ' ' + words[1];
+        }
+      }
+      
+      // Yetkili Tel sadece Yetkili Tel sütunundan gelir, Phone'dan otomatik doldurulmaz
+      // Kullanıcı isterse manuel olarak yazabilir, istemezse boş bırakabilir
+    });
+  </script>
+</body>
+</html> 
